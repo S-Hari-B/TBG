@@ -1,0 +1,14 @@
+{
+  "rusty_sword": {
+    "name": "Rusty Sword",
+    "attack": 3,
+    "value": 15
+  },
+  "training_staff": {
+    "name": "Training Staff",
+    "attack": 2,
+    "value": 12
+  }
+}
+
+

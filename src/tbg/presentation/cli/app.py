@@ -14,7 +14,7 @@ _MAX_RANDOM_SEED = 2**31 - 1
 
 def main() -> None:
     """Start the interactive CLI session."""
-    print("=== Tiny Battleground ===")
+    print("=== Text Based Game (To be renamed) ===")
     running = True
     while running:
         action = _main_menu_loop()

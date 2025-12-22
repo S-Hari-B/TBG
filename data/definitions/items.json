@@ -1,0 +1,28 @@
+{
+  "hp_potion": {
+    "name": "HP Potion",
+    "description": "Restores 30 HP.",
+    "type": "consumable",
+    "effects": [
+      {
+        "kind": "heal_hp",
+        "amount": 30
+      }
+    ],
+    "value": 25
+  },
+  "mp_potion": {
+    "name": "MP Potion",
+    "description": "Restores 20 MP.",
+    "type": "consumable",
+    "effects": [
+      {
+        "kind": "heal_mp",
+        "amount": 20
+      }
+    ],
+    "value": 30
+  }
+}
+
+

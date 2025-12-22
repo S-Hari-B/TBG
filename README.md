@@ -1,6 +1,6 @@
 # TBG
 
-Tiny Battleground (TBG) is a skeleton project built around a deterministic RNG core and a console UI.
+Text Based Game (TBG) is a skeleton project built around a deterministic RNG core and a console UI.
 
 ## Getting Started
 
@@ -17,11 +17,13 @@ python -m tbg
 
 Follow the on-screen menu to start a new game or exit. Starting a new game lets you supply a seed or have one generated for you. The seed is then used to seed the deterministic RNG.
 
+Data definitions live in `data/definitions/*.json` and are loaded through the data-layer repositories (no presentation or domain code reads JSON directly).
+
 ## Running the Tests
 
 ```
 pytest
 ```
 
-Pytest will pick up tests from the `tests/` folder and verify the RNG contract.
+Pytest will pick up tests from the `tests/` folder, including data-layer suites that rely on `tmp_path` overrides so the real JSON files remain untouched.
 

@@ -1,0 +1,20 @@
+{
+  "slime": {
+    "name": "Slime",
+    "max_hp": 20,
+    "attack": 2,
+    "defense": 0,
+    "xp": 5,
+    "gold": 3
+  },
+  "wild_rat": {
+    "name": "Wild Rat",
+    "max_hp": 25,
+    "attack": 3,
+    "defense": 1,
+    "xp": 6,
+    "gold": 4
+  }
+}
+
+

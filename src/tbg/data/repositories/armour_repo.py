@@ -1,0 +1,57 @@
+"""Armour repository."""
+from __future__ import annotations
+
+from typing import Dict
+
+from tbg.data.errors import DataValidationError
+from tbg.data.repositories.base import RepositoryBase
+from tbg.domain.defs import ArmourDef
+
+
+class ArmourRepository(RepositoryBase[ArmourDef]):
+    """Loads and validates armour definitions."""
+
+    def __init__(self, base_path=None) -> None:
+        super().__init__("armour.json", base_path)
+
+    def _build(self, raw: dict[str, object]) -> Dict[str, ArmourDef]:
+        armour: Dict[str, ArmourDef] = {}
+        for raw_id, payload in raw.items():
+            if not isinstance(raw_id, str):
+                raise DataValidationError("Armour IDs must be strings.")
+            armour_data = self._require_mapping(payload, f"armour '{raw_id}'")
+            self._assert_exact_fields(armour_data, {"name", "defense", "value"}, f"armour '{raw_id}'")
+
+            name = self._require_str(armour_data["name"], f"armour '{raw_id}' name")
+            defense = self._require_int(armour_data["defense"], f"armour '{raw_id}' defense")
+            value = self._require_int(armour_data["value"], f"armour '{raw_id}' value")
+
+            armour[raw_id] = ArmourDef(id=raw_id, name=name, defense=defense, value=value)
+        return armour
+
+    @staticmethod
+    def _require_str(value: object, context: str) -> str:
+        if not isinstance(value, str):
+            raise DataValidationError(f"{context} must be a string.")
+        return value
+
+    @staticmethod
+    def _require_int(value: object, context: str) -> int:
+        if not isinstance(value, int):
+            raise DataValidationError(f"{context} must be an integer.")
+        return value
+
+    @staticmethod
+    def _assert_exact_fields(payload: dict[str, object], expected_keys: set[str], context: str) -> None:
+        actual_keys = set(payload.keys())
+        if actual_keys != expected_keys:
+            missing = expected_keys - actual_keys
+            unknown = actual_keys - expected_keys
+            msg_parts = []
+            if missing:
+                msg_parts.append(f"missing fields: {sorted(missing)}")
+            if unknown:
+                msg_parts.append(f"unknown fields: {sorted(unknown)}")
+            raise DataValidationError(f"{context} has schema issues ({'; '.join(msg_parts)}).")
+
+

@@ -1,0 +1,18 @@
+{
+  "fighter": {
+    "name": "Fighter",
+    "base_hp": 50,
+    "base_mp": 10,
+    "starting_weapon": "rusty_sword",
+    "starting_armour": "padded_leather"
+  },
+  "apprentice": {
+    "name": "Apprentice",
+    "base_hp": 35,
+    "base_mp": 30,
+    "starting_weapon": "training_staff",
+    "starting_armour": "cloth_robe"
+  }
+}
+
+

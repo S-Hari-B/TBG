@@ -1,0 +1,14 @@
+{
+  "cloth_robe": {
+    "name": "Cloth Robe",
+    "defense": 1,
+    "value": 10
+  },
+  "padded_leather": {
+    "name": "Padded Leather",
+    "defense": 2,
+    "value": 18
+  }
+}
+
+
