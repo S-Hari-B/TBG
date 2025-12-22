@@ -1,0 +1,84 @@
+import pytest
+
+from tbg.core.rng import RNG
+from tbg.data.repositories import (
+    ArmourRepository,
+    ClassesRepository,
+    EnemiesRepository,
+    WeaponsRepository,
+)
+from tbg.services.errors import FactoryError
+from tbg.services.factories import (
+    create_enemy_instance,
+    create_player_from_class_id,
+    make_instance_id,
+)
+
+
+def test_create_player_from_class_builds_expected_stats_and_equipment() -> None:
+    classes_repo = ClassesRepository()
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    rng = RNG(12345)
+
+    player = create_player_from_class_id(
+        class_id="fighter",
+        name="Aldric",
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=rng,
+    )
+
+    assert player.class_id == "fighter"
+    assert player.name == "Aldric"
+    assert player.stats.hp == player.stats.max_hp == 50
+    assert player.stats.mp == player.stats.max_mp == 10
+    assert player.stats.attack == player.equipment.weapon.attack == 3
+    assert player.stats.defense == player.equipment.armour.defense == 2
+    assert player.id.startswith("player_")
+
+
+def test_create_enemy_instance_builds_expected_stats_and_rewards() -> None:
+    enemies_repo = EnemiesRepository()
+    rng = RNG(999)
+
+    enemy = create_enemy_instance("slime", enemies_repo=enemies_repo, rng=rng)
+
+    assert enemy.enemy_id == "slime"
+    assert enemy.name == "Slime"
+    assert enemy.stats.hp == enemy.stats.max_hp == 20
+    assert enemy.stats.max_mp == 0 and enemy.stats.mp == 0
+    assert enemy.stats.attack == 2
+    assert enemy.stats.defense == 0
+    assert enemy.xp_reward == 5
+    assert enemy.gold_reward == 3
+    assert enemy.id.startswith("enemy_")
+
+
+def test_instance_ids_deterministic_for_same_seed() -> None:
+    rng_a = RNG(321)
+    rng_b = RNG(321)
+
+    ids_a = [make_instance_id("player", rng_a), make_instance_id("enemy", rng_a)]
+    ids_b = [make_instance_id("player", rng_b), make_instance_id("enemy", rng_b)]
+
+    assert ids_a == ids_b
+
+
+def test_create_player_missing_class_raises_clean_error() -> None:
+    classes_repo = ClassesRepository()
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+
+    with pytest.raises(FactoryError):
+        create_player_from_class_id(
+            class_id="missing_class",
+            name="Nope",
+            classes_repo=classes_repo,
+            weapons_repo=weapons_repo,
+            armour_repo=armour_repo,
+            rng=RNG(1),
+        )
+
+
