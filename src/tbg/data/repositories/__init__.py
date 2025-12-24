@@ -1,6 +1,7 @@
 """Repository exports."""
 
 from .items_repo import ItemsRepository
+from .story_repo import StoryRepository
 from .weapons_repo import WeaponsRepository
 from .armour_repo import ArmourRepository
 from .enemies_repo import EnemiesRepository
@@ -12,6 +13,7 @@ __all__ = [
     "ArmourRepository",
     "EnemiesRepository",
     "ClassesRepository",
+    "StoryRepository",
 ]
 
 

@@ -36,6 +36,7 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 class_data,
                 {"name", "base_hp", "base_mp", "starting_weapon", "starting_armour"},
                 f"class '{raw_id}'",
+                optional_fields={"speed", "starting_weapons", "starting_items", "starting_abilities"},
             )
 
             name = self._require_str(class_data["name"], f"class '{raw_id}' name")
@@ -80,11 +81,18 @@ class ClassesRepository(RepositoryBase[ClassDef]):
         return value
 
     @staticmethod
-    def _assert_exact_fields(payload: dict[str, object], expected_keys: set[str], context: str) -> None:
+    def _assert_exact_fields(
+        payload: dict[str, object],
+        expected_keys: set[str],
+        context: str,
+        *,
+        optional_fields: set[str] | None = None,
+    ) -> None:
         actual_keys = set(payload.keys())
-        if actual_keys != expected_keys:
-            missing = expected_keys - actual_keys
-            unknown = actual_keys - expected_keys
+        optional = optional_fields or set()
+        missing = expected_keys - actual_keys
+        unknown = actual_keys - expected_keys - optional
+        if missing or unknown:
             msg_parts = []
             if missing:
                 msg_parts.append(f"missing fields: {sorted(missing)}")

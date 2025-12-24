@@ -20,7 +20,12 @@ class WeaponsRepository(RepositoryBase[WeaponDef]):
             if not isinstance(raw_id, str):
                 raise DataValidationError("Weapon IDs must be strings.")
             weapon_data = self._require_mapping(payload, f"weapon '{raw_id}'")
-            self._assert_exact_fields(weapon_data, {"name", "attack", "value"}, f"weapon '{raw_id}'")
+            self._assert_exact_fields(
+                weapon_data,
+                {"name", "attack", "value"},
+                f"weapon '{raw_id}'",
+                optional_fields={"tags", "slot_cost", "default_basic_attack_id", "energy_bonus"},
+            )
 
             name = self._require_str(weapon_data["name"], f"weapon '{raw_id}' name")
             attack = self._require_int(weapon_data["attack"], f"weapon '{raw_id}' attack")
@@ -42,11 +47,18 @@ class WeaponsRepository(RepositoryBase[WeaponDef]):
         return value
 
     @staticmethod
-    def _assert_exact_fields(payload: dict[str, object], expected_keys: set[str], context: str) -> None:
+    def _assert_exact_fields(
+        payload: dict[str, object],
+        expected_keys: set[str],
+        context: str,
+        *,
+        optional_fields: set[str] | None = None,
+    ) -> None:
         actual_keys = set(payload.keys())
-        if actual_keys != expected_keys:
-            missing = expected_keys - actual_keys
-            unknown = actual_keys - expected_keys
+        optional = optional_fields or set()
+        missing = expected_keys - actual_keys
+        unknown = actual_keys - expected_keys - optional
+        if missing or unknown:
             msg_parts = []
             if missing:
                 msg_parts.append(f"missing fields: {sorted(missing)}")

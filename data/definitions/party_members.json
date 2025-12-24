@@ -1,0 +1,27 @@
+{
+    "emma": {
+    "name": "Emma",
+    "level": 1,
+    "role": "mage",
+    "description": "A young adventurer heading to the capital. Capable, but still learning.",
+    "tags": ["human", "mage", "adventurer"],
+    
+    "base_stats": {
+      "max_hp": 26,
+      "max_mp": 18,
+      "speed": 5
+    },
+    
+    "equipment": {
+      "weapons": ["fire_staff"],
+      "armour": "light_cloth_armour_common"
+    },
+    
+    "starting_abilities": [
+      "firebolt",
+      "fireburst"
+    ]
+    
+    }
+    }
+    

@@ -20,7 +20,12 @@ class ArmourRepository(RepositoryBase[ArmourDef]):
             if not isinstance(raw_id, str):
                 raise DataValidationError("Armour IDs must be strings.")
             armour_data = self._require_mapping(payload, f"armour '{raw_id}'")
-            self._assert_exact_fields(armour_data, {"name", "defense", "value"}, f"armour '{raw_id}'")
+            self._assert_exact_fields(
+                armour_data,
+                {"name", "defense", "value"},
+                f"armour '{raw_id}'",
+                optional_fields={"tags", "hp_bonus"},
+            )
 
             name = self._require_str(armour_data["name"], f"armour '{raw_id}' name")
             defense = self._require_int(armour_data["defense"], f"armour '{raw_id}' defense")
@@ -42,11 +47,18 @@ class ArmourRepository(RepositoryBase[ArmourDef]):
         return value
 
     @staticmethod
-    def _assert_exact_fields(payload: dict[str, object], expected_keys: set[str], context: str) -> None:
+    def _assert_exact_fields(
+        payload: dict[str, object],
+        expected_keys: set[str],
+        context: str,
+        *,
+        optional_fields: set[str] | None = None,
+    ) -> None:
         actual_keys = set(payload.keys())
-        if actual_keys != expected_keys:
-            missing = expected_keys - actual_keys
-            unknown = actual_keys - expected_keys
+        optional = optional_fields or set()
+        missing = expected_keys - actual_keys
+        unknown = actual_keys - expected_keys - optional
+        if missing or unknown:
             msg_parts = []
             if missing:
                 msg_parts.append(f"missing fields: {sorted(missing)}")
