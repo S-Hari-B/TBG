@@ -1,63 +1,127 @@
-Title: Roadmap
+# Roadmap (V1)
 
-Phase 0: Foundation
+This roadmap is organised around deliverable vertical slices.
+Each slice should be playable, deterministic, and tested.
 
-Docs complete (overview, architecture, gameplay, data formats, standards, roadmap)
+Status legend:
 
-Repo skeleton, folder structure, pytest setup
+* DONE: implemented and tested
+* NEXT: the next slice to implement
+* LATER: planned after NEXT
 
-Minimal CLI menu and New Game seed handling (no combat yet)
+---
 
-Phase 1: Data layer
+## DONE: Tickets 1–3 (Foundation + Runtime Core)
 
-JSON loaders and repository
+* Project scaffold, repo structure, pytest setup
+* Data layer repositories and loaders
+* Runtime entities + factories wiring definitions to domain objects
 
-Sample definitions for items, weapons, armour, abilities, enemies, classes, story nodes
+---
 
-Unit tests for repository loading and lookups
+## NEXT: Slice A – Tutorial Vertical Slice (Story + Party + Multi-Enemy Battle)
 
-Phase 2: Inventory slice
+Goal:
 
-Inventory service (add/remove/consume)
+* A player can start a new game, choose a class, progress through the intro story, fight battles, recruit Emma, and complete the forest ambush sequence.
 
-Items usable out of combat
+Scope:
 
-Unit tests for inventory behavior
+1. Class selection flow
 
-CLI inventory view
+* Present class options on New Game
+* Apply starting stats, gear, items from classes.json
 
-Phase 3: Combat slice v1
+2. Story navigation (basic)
 
-Battle start and battle loop (party vs 1 enemy)
+* Load story nodes
+* Display node text and choices
+* Apply node effects
+* Advance to next node
 
-Initiative system (speed, tie d20)
+3. Battles triggered by story
 
-Basic attack derived from weapon
+* Story effect can start battle
+* Battle supports party (1–2 members) versus multiple enemies
 
-Victory/defeat flow
+4. Rewards application
 
-Unit tests for initiative and damage application
+* Apply EXP and gold rewards from defeated enemies
+* Minimal level-up behavior can be stubbed or implemented (decide during slice)
 
-Phase 4: Story slice v1
+5. Party member recruitment
 
-Story graph navigation
+* Story effect adds Emma as a party member
 
-Story effects (start battle, give items, flags)
+6. Party Talk (stub, deterministic)
 
-Stub party talk provider wired into story screens
+* Party Talk exists in battle menu
+* Returns structured facts from deterministic knowledge entries
+* No LLM required for v1
 
-Phase 5: Weapon-tag abilities
+Required tests:
 
-Ability list filtered by equipped weapon tags
+* Story node resolution and effect application is deterministic
+* Battle start from story effect works
+* Multi-enemy battle initiative is deterministic
+* Party member add works
+* Party Talk returns expected facts for known tags
 
-Energy costs
+Docs that define this slice:
 
-Unit tests for ability gating
+* docs/v1_vertical_slice.md
+* docs/knowledge_system.md
 
-Phase 6: Loot and rarity (v1.1)
+---
 
-Drop tables
+## LATER: Slice B – Weapon-Tag Abilities
 
-Rarity roll and stat modifiers
+Goal:
 
-Unique weapons as explicit definitions
+* Abilities filtered by equipped weapon tags
+* Energy costs and targeting
+* Unit tests for gating and energy consumption
+
+---
+
+## LATER: Slice C – Inventory and Items In/Out of Combat
+
+Goal:
+
+* Inventory view in CLI
+* Use items in and out of battle
+* Unit tests for consumption and effects
+
+Note:
+
+* If inventory is already implemented, this slice becomes “expand and polish” rather than “create”.
+
+---
+
+## LATER: Slice D – Knowledge Growth (Player Learning)
+
+Goal:
+
+* Player knowledge database that unlocks info as enemies are encountered/defeated
+* Keeps Party Talk valuable but not mandatory
+* Deterministic unlock rules (counts, flags, milestones)
+
+---
+
+## LATER: Loot and Rarity (V1.1)
+
+Goal:
+
+* Drop tables
+* Rarity roll and stat modifiers
+* Unique items defined explicitly
+
+---
+
+## FUTURE: LLM Party Talk
+
+Goal:
+
+* Natural language queries to party members
+* LLM produces characterful responses from structured knowledge facts
+* Optional and never alters deterministic gameplay

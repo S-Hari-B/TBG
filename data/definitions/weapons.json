@@ -1,14 +1,65 @@
 {
-  "rusty_sword": {
-    "name": "Rusty Sword",
-    "attack": 3,
-    "value": 15
+  "iron_sword": {
+    "name": "Iron Sword",
+    "attack": 8,
+    "value": 50,
+    "tags": ["sword", "slash"],
+    "slot_cost": 1,
+    "default_basic_attack_id": "basic_slash",
+    "energy_bonus": 0
   },
-  "training_staff": {
-    "name": "Training Staff",
-    "attack": 2,
-    "value": 12
+  "wooden_shield": {
+    "name": "Wooden Shield",
+    "attack": 1,
+    "value": 20,
+    "tags": ["shield", "blunt"],
+    "slot_cost": 1,
+    "default_basic_attack_id": "basic_shield_bash",
+    "energy_bonus": 0
+  },
+  "iron_dagger": {
+    "name": "Iron Dagger",
+    "attack": 5,
+    "value": 35,
+    "tags": ["dagger", "pierce"],
+    "slot_cost": 1,
+    "default_basic_attack_id": "basic_stab",
+    "energy_bonus": 0
+  },
+  "shortbow": {
+    "name": "Shortbow",
+    "attack": 6,
+    "value": 45,
+    "tags": ["bow", "pierce"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_shoot",
+    "energy_bonus": 0
+  },
+  "fire_staff": {
+    "name": "Fire Staff",
+    "attack": 3,
+    "value": 60,
+    "tags": ["staff", "fire"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_staff_strike",
+    "energy_bonus": 6
+  },
+  "wooden_club": {
+    "name": "Wooden Club",
+    "attack": 4,
+    "value": 10,
+    "tags": ["club", "blunt"],
+    "slot_cost": 1,
+    "default_basic_attack_id": "basic_club_smash",
+    "energy_bonus": 0
+  },
+  "goblin_dagger": {
+    "name": "Goblin Dagger",
+    "attack": 4,
+    "value": 8,
+    "tags": ["dagger", "pierce"],
+    "slot_cost": 1,
+    "default_basic_attack_id": "basic_stab",
+    "energy_bonus": 0
   }
 }
-
-

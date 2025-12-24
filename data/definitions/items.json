@@ -1,28 +1,17 @@
 {
-  "hp_potion": {
-    "name": "HP Potion",
-    "description": "Restores 30 HP.",
-    "type": "consumable",
-    "effects": [
-      {
-        "kind": "heal_hp",
-        "amount": 30
-      }
-    ],
-    "value": 25
+  "potion_hp_small": {
+    "name": "Small HP Potion",
+    "kind": "consumable",
+    "value": 10,
+    "heal_hp": 25,
+    "restore_energy": 0
   },
-  "mp_potion": {
-    "name": "MP Potion",
-    "description": "Restores 20 MP.",
-    "type": "consumable",
-    "effects": [
-      {
-        "kind": "heal_mp",
-        "amount": 20
-      }
-    ],
-    "value": 30
+  "potion_energy_small": {
+    "name": "Small Energy Potion",
+    "kind": "consumable",
+    "value": 12,
+    "heal_hp": 0,
+    "heal_mp": 15,
+    "restore_energy": 15
   }
 }
-
-

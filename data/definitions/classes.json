@@ -1,18 +1,54 @@
 {
-  "fighter": {
-    "name": "Fighter",
-    "base_hp": 50,
-    "base_mp": 10,
-    "starting_weapon": "rusty_sword",
-    "starting_armour": "padded_leather"
+  "warrior": {
+    "name": "Warrior",
+    "base_hp": 40,
+    "base_mp": 6,
+    "speed": 4,
+    "starting_weapon": "iron_sword",
+    "starting_weapons": ["iron_sword", "wooden_shield"],
+    "starting_armour": "heavy_iron_armour_common",
+    "starting_items": {
+      "potion_hp_small": 2,
+      "potion_energy_small": 1
+    }
   },
-  "apprentice": {
-    "name": "Apprentice",
-    "base_hp": 35,
-    "base_mp": 30,
-    "starting_weapon": "training_staff",
-    "starting_armour": "cloth_robe"
+  "rogue": {
+    "name": "Rogue",
+    "base_hp": 32,
+    "base_mp": 8,
+    "speed": 7,
+    "starting_weapon": "iron_dagger",
+    "starting_weapons": ["iron_dagger", "iron_dagger", "shortbow"],
+    "starting_armour": "medium_leather_armour_common",
+    "starting_items": {
+      "potion_hp_small": 2,
+      "potion_energy_small": 1
+    }
+  },
+  "mage": {
+    "name": "Mage",
+    "base_hp": 26,
+    "base_mp": 18,
+    "speed": 5,
+    "starting_weapon": "fire_staff",
+    "starting_weapons": ["fire_staff"],
+    "starting_armour": "light_cloth_armour_common",
+    "starting_items": {
+      "potion_hp_small": 1,
+      "potion_energy_small": 2
+    },
+    "starting_abilities": ["firebolt", "fireburst"]
+  },
+  "commoner": {
+    "name": "Commoner",
+    "base_hp": 24,
+    "base_mp": 4,
+    "speed": 4,
+    "starting_weapon": "wooden_club",
+    "starting_weapons": ["wooden_club"],
+    "starting_armour": "light_cloth_armour_common",
+    "starting_items": {
+      "potion_hp_small": 1
+    }
   }
 }
-
-

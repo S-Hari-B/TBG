@@ -12,23 +12,53 @@ from tbg.data.repositories import (
 )
 
 
-def test_items_repo_loads_two_items() -> None:
-    repo = ItemsRepository()
+def test_items_repo_loads_two_items(tmp_path: Path) -> None:
+    definitions_dir = _make_definitions_dir(tmp_path)
+    _write_json(
+        definitions_dir / "items.json",
+        {
+            "hp_potion": {
+                "name": "HP Potion",
+                "description": "Restores health.",
+                "type": "consumable",
+                "effects": [{"kind": "heal_hp", "amount": 10}],
+                "value": 5,
+            },
+            "mp_potion": {
+                "name": "MP Potion",
+                "description": "Restores mana.",
+                "type": "consumable",
+                "effects": [{"kind": "heal_mp", "amount": 7}],
+                "value": 6,
+            },
+        },
+    )
+    repo = ItemsRepository(base_path=definitions_dir)
     items = repo.all()
 
     assert len(items) >= 2
     assert {"hp_potion", "mp_potion"}.issubset({item.id for item in items})
 
 
-def test_weapons_repo_get_missing_raises() -> None:
-    repo = WeaponsRepository()
+def test_weapons_repo_get_missing_raises(tmp_path: Path) -> None:
+    definitions_dir = _make_definitions_dir(tmp_path)
+    _write_json(
+        definitions_dir / "weapons.json",
+        {
+            "training_sword": {
+                "name": "Training Sword",
+                "attack": 3,
+                "value": 1,
+            }
+        },
+    )
+    repo = WeaponsRepository(base_path=definitions_dir)
     with pytest.raises(KeyError):
         repo.get("missing_weapon")
 
 
 def test_validation_rejects_unknown_field(tmp_path: Path) -> None:
-    definitions_dir = tmp_path / "definitions"
-    definitions_dir.mkdir()
+    definitions_dir = _make_definitions_dir(tmp_path)
     _write_json(
         definitions_dir / "items.json",
         {
@@ -49,8 +79,7 @@ def test_validation_rejects_unknown_field(tmp_path: Path) -> None:
 
 
 def test_validation_rejects_wrong_type(tmp_path: Path) -> None:
-    definitions_dir = tmp_path / "definitions"
-    definitions_dir.mkdir()
+    definitions_dir = _make_definitions_dir(tmp_path)
     _write_json(
         definitions_dir / "weapons.json",
         {
@@ -117,5 +146,11 @@ def test_classes_repo_reference_validation_fails_when_weapon_missing(tmp_path: P
 
 def _write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def _make_definitions_dir(tmp_path: Path) -> Path:
+    definitions_dir = tmp_path / "definitions"
+    definitions_dir.mkdir()
+    return definitions_dir
 
 

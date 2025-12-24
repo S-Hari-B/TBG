@@ -1,20 +1,22 @@
 {
-  "slime": {
-    "name": "Slime",
-    "max_hp": 20,
-    "attack": 2,
-    "defense": 0,
-    "xp": 5,
-    "gold": 3
+  "goblin_grunt": {
+    "name": "Goblin Grunt",
+    "hp": 22,
+    "mp": 0,
+    "attack": 5,
+    "defense": 2,
+    "speed": 6,
+    "rewards_exp": 6,
+    "rewards_gold": 3,
+    "tags": ["goblin", "humanoid"],
+    "equipment": {
+      "weapons": ["goblin_dagger"],
+      "armour": "goblin_rags"
+    }
   },
-  "wild_rat": {
-    "name": "Wild Rat",
-    "max_hp": 25,
-    "attack": 3,
-    "defense": 1,
-    "xp": 6,
-    "gold": 4
+  "goblin_pack_3": {
+    "name": "Goblin Pack",
+    "enemy_ids": ["goblin_grunt", "goblin_grunt", "goblin_grunt"],
+    "tags": ["goblin", "humanoid"]
   }
 }
-
-

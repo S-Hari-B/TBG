@@ -1,0 +1,59 @@
+{
+    "basic_slash": {
+      "name": "Slash",
+      "required_weapon_tags": ["sword"],
+      "energy_cost": 0,
+      "target": "single_enemy",
+      "effect": { "type": "deal_damage", "power": 1.0, "damage_tag": "slash" }
+    },
+    "basic_shield_bash": {
+      "name": "Shield Bash",
+      "required_weapon_tags": ["shield"],
+      "energy_cost": 0,
+      "target": "single_enemy",
+      "effect": { "type": "deal_damage", "power": 0.7, "damage_tag": "blunt" }
+    },
+    "basic_stab": {
+      "name": "Stab",
+      "required_weapon_tags": ["dagger"],
+      "energy_cost": 0,
+      "target": "single_enemy",
+      "effect": { "type": "deal_damage", "power": 0.9, "damage_tag": "pierce" }
+    },
+    "basic_shoot": {
+      "name": "Shoot",
+      "required_weapon_tags": ["bow"],
+      "energy_cost": 0,
+      "target": "single_enemy",
+      "effect": { "type": "deal_damage", "power": 0.95, "damage_tag": "pierce" }
+    },
+    "basic_staff_strike": {
+      "name": "Staff Strike",
+      "required_weapon_tags": ["staff"],
+      "energy_cost": 0,
+      "target": "single_enemy",
+      "effect": { "type": "deal_damage", "power": 0.8, "damage_tag": "blunt" }
+    },
+    "basic_club_smash": {
+      "name": "Smash",
+      "required_weapon_tags": ["club"],
+      "energy_cost": 0,
+      "target": "single_enemy",
+      "effect": { "type": "deal_damage", "power": 1.0, "damage_tag": "blunt" }
+    },
+    "firebolt": {
+      "name": "Firebolt",
+      "required_weapon_tags": ["staff"],
+      "energy_cost": 3,
+      "target": "single_enemy",
+      "effect": { "type": "deal_damage", "power": 1.2, "damage_tag": "fire" }
+    },
+    "fireburst": {
+      "name": "Fireburst",
+      "required_weapon_tags": ["staff"],
+      "energy_cost": 6,
+      "target": "all_enemies",
+      "effect": { "type": "deal_damage", "power": 0.85, "damage_tag": "fire" }
+    }
+  }
+  

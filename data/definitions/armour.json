@@ -1,14 +1,30 @@
 {
-  "cloth_robe": {
-    "name": "Cloth Robe",
-    "defense": 1,
-    "value": 10
+  "heavy_iron_armour_common": {
+    "name": "Iron Armour (Common)",
+    "defense": 6,
+    "value": 80,
+    "tags": ["heavy_armour"],
+    "hp_bonus": 10
   },
-  "padded_leather": {
-    "name": "Padded Leather",
+  "medium_leather_armour_common": {
+    "name": "Leather Armour (Common)",
+    "defense": 4,
+    "value": 55,
+    "tags": ["medium_armour"],
+    "hp_bonus": 6
+  },
+  "light_cloth_armour_common": {
+    "name": "Cloth Robes (Common)",
     "defense": 2,
-    "value": 18
+    "value": 30,
+    "tags": ["light_armour"],
+    "hp_bonus": 2
+  },
+  "goblin_rags": {
+    "name": "Goblin Rags",
+    "defense": 1,
+    "value": 5,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
   }
 }
-
-

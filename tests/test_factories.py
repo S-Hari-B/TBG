@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 import pytest
 
 from tbg.core.rng import RNG
@@ -15,10 +18,12 @@ from tbg.services.factories import (
 )
 
 
-def test_create_player_from_class_builds_expected_stats_and_equipment() -> None:
-    classes_repo = ClassesRepository()
-    weapons_repo = WeaponsRepository()
-    armour_repo = ArmourRepository()
+def test_create_player_from_class_builds_expected_stats_and_equipment(tmp_path: Path) -> None:
+    definitions_dir = _make_definitions_dir(tmp_path)
+    _seed_minimal_player_definitions(definitions_dir)
+    classes_repo = ClassesRepository(base_path=definitions_dir)
+    weapons_repo = WeaponsRepository(base_path=definitions_dir)
+    armour_repo = ArmourRepository(base_path=definitions_dir)
     rng = RNG(12345)
 
     player = create_player_from_class_id(
@@ -39,8 +44,10 @@ def test_create_player_from_class_builds_expected_stats_and_equipment() -> None:
     assert player.id.startswith("player_")
 
 
-def test_create_enemy_instance_builds_expected_stats_and_rewards() -> None:
-    enemies_repo = EnemiesRepository()
+def test_create_enemy_instance_builds_expected_stats_and_rewards(tmp_path: Path) -> None:
+    definitions_dir = _make_definitions_dir(tmp_path)
+    _seed_minimal_enemy_definitions(definitions_dir)
+    enemies_repo = EnemiesRepository(base_path=definitions_dir)
     rng = RNG(999)
 
     enemy = create_enemy_instance("slime", enemies_repo=enemies_repo, rng=rng)
@@ -66,10 +73,12 @@ def test_instance_ids_deterministic_for_same_seed() -> None:
     assert ids_a == ids_b
 
 
-def test_create_player_missing_class_raises_clean_error() -> None:
-    classes_repo = ClassesRepository()
-    weapons_repo = WeaponsRepository()
-    armour_repo = ArmourRepository()
+def test_create_player_missing_class_raises_clean_error(tmp_path: Path) -> None:
+    definitions_dir = _make_definitions_dir(tmp_path)
+    _seed_minimal_player_definitions(definitions_dir)
+    classes_repo = ClassesRepository(base_path=definitions_dir)
+    weapons_repo = WeaponsRepository(base_path=definitions_dir)
+    armour_repo = ArmourRepository(base_path=definitions_dir)
 
     with pytest.raises(FactoryError):
         create_player_from_class_id(
@@ -80,5 +89,66 @@ def test_create_player_missing_class_raises_clean_error() -> None:
             armour_repo=armour_repo,
             rng=RNG(1),
         )
+
+
+def _make_definitions_dir(tmp_path: Path) -> Path:
+    definitions_dir = tmp_path / "definitions"
+    definitions_dir.mkdir()
+    return definitions_dir
+
+
+def _seed_minimal_player_definitions(definitions_dir: Path) -> None:
+    _write_json(
+        definitions_dir / "weapons.json",
+        {
+            "fighter_blade": {
+                "name": "Fighter Blade",
+                "attack": 3,
+                "value": 10,
+            }
+        },
+    )
+    _write_json(
+        definitions_dir / "armour.json",
+        {
+            "fighter_mail": {
+                "name": "Fighter Mail",
+                "defense": 2,
+                "value": 12,
+            }
+        },
+    )
+    _write_json(
+        definitions_dir / "classes.json",
+        {
+            "fighter": {
+                "name": "Fighter",
+                "base_hp": 50,
+                "base_mp": 10,
+                "starting_weapon": "fighter_blade",
+                "starting_armour": "fighter_mail",
+            }
+        },
+    )
+
+
+def _seed_minimal_enemy_definitions(definitions_dir: Path) -> None:
+    _write_json(
+        definitions_dir / "enemies.json",
+        {
+            "slime": {
+                "name": "Slime",
+                "max_hp": 20,
+                "attack": 2,
+                "defense": 0,
+                "xp": 5,
+                "gold": 3,
+            }
+        },
+    )
+
+
+def _write_json(path: Path, data: dict[str, object]) -> None:
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 

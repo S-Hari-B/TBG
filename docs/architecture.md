@@ -1,131 +1,137 @@
-Title: Architecture and Module Responsibilities
+# Architecture and Responsibilities (V1)
 
-High-level structure
-The codebase is split into layers with strict responsibilities:
+TBG is structured with strict layering to keep core rules deterministic, testable, and independent from the CLI.
 
-presentation (CLI only)
+Layers:
 
-Renders text to the user
+## presentation (CLI)
 
-Reads and validates user input
+* Renders text to the user
+* Reads and validates user input
+* Calls services to perform actions
+* Never computes combat outcomes or modifies domain objects directly
 
-Calls services to perform actions
+## services (orchestration)
 
-Never computes combat outcomes or edits domain objects directly
+* Runs use cases (start game, advance story, start battle, apply action)
+* Loads definitions via repositories
+* Constructs domain entities using factories
+* Owns GameState (overall runtime state)
+* Returns structured results and events for presentation to render
 
-services (orchestration)
+## domain (game rules)
 
-Runs “use cases” like start game, start battle, apply action, advance story
+* Pure game rules and state transitions
+* Entities: actors, party members, enemies, inventory state
+* Combat rules, actions, effects, initiative
+* No printing, no file I/O, no input(), no global randomness
 
-Loads definitions via repositories
+## data (definitions and loading)
 
-Constructs domain objects and calls domain logic
+* JSON loaders and repositories
+* Validates and returns definitions
+* No combat rules, no printing
 
-Owns GameState (overall run state)
+## core (shared utilities)
 
-Returns structured results and events for presentation to render
+* RNG wrapper and seed handling
+* Result types and errors
+* Small helpers only
 
-domain (game rules)
+## ai (optional seam)
 
-Pure game rules and state transitions
+* Interface for Party Talk response generation
+* Stub implementation in v1
+* Later: local LLM + RAG behind same interface
+* AI must not change facts or gameplay outcomes
 
-Entities (actors, party members, enemies)
+---
 
-Combat rules, actions, effects
+## Determinism and RNG Policy
 
-No printing, no file I/O, no input(), no global randomness
+* The game uses exactly one RNG instance, created from the game seed at New Game.
+* Domain logic never calls Python’s random module directly.
+* Any random event must use the injected RNG.
+* Important random choices should emit events describing the roll (example: initiative tie-break d20).
 
-data (definitions and loading)
+---
 
-JSON loaders and repositories
+## Event-Driven Output
 
-Validates and returns definitions
-
-No combat rules, no printing
-
-core (shared utilities)
-
-RNG wrapper and seed handling
-
-Result types and errors
-
-Small helpers only
-
-ai (optional seam)
-
-Interface for party talk generation
-
-Stub implementation in v1
-
-Later: local LLM + RAG implementation behind the same interface
-
-Determinism and RNG policy
-
-The game uses exactly one RNG instance, created from the game seed at New Game.
-
-Domain logic never calls Python’s random module directly.
-
-Any random event must use the injected RNG, and should emit an event describing the roll where relevant (ex: initiative tie-break roll).
-
-Event-driven output
-Domain logic returns Events, not printed strings.
+Domain logic emits Events, not printed strings.
 Presentation renders those events into text.
 
-Example: a weapon attack produces events such as:
+Example combat events:
 
-TurnStarted(actor_id)
+* TurnStarted(actor_id)
+* AttackDeclared(attacker_id, target_id, ability_id)
+* DamageDealt(attacker_id, target_id, amount)
+* ActorDefeated(actor_id)
 
-AttackDeclared(attacker_id, target_id, move_id)
+---
 
-DamageDealt(attacker_id, target_id, amount)
+## Party and Equipment
 
-ActorDefeated(actor_id)
+### Party
 
-Party and equipment architecture
-Party
+* Max party size is 4.
+* Party members are added or removed via story effects (data-driven).
+* Party members are strategic assets due to the Knowledge system (Party Talk).
 
-Party is a collection with max size 4.
+### Base stats vs derived stats
 
-Party members can be added or removed via story effects (data-driven).
-
-Base stats vs derived stats
 Actors store base stats and equipment references.
 Combat uses derived stats computed from equipment.
 
-Base stats stored on Actor:
+Base stats:
 
-max_hp, hp
+* max_hp, hp
+* max_energy, energy
+* speed
+* level, exp
+* gold (typically on Player)
 
-max_energy, energy
+Derived stats:
 
-speed
+* attack: derived from equipped weapons
+* defense: derived from equipped armour
+* max_energy modifier: can be modified by equipped weapon bonuses
 
-level, exp
+### Equipment Slots (v1)
 
-gold (primarily on Player, but can be a field on Player specifically)
+* Weapon slots: 2 total
+* Each weapon has a slot_cost (1 or 2)
+* Two-handed weapons consume 2 slots
+* Shields are weapons and consume 1 slot
+* Body armour slot: 1 piece
 
-Derived stats computed from equipped gear:
+---
 
-attack (from equipped weapon)
+## Story System
 
-defense (from equipped armour)
-
-Equipment slots (v1)
-
-weapon slot (one weapon)
-
-body armour slot (one armour piece)
-
-Later slots (future): head, hands, legs, accessory.
-
-Story system
 Story is represented as a graph of story nodes in JSON.
+
 Story nodes can:
 
-display text
+* display text
+* offer choices
+* apply effects (flags, rewards, party changes, battles)
+* route to the next node
 
-offer choices
+Story effects are processed by services, not presentation.
 
-apply effects (set flag, give item, start battle, add/remove party member)
+---
 
-route to the next node
+## Knowledge and Party Talk
+
+Knowledge is a deterministic mechanic:
+
+* Enemy stats can be hidden by default (displayed as ???)
+* Party members have predefined knowledge entries (data-driven)
+* Party Talk queries a party member’s knowledge and returns structured results
+
+Optional LLM integration:
+
+* Receives structured facts only
+* Rephrases in character
+* Must not invent new information or alter what is revealed

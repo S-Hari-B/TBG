@@ -1,0 +1,42 @@
+{
+    "class_select": {
+      "text": "Choose your starting class.",
+      "choices": [
+        { "label": "Warrior", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "warrior" }] },
+        { "label": "Rogue", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "rogue" }] },
+        { "label": "Mage", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "mage" }] },
+        { "label": "Commoner", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "commoner" }] }
+      ]
+    },
+    "forest_intro": {
+      "text": "You leave your village behind and set out along the forest road toward the capital.",
+      "next": "forest_scream"
+    },
+    "forest_scream": {
+      "text": "A sudden scream cuts through the trees.",
+      "choices": [
+        { "label": "Investigate", "next": "emma_encounter" },
+        { "label": "Ignore it (not implemented)", "next": "forest_scream" }
+      ]
+    },
+    "emma_encounter": {
+      "text": "You find a young adventurer backed against a tree. Three goblin corpses lie nearby. One goblin remains, snarling.",
+      "effects": [{ "type": "start_battle", "enemy_id": "goblin_grunt" }],
+      "next": "emma_join"
+    },
+    "emma_join": {
+      "text": "After the fight, she steadies her breathing. “I had them… until I didn’t.”\n\nShe introduces herself as Emma, also heading to the capital. After a moment, she nods. “Alright. Let’s go together.”",
+      "effects": [{ "type": "add_party_member", "member_id": "emma" }],
+      "next": "forest_ambush"
+    },
+    "forest_ambush": {
+      "text": "Rustling. Three goblins step onto the path, fanning out with practiced cruelty.",
+      "effects": [{ "type": "start_battle", "enemy_id": "goblin_pack_3" }],
+      "next": "forest_aftermath"
+    },
+    "forest_aftermath": {
+      "text": "The forest goes quiet again. Emma exhales. “Okay. Now we’re even.”\n\nYou continue toward the capital.",
+      "effects": [{ "type": "give_gold", "amount": 5 }, { "type": "give_exp", "amount": 10 }]
+    }
+  }
+  
