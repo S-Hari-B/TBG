@@ -41,6 +41,7 @@ def test_create_player_from_class_builds_expected_stats_and_equipment(tmp_path: 
     assert player.stats.mp == player.stats.max_mp == 10
     assert player.stats.attack == player.equipment.weapon.attack == 3
     assert player.stats.defense == player.equipment.armour.defense == 2
+    assert player.stats.speed == 4
     assert player.id.startswith("player_")
 
 
@@ -58,6 +59,7 @@ def test_create_enemy_instance_builds_expected_stats_and_rewards(tmp_path: Path)
     assert enemy.stats.max_mp == 0 and enemy.stats.mp == 0
     assert enemy.stats.attack == 2
     assert enemy.stats.defense == 0
+    assert enemy.stats.speed == 1
     assert enemy.xp_reward == 5
     assert enemy.gold_reward == 3
     assert enemy.id.startswith("enemy_")
@@ -125,6 +127,7 @@ def _seed_minimal_player_definitions(definitions_dir: Path) -> None:
                 "name": "Fighter",
                 "base_hp": 50,
                 "base_mp": 10,
+                "speed": 4,
                 "starting_weapon": "fighter_blade",
                 "starting_armour": "fighter_mail",
             }
@@ -138,11 +141,14 @@ def _seed_minimal_enemy_definitions(definitions_dir: Path) -> None:
         {
             "slime": {
                 "name": "Slime",
-                "max_hp": 20,
+                "hp": 20,
+                "mp": 0,
                 "attack": 2,
                 "defense": 0,
-                "xp": 5,
-                "gold": 3,
+                "speed": 1,
+                "rewards_exp": 5,
+                "rewards_gold": 3,
+                "tags": ["ooze"],
             }
         },
     )

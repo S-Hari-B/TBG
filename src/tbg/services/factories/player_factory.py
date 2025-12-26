@@ -44,6 +44,7 @@ def create_player_from_class_id(
         mp=class_def.base_mp,
         attack=weapon_def.attack,
         defense=armour_def.defense,
+        speed=class_def.speed,
     )
 
     equipment = Equipment(weapon=weapon_def, armour=armour_def)

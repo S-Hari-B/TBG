@@ -114,8 +114,13 @@ class StoryService:
             raise IndexError(f"Choice index {choice_index} is invalid for node '{node.id}'.") from exc
 
         events: List[StoryEvent] = []
-        events.extend(self._apply_effects(selected_choice.effects, state))
-        self._enter_node(state, selected_choice.next_node_id, events)
+        choice_events, halt = self._apply_effects(selected_choice.effects, state)
+        events.extend(choice_events)
+        if halt:
+            state.pending_story_node_id = selected_choice.next_node_id
+        else:
+            state.pending_story_node_id = None
+            self._enter_node(state, selected_choice.next_node_id, events)
         node_view = self.get_current_node_view(state)
         return ChoiceResult(events=events, node_view=node_view)
 
@@ -126,16 +131,33 @@ class StoryService:
         """Move state to the given node, applying auto-advance rules."""
         state.current_node_id = node_id
         state.pending_narration = []
+        state.pending_story_node_id = None
         while True:
             node = self._story_repo.get(state.current_node_id)
             state.pending_narration.append((node.id, node.text))
-            events.extend(self._apply_effects(node.effects, state))
+            node_events, halt = self._apply_effects(node.effects, state)
+            events.extend(node_events)
+            if halt:
+                state.pending_story_node_id = node.next_node_id
+                return
             if node.choices or not node.next_node_id:
+                state.pending_story_node_id = None
                 return
             state.current_node_id = node.next_node_id
 
-    def _apply_effects(self, effects: Sequence[StoryEffectDef], state: GameState) -> List[StoryEvent]:
+    def resume_after_battle(self, state: GameState) -> List[StoryEvent]:
+        """Resume story flow after a blocking battle."""
+        if not state.pending_story_node_id:
+            return []
+        next_node_id = state.pending_story_node_id
+        state.pending_story_node_id = None
+        events: List[StoryEvent] = []
+        self._enter_node(state, next_node_id, events)
+        return events
+
+    def _apply_effects(self, effects: Sequence[StoryEffectDef], state: GameState) -> tuple[List[StoryEvent], bool]:
         emitted: List[StoryEvent] = []
+        halt_flow = False
         for effect in effects:
             effect_type = effect.type
             if effect_type == "set_class":
@@ -153,6 +175,7 @@ class StoryService:
             elif effect_type == "start_battle":
                 enemy_id = self._require_str(effect.data.get("enemy_id"), "start_battle.enemy_id")
                 emitted.append(BattleRequestedEvent(enemy_id=enemy_id))
+                halt_flow = True
             elif effect_type == "add_party_member":
                 member_id = self._require_str(effect.data.get("member_id"), "add_party_member.member_id")
                 if member_id not in state.party_members:
@@ -169,7 +192,7 @@ class StoryService:
             else:
                 # Unknown effects are ignored for now to keep the interpreter forward compatible.
                 continue
-        return emitted
+        return emitted, halt_flow
 
     @staticmethod
     def _require_str(value: object, context: str) -> str:

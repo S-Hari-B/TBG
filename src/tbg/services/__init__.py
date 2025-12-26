@@ -11,6 +11,7 @@ from .story_service import (
     StoryNodeView,
     StoryService,
 )
+from .battle_service import BattleService
 
 __all__ = [
     "FactoryError",
@@ -22,6 +23,7 @@ __all__ = [
     "PlayerClassSetEvent",
     "StoryNodeView",
     "StoryService",
+    "BattleService",
 ]
 
 

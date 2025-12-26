@@ -24,5 +24,6 @@ class GameState:
     exp: int = 0
     flags: Dict[str, bool] = field(default_factory=dict)
     pending_narration: List[Tuple[str, str]] = field(default_factory=list)
+    pending_story_node_id: str | None = None
 
 

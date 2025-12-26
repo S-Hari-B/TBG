@@ -120,6 +120,13 @@ Story nodes can:
 
 Story effects are processed by services, not presentation.
 
+### Story ↔ Battle Control Flow
+
+* `StoryService` processes node/choice effects. When an effect starts a battle it emits a `BattleRequested` event and records the pending next node inside `GameState`.
+* The CLI listens for `BattleRequested`, pauses story advancement, and asks `BattleService` to run the encounter (player actions, enemy turns, Party Talk, etc.).
+* When `BattleService` reports the battle is over, the CLI calls `StoryService.resume_after_battle()` so the queued node(s) continue processing using the same `GameState`.
+* This handshake keeps the story graph deterministic and ensures allied party composition only changes when the corresponding story effect (e.g., `add_party_member`) fires.
+
 ---
 
 ## Knowledge and Party Talk

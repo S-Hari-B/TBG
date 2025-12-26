@@ -12,6 +12,7 @@ class ClassDef:
     name: str
     base_hp: int
     base_mp: int
+    speed: int
     starting_weapon_id: str
     starting_armour_id: str
 

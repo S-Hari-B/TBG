@@ -79,6 +79,17 @@ Armour: Light body armour
 Role: Low stats, challenge run
 
 Story Flow
+
+Ordered sequence (Slice A):
+
+1. `class_select`
+2. `forest_intro`
+3. `forest_scream`
+4. `emma_encounter` → battle vs `goblin_grunt` (player only)
+5. `emma_join` → Emma formally joins the party
+6. `forest_ambush` → battle vs `goblin_pack_3` (player + Emma)
+7. `forest_aftermath`
+
 Node: class_select
 
 Player selects starting class
@@ -128,6 +139,7 @@ Enemy: 1 Goblin
 Mechanics introduced:
 
 Basic combat
+Basic Attack action only (abilities/items locked for v1)
 
 Enemy stats hidden (shown as ???)
 
@@ -160,6 +172,7 @@ Party-based combat
 Initiative with multiple actors
 
 Party Talk (knowledge reveal)
+Party Talk consumes the active character's turn and prints deterministic knowledge text
 
 Emma can reveal information about goblins via Party Talk
 
@@ -180,6 +193,8 @@ Slice ends here
 Design Notes
 
 Enemy stats are hidden by default
+Battles now run directly inside the CLI with deterministic turn order and only Basic Attack + Party Talk actions enabled.
+Party Talk currently prints structured knowledge text directly (UI intel reveal remains future work and enemy HP stays `???`).
 
 Information is revealed only through Party Talk
 

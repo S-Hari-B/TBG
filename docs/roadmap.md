@@ -19,53 +19,33 @@ Status legend:
 
 ---
 
-## NEXT: Slice A – Tutorial Vertical Slice (Story + Party + Multi-Enemy Battle)
+## DONE: Ticket 005 – Tutorial Battles + Party Talk Stub
+
+* Story-driven battles now execute inside the CLI with deterministic turn order
+* Basic Attack is the only combat action; Party Talk consumes a turn and prints structured knowledge text
+* Enemy HP remains hidden (`???`) in the UI
+* Emma’s goblin knowledge is available via Party Talk during the ambush battle
+
+---
+
+## NEXT: Ticket-005.1 – UI Intel Reveal + Knowledge Tracking
 
 Goal:
 
-* A player can start a new game, choose a class, progress through the intro story, fight battles, recruit Emma, and complete the forest ambush sequence.
+* Surface Party Talk knowledge inside the battle UI while keeping hidden stats for unrevealed foes.
+* Begin wiring player-side knowledge tracking so intel persists beyond a single conversation.
 
 Scope:
 
-1. Class selection flow
-
-* Present class options on New Game
-* Apply starting stats, gear, items from classes.json
-
-2. Story navigation (basic)
-
-* Load story nodes
-* Display node text and choices
-* Apply node effects
-* Advance to next node
-
-3. Battles triggered by story
-
-* Story effect can start battle
-* Battle supports party (1–2 members) versus multiple enemies
-
-4. Rewards application
-
-* Apply EXP and gold rewards from defeated enemies
-* Minimal level-up behavior can be stubbed or implemented (decide during slice)
-
-5. Party member recruitment
-
-* Story effect adds Emma as a party member
-
-6. Party Talk (stub, deterministic)
-
-* Party Talk exists in battle menu
-* Returns structured facts from deterministic knowledge entries
-* No LLM required for v1
+1. Extend battle UI to reveal stats (HP, speed hints, behaviors) after relevant Party Talk.
+2. Persist player knowledge flags in `GameState` so repeated encounters remember previous intel.
+3. Keep determinism—knowledge unlocks must be data-driven and testable.
 
 Required tests:
 
-* Story node resolution and effect application is deterministic
-* Battle start from story effect works
-* Multi-enemy battle initiative is deterministic
-* Party member add works
-* Party Talk returns expected facts for known tags
+* Knowledge reveal is deterministic and only triggers after matching Party Talk
+* Persisted intel is loaded for repeated battles
+* Hidden information stays concealed when no knowledge is available
 
 Docs that define this slice:
 
@@ -74,7 +54,7 @@ Docs that define this slice:
 
 ---
 
-## LATER: Slice B – Weapon-Tag Abilities
+## LATER: Ticket-006 – Weapon-Tag Abilities
 
 Goal:
 

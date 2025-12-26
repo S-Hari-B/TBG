@@ -126,6 +126,7 @@ def test_classes_repo_reference_validation_fails_when_weapon_missing(tmp_path: P
                 "name": "Apprentice",
                 "base_hp": 30,
                 "base_mp": 25,
+                "speed": 5,
                 "starting_weapon": "missing_weapon",
                 "starting_armour": "cloth_robe",
             }

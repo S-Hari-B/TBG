@@ -6,14 +6,18 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class EnemyDef:
-    """Minimal enemy definition."""
+    """Enemy definition including optional grouping info."""
 
     id: str
     name: str
-    max_hp: int
-    attack: int
-    defense: int
-    xp: int
-    gold: int
+    hp: int | None = None
+    mp: int | None = None
+    attack: int | None = None
+    defense: int | None = None
+    speed: int | None = None
+    rewards_exp: int | None = None
+    rewards_gold: int | None = None
+    tags: tuple[str, ...] = ()
+    enemy_ids: tuple[str, ...] | None = None
 
 

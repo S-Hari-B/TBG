@@ -34,14 +34,15 @@ class ClassesRepository(RepositoryBase[ClassDef]):
             class_data = self._require_mapping(payload, f"class '{raw_id}'")
             self._assert_exact_fields(
                 class_data,
-                {"name", "base_hp", "base_mp", "starting_weapon", "starting_armour"},
+                {"name", "base_hp", "base_mp", "speed", "starting_weapon", "starting_armour"},
                 f"class '{raw_id}'",
-                optional_fields={"speed", "starting_weapons", "starting_items", "starting_abilities"},
+                optional_fields={"starting_weapons", "starting_items", "starting_abilities"},
             )
 
             name = self._require_str(class_data["name"], f"class '{raw_id}' name")
             base_hp = self._require_int(class_data["base_hp"], f"class '{raw_id}' base_hp")
             base_mp = self._require_int(class_data["base_mp"], f"class '{raw_id}' base_mp")
+            speed = self._require_int(class_data["speed"], f"class '{raw_id}' speed")
             starting_weapon = self._require_str(
                 class_data["starting_weapon"], f"class '{raw_id}' starting_weapon"
             )
@@ -63,6 +64,7 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 name=name,
                 base_hp=base_hp,
                 base_mp=base_mp,
+                speed=speed,
                 starting_weapon_id=starting_weapon,
                 starting_armour_id=starting_armour,
             )

@@ -14,5 +14,6 @@ class Stats:
     mp: int
     attack: int
     defense: int
+    speed: int
 
 

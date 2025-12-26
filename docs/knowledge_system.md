@@ -9,6 +9,7 @@ Knowledge is a **game mechanic**, not an AI feature.
 ## Core Principles
 
 * Knowledge is deterministic and data-driven
+* Facts are stored in `data/definitions/knowledge.json` and surfaced exactly as defined
 * Party members have predefined knowledge entries
 * The local LLM is presentation-only and optional
 * Knowledge never alters combat outcomes directly
@@ -73,6 +74,14 @@ When Party Talk is used:
 
 If no matching knowledge exists, the party member reports uncertainty.
 
+### V1 Battle Stub
+
+* Battle Party Talk is available as a combat action in the CLI.
+* The action consumes the acting character’s turn.
+* The CLI prints deterministic text assembled from the structured knowledge entry (HP ranges, speed hints, behaviors).
+* Enemy UI elements remain hidden (`???`) even after talking in v1—the text output is purely informational.
+* Dev-only debug flag: set `TBG_DEBUG=1` to show raw enemy HP while testing; keep it unset for normal play.
+
 ---
 
 ## LLM Integration (Optional)
@@ -87,7 +96,7 @@ If disabled:
 
 * Structured knowledge is displayed directly
 
-The underlying facts are identical in both cases.
+The underlying facts are identical in both cases. (Ticket-005 keeps the LLM path disabled; Party Talk prints the deterministic JSON text verbatim.)
 
 ---
 

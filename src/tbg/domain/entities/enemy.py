@@ -16,5 +16,6 @@ class EnemyInstance:
     stats: Stats
     xp_reward: int
     gold_reward: int
+    tags: tuple[str, ...] = ()
 
 
