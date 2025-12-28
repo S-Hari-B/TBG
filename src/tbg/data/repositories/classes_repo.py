@@ -59,6 +59,17 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                     f"class '{raw_id}' references missing armour '{starting_armour}'."
                 )
 
+            extra_weapons: list[str] = []
+            if "starting_weapons" in class_data:
+                extra_weapons = self._require_str_list(
+                    class_data["starting_weapons"], f"class '{raw_id}' starting_weapons"
+                )
+                for weapon_id in extra_weapons:
+                    if weapon_id not in weapon_ids:
+                        raise DataReferenceError(
+                            f"class '{raw_id}' references missing weapon '{weapon_id}' in starting_weapons."
+                        )
+
             classes[raw_id] = ClassDef(
                 id=raw_id,
                 name=name,
@@ -67,6 +78,7 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 speed=speed,
                 starting_weapon_id=starting_weapon,
                 starting_armour_id=starting_armour,
+                starting_weapons=tuple(extra_weapons),
             )
         return classes
 
@@ -101,5 +113,16 @@ class ClassesRepository(RepositoryBase[ClassDef]):
             if unknown:
                 msg_parts.append(f"unknown fields: {sorted(unknown)}")
             raise DataValidationError(f"{context} has schema issues ({'; '.join(msg_parts)}).")
+
+    @staticmethod
+    def _require_str_list(value: object, context: str) -> list[str]:
+        if not isinstance(value, list):
+            raise DataValidationError(f"{context} must be a list.")
+        result: list[str] = []
+        for entry in value:
+            if not isinstance(entry, str):
+                raise DataValidationError(f"{context} entries must be strings.")
+            result.append(entry)
+        return result
 
 

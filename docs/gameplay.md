@@ -67,13 +67,11 @@ Party (1 to 4 actors) versus enemies (later expand for unique enemies and bosses
 Action economy
 On a turn, the active actor chooses exactly one action:
 
-Basic Attack
-
-Ability (weapon-tag gated, later)
-
-Use Item
-
-Defend (optional, can be v1.1)
+* Basic Attack
+* Use Skill (if at least one skill matches the actor’s equipped weapon/shield tags and they have the MP to spend)
+* Use Item
+* Party Talk (consumes the turn; returns deterministic intel text; no stat reveal yet)
+* Defend (optional, can be v1.1)
 
 Initiative
 Initiative order is computed each round:
@@ -84,7 +82,23 @@ If speeds tie, resolve tie with a deterministic dice roll using the game RNG
 
 Tie-break roll is a d20 by default
 
-Party talk (later expanded for ability to discuss battle with party members)
+### Skills (starter set)
+
+* Skills live in `data/definitions/skills.json` and are gated by `required_weapon_tags`. Warriors with `["sword", "shield"]` gain Power Slash + Brace; Staff casters gain Firebolt + Ember Wave.
+* Target modes:
+  * `single_enemy` – choose one living enemy.
+  * `multi_enemy` – choose 1..`max_targets` living enemies (Slice A cap: 3 on Ember Wave).
+  * `self` – applies to the acting combatant (Brace).
+* Effects:
+  * `damage`: `damage = max(1, attack + base_power - target.defense)` (before guard). MP cost paid once per use.
+  * `guard`: applies `base_power` as a guard buffer; the next incoming hit is reduced by that amount, then the buffer expires.
+* The CLI only lists “Use Skill” when at least one eligible skill exists for the actor.
+
+### Party Talk in combat
+
+* Available whenever at least one party member is present (Emma in Slice A).
+* Consumes the acting character’s turn.
+* Prints deterministic intel lines from `knowledge.json`. Enemy HP stays hidden (`???`) unless `TBG_DEBUG=1` is set for development.
 
 Item (later, ability to use items)
 

@@ -8,6 +8,7 @@ from .item_def import ItemDef
 from .story_def import StoryChoiceDef, StoryEffectDef, StoryNodeDef
 from .party_member_def import PartyMemberDef
 from .knowledge_def import KnowledgeEntry
+from .skill_def import SkillDef
 from .weapon_def import WeaponDef
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "StoryChoiceDef",
     "StoryNodeDef",
     "StoryEffectDef",
+    "SkillDef",
     "WeaponDef",
 ]
 

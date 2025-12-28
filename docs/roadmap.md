@@ -28,6 +28,15 @@ Status legend:
 
 ---
 
+## DONE: Ticket-006 – Weapon-Tag Skills + Guard Stub
+
+* Added skills.json and SkillRepository (Power Slash, Brace, Quick Stab, Skull Thump, Firebolt, Ember Wave).
+* Skills are gated by equipped weapon/shield tags and consume MP; targeting supports single, multi (up to 3), and self.
+* Shield skill “Brace” adds a one-hit guard buffer; staff users can now cast Firebolt/Ember Wave in battle.
+* CLI exposes “Use Skill”, Party Talk remains text-only, and enemy HP is still hidden unless `TBG_DEBUG=1`.
+
+---
+
 ## NEXT: Ticket-005.1 – UI Intel Reveal + Knowledge Tracking
 
 Goal:
@@ -54,13 +63,15 @@ Docs that define this slice:
 
 ---
 
-## LATER: Ticket-006 – Weapon-Tag Abilities
+---
+
+## LATER: Ticket-007 – Status Effects & Ability Expansion
 
 Goal:
 
-* Abilities filtered by equipped weapon tags
-* Energy costs and targeting
-* Unit tests for gating and energy consumption
+* Introduce simple status effects (burn/poison/guard break) tied to skills.
+* Expand AI targeting hooks beyond random selection.
+* Unit tests covering status application, expiration, and deterministic processing order.
 
 ---
 

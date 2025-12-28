@@ -1,6 +1,4 @@
-"""TBG package root exporting the CLI entrypoint."""
+"""TBG package root metadata (intentionally lightweight)."""
 
-from .main import main
-
-__all__ = ["main"]
+__all__: list[str] = []
 

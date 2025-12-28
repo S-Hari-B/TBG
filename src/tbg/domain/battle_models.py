@@ -18,6 +18,8 @@ class Combatant:
     side: Side
     stats: Stats
     tags: Tuple[str, ...] = ()
+    weapon_tags: Tuple[str, ...] = ()
+    guard_reduction: int = 0
     source_id: str | None = None  # original definition id
 
     @property
@@ -36,5 +38,18 @@ class BattleState:
     current_actor_id: str | None = None
     is_over: bool = False
     victor: Side | None = None
+
+
+@dataclass(slots=True)
+class BattleCombatantView:
+    """Presentation-friendly snapshot of a combatant."""
+
+    instance_id: str
+    name: str
+    hp_display: str
+    side: str
+    is_alive: bool
+    current_hp: int
+    max_hp: int
 
 

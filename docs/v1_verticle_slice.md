@@ -139,7 +139,7 @@ Enemy: 1 Goblin
 Mechanics introduced:
 
 Basic combat
-Basic Attack action only (abilities/items locked for v1)
+Basic Attack and weapon-tag skills (Power Slash, Brace if tags match)
 
 Enemy stats hidden (shown as ???)
 
@@ -175,6 +175,7 @@ Party Talk (knowledge reveal)
 Party Talk consumes the active character's turn and prints deterministic knowledge text
 
 Emma can reveal information about goblins via Party Talk
+Staff-user skills (Firebolt single-target, Ember Wave up to 3) unlock when Emma has the MP to spend.
 
 Next: forest_aftermath
 
@@ -193,7 +194,7 @@ Slice ends here
 Design Notes
 
 Enemy stats are hidden by default
-Battles now run directly inside the CLI with deterministic turn order and only Basic Attack + Party Talk actions enabled.
+Battles now run directly inside the CLI with deterministic turn order and offer Basic Attack, Use Skill (weapon-tag gated), and Party Talk actions.
 Party Talk currently prints structured knowledge text directly (UI intel reveal remains future work and enemy HP stays `???`).
 
 Information is revealed only through Party Talk

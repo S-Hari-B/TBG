@@ -7,10 +7,17 @@ from tbg.data.repositories import (
     EnemiesRepository,
     KnowledgeRepository,
     PartyMembersRepository,
+    SkillsRepository,
     WeaponsRepository,
 )
 from tbg.domain.state import GameState
-from tbg.services.battle_service import AttackResolvedEvent, BattleService, PartyTalkEvent
+from tbg.services.battle_service import (
+    AttackResolvedEvent,
+    BattleService,
+    GuardAppliedEvent,
+    PartyTalkEvent,
+    SkillUsedEvent,
+)
 from tbg.services.factories import create_player_from_class_id
 
 
@@ -21,17 +28,18 @@ def _make_battle_service() -> BattleService:
         knowledge_repo=KnowledgeRepository(),
         weapons_repo=WeaponsRepository(),
         armour_repo=ArmourRepository(),
+        skills_repo=SkillsRepository(),
     )
 
 
-def _make_state(seed: int = 123, with_party: bool = True) -> GameState:
+def _make_state(seed: int = 123, with_party: bool = True, class_id: str = "warrior") -> GameState:
     rng = RNG(seed)
     state = GameState(seed=seed, rng=rng, mode="game_menu", current_node_id="class_select")
     classes_repo = ClassesRepository()
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
     player = create_player_from_class_id(
-        class_id="warrior",
+        class_id=class_id,
         name="Tester",
         classes_repo=classes_repo,
         weapons_repo=weapons_repo,
@@ -136,4 +144,68 @@ def test_enemy_ai_target_selection_deterministic_for_seed() -> None:
     target_b = next(evt.target_id for evt in events_b if isinstance(evt, AttackResolvedEvent))
 
     assert target_a == target_b
+
+
+def test_skill_eligibility_by_weapon_tags() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    skills = service.get_available_skills(battle_state, state.player.id)
+    skill_ids = {skill.id for skill in skills}
+    assert "skill_power_slash" in skill_ids
+    assert "skill_brace" in skill_ids
+
+
+def test_single_target_skill_applies_damage_and_cost() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    enemy_id = battle_state.enemies[0].instance_id
+    initial_mp = state.player.stats.mp
+
+    events = service.use_skill(battle_state, state.player.id, "skill_power_slash", [enemy_id])
+
+    assert any(isinstance(evt, SkillUsedEvent) for evt in events)
+    assert battle_state.enemies[0].stats.hp == 12  # 22 - 10 damage
+    assert state.player.stats.mp == initial_mp - 3
+
+
+def test_multi_target_skill_hits_up_to_three_targets() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False, class_id="mage")
+    battle_state, _ = service.start_battle("goblin_pack_3", state)
+    enemy_ids = [enemy.instance_id for enemy in battle_state.enemies]
+    initial_mp = state.player.stats.mp
+
+    events = service.use_skill(battle_state, state.player.id, "skill_ember_wave", enemy_ids)
+
+    assert sum(isinstance(evt, SkillUsedEvent) for evt in events) == 3
+    assert state.player.stats.mp == initial_mp - 6
+    for enemy in battle_state.enemies:
+        assert enemy.stats.hp == 18  # 22 - 4
+
+
+def test_guard_reduces_next_damage_then_expires() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    enemy_id = battle_state.enemies[0].instance_id
+
+    guard_events = service.use_skill(battle_state, state.player.id, "skill_brace", [])
+    assert any(isinstance(evt, GuardAppliedEvent) for evt in guard_events)
+
+    attack_events = service.basic_attack(battle_state, enemy_id, state.player.id)
+    damage_event = next(evt for evt in attack_events if isinstance(evt, AttackResolvedEvent))
+    assert damage_event.damage == 0  # 5 guard absorbs the 5 damage
+
+
+def test_ai_uses_skill_deterministically_with_seed() -> None:
+    service = _make_battle_service()
+    state = _make_state(seed=555, with_party=True, class_id="mage")
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    emma_id = next(ally.instance_id for ally in battle_state.allies if ally.instance_id != state.player.id)
+
+    events = service.run_ally_ai_turn(battle_state, emma_id, state.rng)
+
+    assert any(isinstance(evt, (SkillUsedEvent, AttackResolvedEvent)) for evt in events)
 

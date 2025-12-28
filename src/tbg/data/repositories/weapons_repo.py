@@ -31,7 +31,25 @@ class WeaponsRepository(RepositoryBase[WeaponDef]):
             attack = self._require_int(weapon_data["attack"], f"weapon '{raw_id}' attack")
             value = self._require_int(weapon_data["value"], f"weapon '{raw_id}' value")
 
-            weapons[raw_id] = WeaponDef(id=raw_id, name=name, attack=attack, value=value)
+            tags = tuple(weapon_data.get("tags", [])) if isinstance(weapon_data.get("tags", []), list) else ()
+            slot_cost = self._require_int(weapon_data.get("slot_cost", 1), f"weapon '{raw_id}' slot_cost")
+            default_basic_attack_id = weapon_data.get("default_basic_attack_id")
+            if default_basic_attack_id is not None:
+                default_basic_attack_id = self._require_str(
+                    default_basic_attack_id, f"weapon '{raw_id}' default_basic_attack_id"
+                )
+            energy_bonus = self._require_int(weapon_data.get("energy_bonus", 0), f"weapon '{raw_id}' energy_bonus")
+
+            weapons[raw_id] = WeaponDef(
+                id=raw_id,
+                name=name,
+                attack=attack,
+                value=value,
+                tags=tags,
+                slot_cost=slot_cost,
+                default_basic_attack_id=default_basic_attack_id,
+                energy_bonus=energy_bonus,
+            )
         return weapons
 
     @staticmethod
@@ -65,5 +83,11 @@ class WeaponsRepository(RepositoryBase[WeaponDef]):
             if unknown:
                 msg_parts.append(f"unknown fields: {sorted(unknown)}")
             raise DataValidationError(f"{context} has schema issues ({'; '.join(msg_parts)}).")
+
+    @staticmethod
+    def _require_str(value: object, context: str) -> str:
+        if not isinstance(value, str):
+            raise DataValidationError(f"{context} must be a string.")
+        return value
 
 

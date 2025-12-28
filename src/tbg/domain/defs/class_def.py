@@ -15,5 +15,6 @@ class ClassDef:
     speed: int
     starting_weapon_id: str
     starting_armour_id: str
+    starting_weapons: tuple[str, ...] = ()
 
 

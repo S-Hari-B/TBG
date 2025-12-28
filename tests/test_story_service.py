@@ -6,6 +6,7 @@ from tbg.data.repositories import (
     EnemiesRepository,
     KnowledgeRepository,
     PartyMembersRepository,
+    SkillsRepository,
     StoryRepository,
     WeaponsRepository,
 )
@@ -36,6 +37,7 @@ def _make_battle_service() -> BattleService:
         knowledge_repo=KnowledgeRepository(),
         weapons_repo=WeaponsRepository(),
         armour_repo=ArmourRepository(),
+        skills_repo=SkillsRepository(),
     )
 
 

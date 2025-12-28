@@ -1,0 +1,75 @@
+{
+  "skill_power_slash": {
+    "name": "Power Slash",
+    "description": "A heavy sword strike that cuts past armor.",
+    "tags": ["skill", "starter", "sword"],
+    "required_weapon_tags": ["sword"],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 3,
+    "base_power": 4,
+    "effect_type": "damage",
+    "gold_value": 20
+  },
+  "skill_brace": {
+    "name": "Brace",
+    "description": "Raise your shield to absorb the next blow.",
+    "tags": ["skill", "starter", "shield"],
+    "required_weapon_tags": ["shield"],
+    "target_mode": "self",
+    "max_targets": 1,
+    "mp_cost": 2,
+    "base_power": 5,
+    "effect_type": "guard",
+    "gold_value": 18
+  },
+  "skill_quick_stab": {
+    "name": "Quick Stab",
+    "description": "A rapid dagger strike aimed at vital points.",
+    "tags": ["skill", "starter", "dagger"],
+    "required_weapon_tags": ["dagger"],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 2,
+    "base_power": 3,
+    "effect_type": "damage",
+    "gold_value": 18
+  },
+  "skill_skull_thump": {
+    "name": "Skull Thump",
+    "description": "A crushing club blow meant to stagger foes.",
+    "tags": ["skill", "starter", "club"],
+    "required_weapon_tags": ["club"],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 2,
+    "base_power": 4,
+    "effect_type": "damage",
+    "gold_value": 15
+  },
+  "skill_firebolt": {
+    "name": "Firebolt",
+    "description": "Launch a focused bolt of fire.",
+    "tags": ["skill", "starter", "staff", "fire"],
+    "required_weapon_tags": ["staff"],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 4,
+    "base_power": 5,
+    "effect_type": "damage",
+    "gold_value": 25
+  },
+  "skill_ember_wave": {
+    "name": "Ember Wave",
+    "description": "Unleash a sweeping wave of embers that scorches multiple foes.",
+    "tags": ["skill", "starter", "staff", "fire"],
+    "required_weapon_tags": ["staff"],
+    "target_mode": "multi_enemy",
+    "max_targets": 3,
+    "mp_cost": 6,
+    "base_power": 3,
+    "effect_type": "damage",
+    "gold_value": 32
+  }
+}
+

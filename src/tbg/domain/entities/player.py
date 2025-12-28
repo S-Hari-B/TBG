@@ -16,5 +16,6 @@ class Player:
     class_id: str
     stats: Stats
     equipment: Equipment
+    extra_weapon_ids: tuple[str, ...] = ()
 
 

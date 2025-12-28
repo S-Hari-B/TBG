@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Sequence
+from typing import Iterable, List, Sequence, Tuple
 
 from tbg.core.rng import RNG
 from tbg.data.repositories import (
@@ -10,26 +10,15 @@ from tbg.data.repositories import (
     EnemiesRepository,
     KnowledgeRepository,
     PartyMembersRepository,
+    SkillsRepository,
     WeaponsRepository,
 )
-from tbg.domain.battle_models import BattleState, Combatant
+from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
+from tbg.domain.defs import SkillDef
 from tbg.domain.entities import Stats
 from tbg.domain.state import GameState
 from tbg.services.errors import FactoryError
 from tbg.services.factories import create_enemy_instance, make_instance_id
-
-
-@dataclass(slots=True)
-class BattleCombatantView:
-    """Presentation data for a combatant."""
-
-    instance_id: str
-    name: str
-    hp_display: str
-    side: str
-    is_alive: bool
-    current_hp: int
-    max_hp: int
 
 
 @dataclass(slots=True)
@@ -81,6 +70,32 @@ class BattleResolvedEvent(BattleEvent):
     victor: str
 
 
+@dataclass(slots=True)
+class SkillUsedEvent(BattleEvent):
+    attacker_id: str
+    attacker_name: str
+    skill_id: str
+    skill_name: str
+    target_id: str
+    target_name: str
+    damage: int
+    target_hp: int
+
+
+@dataclass(slots=True)
+class GuardAppliedEvent(BattleEvent):
+    combatant_id: str
+    combatant_name: str
+    amount: int
+
+
+@dataclass(slots=True)
+class SkillFailedEvent(BattleEvent):
+    combatant_id: str
+    combatant_name: str
+    reason: str
+
+
 class BattleService:
     """Deterministic battle orchestrator supporting basic attacks and party talk."""
 
@@ -91,12 +106,14 @@ class BattleService:
         knowledge_repo: KnowledgeRepository,
         weapons_repo: WeaponsRepository,
         armour_repo: ArmourRepository,
+        skills_repo: SkillsRepository,
     ) -> None:
         self._enemies_repo = enemies_repo
         self._party_members_repo = party_members_repo
         self._knowledge_repo = knowledge_repo
         self._weapons_repo = weapons_repo
         self._armour_repo = armour_repo
+        self._skills_repo = skills_repo
 
     # -----------------------
     # Battle Lifecycle
@@ -123,6 +140,7 @@ class BattleService:
                     side="enemies",
                     stats=enemy_instance.stats,
                     tags=enemy_instance.tags,
+                    weapon_tags=(),
                     source_id=enemy_instance.enemy_id,
                 )
             )
@@ -155,8 +173,7 @@ class BattleService:
     def basic_attack(self, battle_state: BattleState, attacker_id: str, target_id: str) -> List[BattleEvent]:
         attacker = self._get_combatant(battle_state, attacker_id)
         target = self._get_combatant(battle_state, target_id)
-        damage = max(1, attacker.stats.attack - target.stats.defense)
-        target.stats.hp = max(0, target.stats.hp - damage)
+        damage = self._resolve_damage(attacker, target, bonus_power=0, minimum=1)
 
         events: List[BattleEvent] = [
             AttackResolvedEvent(
@@ -170,6 +187,71 @@ class BattleService:
         ]
         if not target.is_alive:
             events.append(CombatantDefeatedEvent(combatant_id=target.instance_id, combatant_name=target.display_name))
+
+        maybe_resolved = self._update_victory(battle_state)
+        if maybe_resolved:
+            events.append(maybe_resolved)
+        else:
+            self._advance_turn(battle_state, attacker.instance_id)
+        return events
+
+    def get_available_skills(self, battle_state: BattleState, combatant_id: str) -> List[SkillDef]:
+        combatant = self._get_combatant(battle_state, combatant_id)
+        if not combatant.weapon_tags:
+            return []
+        available: List[SkillDef] = []
+        for skill in self._skills_repo.all():
+            if set(skill.required_weapon_tags).issubset(set(combatant.weapon_tags)):
+                available.append(skill)
+        return available
+
+    def use_skill(
+        self, battle_state: BattleState, attacker_id: str, skill_id: str, target_ids: Sequence[str]
+    ) -> List[BattleEvent]:
+        attacker = self._get_combatant(battle_state, attacker_id)
+        skill = self._skills_repo.get(skill_id)
+        if attacker.stats.mp < skill.mp_cost:
+            return [
+                SkillFailedEvent(
+                    combatant_id=attacker.instance_id,
+                    combatant_name=attacker.display_name,
+                    reason="insufficient_mp",
+                )
+            ]
+
+        resolved_targets = self._resolve_skill_targets(battle_state, attacker, skill, target_ids)
+
+        events: List[BattleEvent] = []
+        attacker.stats.mp -= skill.mp_cost
+
+        if skill.effect_type == "damage":
+            for target in resolved_targets:
+                damage = self._resolve_damage(attacker, target, bonus_power=skill.base_power, minimum=1)
+                events.append(
+                    SkillUsedEvent(
+                        attacker_id=attacker.instance_id,
+                        attacker_name=attacker.display_name,
+                        skill_id=skill.id,
+                        skill_name=skill.name,
+                        target_id=target.instance_id,
+                        target_name=target.display_name,
+                        damage=damage,
+                        target_hp=target.stats.hp,
+                    )
+                )
+                if not target.is_alive:
+                    events.append(
+                        CombatantDefeatedEvent(combatant_id=target.instance_id, combatant_name=target.display_name)
+                    )
+        elif skill.effect_type == "guard":
+            attacker.guard_reduction = skill.base_power
+            events.append(
+                GuardAppliedEvent(
+                    combatant_id=attacker.instance_id,
+                    combatant_name=attacker.display_name,
+                    amount=skill.base_power,
+                )
+            )
 
         maybe_resolved = self._update_victory(battle_state)
         if maybe_resolved:
@@ -199,25 +281,48 @@ class BattleService:
         events = self.basic_attack(battle_state, actor.instance_id, living_allies[target_index].instance_id)
         return events
 
+    def run_ally_ai_turn(self, battle_state: BattleState, actor_id: str, rng: RNG) -> List[BattleEvent]:
+        actor = self._get_combatant(battle_state, actor_id)
+        living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
+        if not living_enemies:
+            return []
+
+        available_skills = self.get_available_skills(battle_state, actor_id)
+        firebolt_skill = next((skill for skill in available_skills if skill.id == "skill_firebolt"), None)
+        if (
+            firebolt_skill
+            and actor.stats.mp >= firebolt_skill.mp_cost
+            and rng.randint(0, 1) == 0
+        ):
+            target = living_enemies[rng.randint(0, len(living_enemies) - 1)]
+            return self.use_skill(battle_state, actor_id, firebolt_skill.id, [target.instance_id])
+
+        target = living_enemies[rng.randint(0, len(living_enemies) - 1)]
+        return self.basic_attack(battle_state, actor_id, target.instance_id)
+
     # -----------------------
     # Helpers
     # -----------------------
     def _player_to_combatant(self, state: GameState) -> Combatant:
         assert state.player is not None
+        weapon_ids: List[str] = [state.player.equipment.weapon.id]
+        weapon_ids.extend(state.player.extra_weapon_ids)
         return Combatant(
             instance_id=state.player.id,
             display_name=state.player.name,
             side="allies",
             stats=state.player.stats,
             tags=(),
+            weapon_tags=self._weapon_tags_for_ids(weapon_ids),
             source_id=state.player.class_id,
         )
 
     def _party_member_to_combatant(self, member_id: str, state: GameState) -> Combatant:
         member_def = self._party_members_repo.get(member_id)
         weapon_attack = 1
-        if member_def.weapon_ids:
-            weapon = self._weapons_repo.get(member_def.weapon_ids[0])
+        weapon_ids = list(member_def.weapon_ids)
+        if weapon_ids:
+            weapon = self._weapons_repo.get(weapon_ids[0])
             weapon_attack = weapon.attack
         armour_def = self._armour_repo.get(member_def.armour_id) if member_def.armour_id else None
         stats = Stats(
@@ -235,6 +340,7 @@ class BattleService:
             side="allies",
             stats=stats,
             tags=member_def.tags,
+            weapon_tags=self._weapon_tags_for_ids(weapon_ids),
             source_id=member_id,
         )
 
@@ -324,5 +430,57 @@ class BattleService:
             current_hp=combatant.stats.hp,
             max_hp=combatant.stats.max_hp,
         )
+
+    def _weapon_tags_for_ids(self, weapon_ids: Sequence[str]) -> Tuple[str, ...]:
+        tags: set[str] = set()
+        for weapon_id in weapon_ids:
+            try:
+                weapon = self._weapons_repo.get(weapon_id)
+            except KeyError:
+                continue
+            tags.update(weapon.tags)
+        return tuple(sorted(tags))
+
+    def _resolve_damage(self, attacker: Combatant, target: Combatant, *, bonus_power: int, minimum: int) -> int:
+        base_damage = max(minimum, attacker.stats.attack + bonus_power - target.stats.defense)
+        damage = base_damage
+        if target.guard_reduction > 0:
+            absorbed = min(damage, target.guard_reduction)
+            damage -= absorbed
+            target.guard_reduction = 0
+        damage = max(0, damage)
+        target.stats.hp = max(0, target.stats.hp - damage)
+        return damage
+
+    def _resolve_skill_targets(
+        self,
+        battle_state: BattleState,
+        attacker: Combatant,
+        skill: SkillDef,
+        requested_target_ids: Sequence[str],
+    ) -> List[Combatant]:
+        if skill.target_mode == "self":
+            return [attacker]
+
+        if skill.target_mode == "single_enemy":
+            if len(requested_target_ids) != 1:
+                raise ValueError("Single-target skill requires exactly one target.")
+        elif skill.target_mode == "multi_enemy":
+            if not requested_target_ids:
+                raise ValueError("Multi-target skill requires at least one target.")
+            if len(requested_target_ids) > skill.max_targets:
+                raise ValueError("Too many targets selected for skill.")
+
+        targets: List[Combatant] = []
+        for target_id in requested_target_ids:
+            target = self._get_combatant(battle_state, target_id)
+            if target.side == attacker.side:
+                raise ValueError("Cannot target allies with this skill.")
+            if not target.is_alive:
+                raise ValueError("Cannot target defeated combatants.")
+            if target in targets:
+                raise ValueError("Duplicate targets are not allowed.")
+            targets.append(target)
+        return targets
 
 

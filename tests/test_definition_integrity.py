@@ -25,6 +25,7 @@ def definitions_dir() -> Path:
         "enemies.json",
         "story.json",
         "abilities.json",
+        "skills.json",
     ],
 )
 def test_definition_files_are_valid_json(definitions_dir: Path, filename: str) -> None:
@@ -43,10 +44,12 @@ def test_definition_integrity_and_references(definitions_dir: Path) -> None:
     weapons = _validate_weapons(definitions_dir)
     armour = _validate_armour(definitions_dir)
     items = _validate_items(definitions_dir)
+    skills = _validate_skills(definitions_dir)
     classes = _validate_classes(definitions_dir, weapons, armour, items)
     enemies = _validate_enemies(definitions_dir, weapons, armour)
     _validate_story(definitions_dir, classes, enemies)
     _validate_abilities(definitions_dir)
+    assert skills  # ensure skills file not empty
 
 
 def _validate_weapons(definitions_dir: Path) -> set[str]:
@@ -123,6 +126,43 @@ def _validate_items(definitions_dir: Path) -> set[str]:
             if field in mapping:
                 _require_int(mapping[field], f"item '{item_id}' {field}")
         ids.add(item_id)
+    return ids
+
+
+def _validate_skills(definitions_dir: Path) -> set[str]:
+    data = _load_required_dict(definitions_dir, "skills.json")
+    ids: set[str] = set()
+    for skill_id, payload in data.items():
+        _require_str(skill_id, "skill id")
+        mapping = _require_mapping(payload, f"skill '{skill_id}'")
+        _assert_allowed_fields(
+            mapping,
+            required={
+                "name",
+                "description",
+                "tags",
+                "required_weapon_tags",
+                "target_mode",
+                "max_targets",
+                "mp_cost",
+                "base_power",
+                "effect_type",
+                "gold_value",
+            },
+            optional=set(),
+            context=f"skill '{skill_id}'",
+        )
+        _require_str(mapping["name"], f"skill '{skill_id}' name")
+        _require_str(mapping["description"], f"skill '{skill_id}' description")
+        _require_str_list(mapping["tags"], f"skill '{skill_id}' tags")
+        _require_str_list(mapping["required_weapon_tags"], f"skill '{skill_id}' required_weapon_tags")
+        assert mapping["target_mode"] in {"single_enemy", "multi_enemy", "self"}
+        assert mapping["effect_type"] in {"damage", "guard"}
+        _require_int(mapping["max_targets"], f"skill '{skill_id}' max_targets")
+        _require_int(mapping["mp_cost"], f"skill '{skill_id}' mp_cost")
+        _require_int(mapping["base_power"], f"skill '{skill_id}' base_power")
+        _require_int(mapping["gold_value"], f"skill '{skill_id}' gold_value")
+        ids.add(skill_id)
     return ids
 
 

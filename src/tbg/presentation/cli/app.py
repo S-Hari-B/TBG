@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import secrets
-from typing import List, Literal
+from typing import List, Literal, Sequence
 
 from tbg.data.repositories import (
     ArmourRepository,
@@ -12,9 +12,11 @@ from tbg.data.repositories import (
     KnowledgeRepository,
     PartyMembersRepository,
     StoryRepository,
+    SkillsRepository,
     WeaponsRepository,
 )
-from tbg.domain.battle_models import BattleState, Combatant
+from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
+from tbg.domain.defs import SkillDef
 from tbg.domain.state import GameState
 from tbg.services import (
     BattleRequestedEvent,
@@ -28,12 +30,16 @@ from tbg.services import (
 )
 from tbg.services.battle_service import (
     AttackResolvedEvent,
+    BattleEvent,
     BattleResolvedEvent,
     BattleService,
     BattleStartedEvent,
     BattleView,
     CombatantDefeatedEvent,
+    GuardAppliedEvent,
     PartyTalkEvent,
+    SkillFailedEvent,
+    SkillUsedEvent,
 )
 
 MenuAction = Literal["new_game", "quit"]
@@ -93,12 +99,14 @@ def _build_battle_service() -> BattleService:
     knowledge_repo = KnowledgeRepository()
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
+    skills_repo = SkillsRepository()
     return BattleService(
         enemies_repo=enemies_repo,
         party_members_repo=party_repo,
         knowledge_repo=knowledge_repo,
         weapons_repo=weapons_repo,
         armour_repo=armour_repo,
+        skills_repo=skills_repo,
     )
 
 
@@ -206,6 +214,15 @@ def _handle_story_events(
             print(f"- Gained {event.amount} gold (Total: {event.total_gold}).")
         elif isinstance(event, ExpGainedEvent):
             print(f"- Gained {event.amount} experience (Total: {event.total_exp}).")
+        elif isinstance(event, SkillUsedEvent):
+            print(
+                f"- {event.attacker_name} uses {event.skill_name} on {event.target_name} "
+                f"for {event.damage} damage (HP {event.target_hp})."
+            )
+        elif isinstance(event, GuardAppliedEvent):
+            print(f"- {event.combatant_name} braces, reducing the next hit by {event.amount}.")
+        elif isinstance(event, SkillFailedEvent):
+            print(f"- {event.combatant_name} cannot use that skill ({event.reason}).")
         else:
             print(f"- {event}")
     if print_header:
@@ -222,14 +239,27 @@ def _run_battle_loop(battle_service: BattleService, battle_state: BattleState, s
         if actor is None:
             break
         if actor.side == "allies":
-            action = _prompt_battle_action(can_talk=bool(state.party_members))
-            if action == "attack":
-                target = _prompt_battle_target(battle_state)
-                events = battle_service.basic_attack(battle_state, actor.instance_id, target.instance_id)
+            if actor.instance_id == state.player.id:
+                available_skills = battle_service.get_available_skills(battle_state, actor.instance_id)
+                action = _prompt_battle_action(
+                    can_talk=bool(state.party_members), can_use_skill=bool(available_skills)
+                )
+                if action == "attack":
+                    target = _prompt_battle_target(battle_state)
+                    events = battle_service.basic_attack(battle_state, actor.instance_id, target.instance_id)
+                elif action == "skill":
+                    events = _handle_player_skill_choice(
+                        battle_service, battle_state, actor.instance_id, available_skills
+                    )
+                    if any(isinstance(evt, SkillFailedEvent) for evt in events):
+                        _render_battle_events(events)
+                        continue
+                else:
+                    speaker_member_id = _prompt_party_member_choice(state)
+                    speaker_combatant_id = f"party_{speaker_member_id}"
+                    events = battle_service.party_talk(battle_state, speaker_combatant_id)
             else:
-                speaker_member_id = _prompt_party_member_choice(state)
-                speaker_combatant_id = f"party_{speaker_member_id}"
-                events = battle_service.party_talk(battle_state, speaker_combatant_id)
+                events = battle_service.run_ally_ai_turn(battle_state, actor.instance_id, state.rng)
         else:
             events = battle_service.run_enemy_turn(battle_state, state.rng)
         _render_battle_events(events)
@@ -251,22 +281,102 @@ def _render_battle_view(view: BattleView) -> None:
         print(f"{marker} {enemy.name:<12} HP {status}")
 
 
-def _prompt_battle_action(can_talk: bool) -> str:
+def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool) -> str:
+    options: List[tuple[str, str]] = [("attack", "Basic Attack")]
+    if can_use_skill:
+        options.append(("skill", "Use Skill"))
+    if can_talk:
+        options.append(("talk", "Party Talk"))
     while True:
         print("\nActions:")
-        print("1. Basic Attack")
-        if can_talk:
-            print("2. Party Talk")
+        for idx, (_, label) in enumerate(options, start=1):
+            print(f"{idx}. {label}")
         choice = input("Choose action: ").strip()
-        if choice == "1":
-            return "attack"
-        if can_talk and choice == "2":
-            return "talk"
+        try:
+            index = int(choice) - 1
+        except ValueError:
+            print("Invalid selection.")
+            continue
+        if 0 <= index < len(options):
+            return options[index][0]
         print("Invalid selection.")
 
 
-def _prompt_battle_target(battle_state: BattleState) -> Combatant:
+def _handle_player_skill_choice(
+    battle_service: BattleService,
+    battle_state: BattleState,
+    actor_id: str,
+    skills: List[SkillDef],
+) -> List[BattleEvent]:
+    skill = _prompt_skill_choice(skills)
+    target_ids = _prompt_skill_targets(skill, battle_state)
+    return battle_service.use_skill(battle_state, actor_id, skill.id, target_ids)
+
+
+def _prompt_skill_choice(skills: List[SkillDef]) -> SkillDef:
+    while True:
+        print("\nSkills:")
+        for idx, skill in enumerate(skills, start=1):
+            target_desc = {
+                "single_enemy": "Single Enemy",
+                "multi_enemy": f"Up to {skill.max_targets} Enemies",
+                "self": "Self",
+            }[skill.target_mode]
+            print(f"{idx}. {skill.name} (MP {skill.mp_cost}, {target_desc}) - {skill.description}")
+        choice = input("Select skill: ").strip()
+        try:
+            index = int(choice) - 1
+        except ValueError:
+            print("Invalid selection.")
+            continue
+        if 0 <= index < len(skills):
+            return skills[index]
+        print("Invalid selection.")
+
+
+def _prompt_skill_targets(skill: SkillDef, battle_state: BattleState) -> List[str]:
+    if skill.target_mode == "self":
+        return []
     living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
+    if not living_enemies:
+        raise ValueError("No valid targets.")
+    if skill.target_mode == "single_enemy":
+        target = _prompt_battle_target(battle_state)
+        return [target.instance_id]
+    return _prompt_multi_enemy_targets(battle_state, skill.max_targets)
+
+
+def _prompt_multi_enemy_targets(battle_state: BattleState, max_targets: int) -> List[str]:
+    living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
+    while True:
+        print("\nSelect targets (comma-separated):")
+        for idx, enemy in enumerate(living_enemies, start=1):
+            print(f"{idx}. {enemy.display_name}")
+        raw = input(f"Choose up to {max_targets} targets: ").strip()
+        parts = [part.strip() for part in raw.split(",") if part.strip()]
+        try:
+            indices = [int(part) - 1 for part in parts]
+        except ValueError:
+            print("Please enter numbers separated by commas.")
+            continue
+        if not indices:
+            print("Select at least one target.")
+            continue
+        if len(indices) > max_targets:
+            print("Too many targets selected.")
+            continue
+        if any(index < 0 or index >= len(living_enemies) for index in indices):
+            print("Invalid target selection.")
+            continue
+        if len(indices) != len(set(indices)):
+            print("Duplicate targets are not allowed.")
+            continue
+        return [living_enemies[index].instance_id for index in indices]
+
+
+def _prompt_battle_target(battle_state: BattleState, exclude_ids: Sequence[str] | None = None) -> Combatant:
+    exclude_set = set(exclude_ids or [])
+    living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive and enemy.instance_id not in exclude_set]
     while True:
         print("\nChoose target:")
         for idx, enemy in enumerate(living_enemies, start=1):
@@ -311,6 +421,15 @@ def _render_battle_events(events: List[BattleEvent]) -> None:
             print(f"- {event.combatant_name} is defeated.")
         elif isinstance(event, PartyTalkEvent):
             print(f"- {event.text}")
+        elif isinstance(event, SkillUsedEvent):
+            print(
+                f"- {event.attacker_name} uses {event.skill_name} on {event.target_name} "
+                f"for {event.damage} damage (HP now {event.target_hp})."
+            )
+        elif isinstance(event, GuardAppliedEvent):
+            print(f"- {event.combatant_name} braces, reducing the next hit by {event.amount}.")
+        elif isinstance(event, SkillFailedEvent):
+            print(f"- {event.combatant_name} cannot use that skill ({event.reason}).")
         elif isinstance(event, BattleResolvedEvent):
             print(f"- Battle resolved. Victor: {event.victor.title()}")
         else:

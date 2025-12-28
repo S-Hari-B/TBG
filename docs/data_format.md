@@ -72,50 +72,48 @@ Tags are used for:
 
 ## Weapons (`weapons.json`)
 
-Weapons can be one-handed or two-handed via `slot_cost`.
-Shields are weapons.
+Weapons (including shields) are keyed by id:
 
-Fields (v1):
+```json
+{
+  "iron_sword": { ... },
+  "wooden_shield": { ... }
+}
+```
 
-* id: string
-* name: string
-* description: string
-* tags: list[string]
-* base_attack: int
-* slot_cost: int (1 or 2)
-* default_basic_attack_id: string (ability id)
-* bonus_max_energy: int (added to actor base max_energy)
-* value_gold: int
+Fields (v1 data):
+
+* `name`: string
+* `attack`: int
+* `value`: int
+* `tags`: list[string] – must include canonical weapon-type tags such as `"sword"`, `"shield"`, `"staff"`, `"dagger"`, `"club"` so that skills can gate on them.
+* `slot_cost`: int (1 or 2)
+* `default_basic_attack_id`: string (used by factories to map to the correct basic attack animation/sfx later)
+* `energy_bonus`: int (bonus MP/energy; Slice A keeps these at 0 except the staff)
 
 Example:
 
 ```json
-{
-  "id": "iron_sword",
+"iron_sword": {
   "name": "Iron Sword",
-  "description": "A sturdy one-handed sword.",
+  "attack": 8,
+  "value": 50,
   "tags": ["sword", "slash"],
-  "base_attack": 8,
   "slot_cost": 1,
   "default_basic_attack_id": "basic_slash",
-  "bonus_max_energy": 0,
-  "value_gold": 50
+  "energy_bonus": 0
 }
 ```
 
-Shield example:
-
 ```json
-{
-  "id": "wooden_shield",
+"wooden_shield": {
   "name": "Wooden Shield",
-  "description": "Basic protection, surprisingly decent.",
+  "attack": 1,
+  "value": 20,
   "tags": ["shield", "blunt"],
-  "base_attack": 1,
   "slot_cost": 1,
   "default_basic_attack_id": "basic_shield_bash",
-  "bonus_max_energy": 0,
-  "value_gold": 20
+  "energy_bonus": 0
 }
 ```
 
@@ -219,6 +217,55 @@ Example:
   "energy_cost": 0,
   "target": "single_enemy",
   "effect": { "type": "deal_damage", "power": 1.0, "damage_tag": "slash" }
+}
+```
+
+---
+
+## Skills (`skills.json`)
+
+Weapon-tag skills live in their own file (map keyed by id). Fields (v1):
+
+* `name`: string
+* `description`: string
+* `tags`: list[string] (classification helpers such as `"skill"`, `"starter"`, `"staff"`)
+* `required_weapon_tags`: list[string] – every tag listed must be present on the actor’s equipped weapon/shield tags for the skill to appear in the CLI.
+* `target_mode`: `"single_enemy"` | `"multi_enemy"` | `"self"`
+* `max_targets`: int (only used for `"multi_enemy"`, but stored for all skills for future expansion)
+* `mp_cost`: int
+* `base_power`: int (damage/guard scalar)
+* `effect_type`: `"damage"` | `"guard"`
+* `gold_value`: int (placeholder for economy and shops)
+
+Example:
+
+```json
+"skill_firebolt": {
+  "name": "Firebolt",
+  "description": "Launch a focused bolt of fire.",
+  "tags": ["skill", "starter", "staff", "fire"],
+  "required_weapon_tags": ["staff"],
+  "target_mode": "single_enemy",
+  "max_targets": 1,
+  "mp_cost": 4,
+  "base_power": 5,
+  "effect_type": "damage",
+  "gold_value": 25
+}
+```
+
+```json
+"skill_brace": {
+  "name": "Brace",
+  "description": "Raise your shield to absorb the next blow.",
+  "tags": ["skill", "starter", "shield"],
+  "required_weapon_tags": ["shield"],
+  "target_mode": "self",
+  "max_targets": 1,
+  "mp_cost": 2,
+  "base_power": 5,
+  "effect_type": "guard",
+  "gold_value": 18
 }
 ```
 
