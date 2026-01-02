@@ -22,6 +22,7 @@ from tbg.services import (
     BattleRequestedEvent,
     ChoiceResult,
     ExpGainedEvent,
+    GameMenuEnteredEvent,
     GoldGainedEvent,
     PartyMemberJoinedEvent,
     PlayerClassSetEvent,
@@ -41,9 +42,22 @@ from tbg.services.battle_service import (
     SkillFailedEvent,
     SkillUsedEvent,
 )
+from .render import (
+    render_choices,
+    render_events_header,
+    render_heading,
+    render_menu,
+    render_story,
+)
 
 MenuAction = Literal["new_game", "quit"]
 _MAX_RANDOM_SEED = 2**31 - 1
+_MENU_TALK_LINES = {
+    "emma": [
+        "We handled that ambush together. Let's keep that rhythm.",
+        "If more goblins show up, we strike first this time.",
+    ]
+}
 
 
 def main() -> None:
@@ -153,15 +167,8 @@ def _run_story_loop(story_service: StoryService, battle_service: BattleService, 
 
 
 def _render_node_view(node_view: StoryNodeView) -> None:
-    for idx, (node_id, text) in enumerate(node_view.segments):
-        if idx > 0:
-            print()
-        print(f"[{node_id}]")
-        print(text)
-    if node_view.choices:
-        print("Choices:")
-        for idx, label in enumerate(node_view.choices, start=1):
-            print(f"  {idx}. {label}")
+    render_story(node_view.segments)
+    render_choices(node_view.choices)
 
 
 def _prompt_choice(choice_count: int) -> int:
@@ -193,19 +200,23 @@ def _handle_story_events(
 ) -> bool:
     if not events:
         return True
+    rendered_story_this_batch = False
     if print_header:
-        print("\nEvents:")
+        render_events_header()
     for event in events:
         if isinstance(event, PlayerClassSetEvent):
             print(f"- You assume the role of a {event.class_id}. (Player ID: {event.player_id})")
         elif isinstance(event, BattleRequestedEvent):
+            rendered_story_this_batch = _render_story_if_needed(
+                story_service, state, rendered_story_this_batch
+            )
             print(f"- Battle initiated against '{event.enemy_id}'.")
             battle_state, start_events = battle_service.start_battle(event.enemy_id, state)
             _render_battle_events(start_events)
             if not _run_battle_loop(battle_service, battle_state, state):
                 print("You fall in battle. Game Over.\n")
                 return False
-            post_events = story_service.resume_after_battle(state)
+            post_events = story_service.resume_pending_flow(state)
             if not _handle_story_events(post_events, battle_service, story_service, state, print_header=bool(post_events)):
                 return False
         elif isinstance(event, PartyMemberJoinedEvent):
@@ -223,6 +234,21 @@ def _handle_story_events(
             print(f"- {event.combatant_name} braces, reducing the next hit by {event.amount}.")
         elif isinstance(event, SkillFailedEvent):
             print(f"- {event.combatant_name} cannot use that skill ({event.reason}).")
+        elif isinstance(event, GameMenuEnteredEvent):
+            rendered_story_this_batch = _render_story_if_needed(
+                story_service, state, rendered_story_this_batch
+            )
+            follow_up = _run_post_battle_interlude(event.message, story_service, state)
+            if follow_up is None:
+                return False
+            if not _handle_story_events(
+                follow_up,
+                battle_service,
+                story_service,
+                state,
+                print_header=bool(follow_up),
+            ):
+                return False
         else:
             print(f"- {event}")
     if print_header:
@@ -230,11 +256,57 @@ def _handle_story_events(
     return True
 
 
+def _run_post_battle_interlude(
+    message: str, story_service: StoryService, state: GameState
+) -> List[object] | None:
+    render_heading("Camp Interlude")
+    if message:
+        print(message)
+    while True:
+        options: List[str] = ["Continue story"]
+        actions: List[str] = ["continue"]
+        if state.party_members:
+            options.append("Party Talk")
+            actions.append("talk")
+        options.append("Quit to Main Menu")
+        actions.append("quit")
+        render_menu("Camp Menu", options)
+        choice = input("Select an option: ").strip()
+        try:
+            index = int(choice) - 1
+        except ValueError:
+            print("Invalid selection.")
+            continue
+        if not 0 <= index < len(actions):
+            print("Invalid selection.")
+            continue
+        action = actions[index]
+        if action == "continue":
+            state.mode = "game_menu"
+            return story_service.resume_pending_flow(state)
+        if action == "talk":
+            _handle_menu_party_talk(state)
+            continue
+        return None
+
+
+def _handle_menu_party_talk(state: GameState) -> None:
+    if not state.party_members:
+        print("No companions to speak with.")
+        return
+    member_id = _prompt_party_member_choice(state, prompt_title="Camp Conversation")
+    lines = _MENU_TALK_LINES.get(member_id, ["We should stay alert."])
+    render_heading("Party Talk")
+    print(f"{member_id.title()}: {lines[0]}")
+
+
 def _run_battle_loop(battle_service: BattleService, battle_state: BattleState, state: GameState) -> bool:
     """Run the deterministic battle loop until victory or defeat."""
+    first_snapshot = True
     while not battle_state.is_over:
         view = battle_service.get_battle_view(battle_state)
-        _render_battle_view(view)
+        _render_battle_view(view, show_banner=first_snapshot)
+        first_snapshot = False
         actor = _find_combatant(battle_state, view.current_actor_id)
         if actor is None:
             break
@@ -257,7 +329,7 @@ def _run_battle_loop(battle_service: BattleService, battle_state: BattleState, s
                 else:
                     speaker_member_id = _prompt_party_member_choice(state)
                     speaker_combatant_id = f"party_{speaker_member_id}"
-                    events = battle_service.party_talk(battle_state, speaker_combatant_id)
+                    events = battle_service.party_talk(battle_state, speaker_combatant_id, state.rng)
             else:
                 events = battle_service.run_ally_ai_turn(battle_state, actor.instance_id, state.rng)
         else:
@@ -266,15 +338,19 @@ def _run_battle_loop(battle_service: BattleService, battle_state: BattleState, s
     return battle_state.victor == "allies"
 
 
-def _render_battle_view(view: BattleView) -> None:
-    print(f"\n=== Battle: {view.battle_id} ===")
+def _render_battle_view(view: BattleView, *, show_banner: bool) -> None:
+    debug_enabled = bool(os.getenv("TBG_DEBUG"))
+    if show_banner:
+        render_heading(f"Battle {view.battle_id}")
+    else:
+        actor_name = _lookup_combatant_name(view, view.current_actor_id)
+        render_heading(f"Turn: {actor_name or 'Battle Continues'}")
     print("Allies:")
     for ally in view.allies:
         status = "DOWN" if not ally.is_alive else ally.hp_display
         marker = "*" if ally.instance_id == view.current_actor_id else " "
         print(f"{marker} {ally.name:<12} HP {status}")
     print("Enemies:")
-    debug_enabled = bool(os.getenv("TBG_DEBUG"))
     for enemy in view.enemies:
         marker = "*" if enemy.instance_id == view.current_actor_id else " "
         status = _format_enemy_hp_display(enemy, debug_enabled=debug_enabled)
@@ -288,9 +364,7 @@ def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool) -> str:
     if can_talk:
         options.append(("talk", "Party Talk"))
     while True:
-        print("\nActions:")
-        for idx, (_, label) in enumerate(options, start=1):
-            print(f"{idx}. {label}")
+        render_menu("Actions", [label for _, label in options])
         choice = input("Choose action: ").strip()
         try:
             index = int(choice) - 1
@@ -315,7 +389,7 @@ def _handle_player_skill_choice(
 
 def _prompt_skill_choice(skills: List[SkillDef]) -> SkillDef:
     while True:
-        print("\nSkills:")
+        render_heading("Skills")
         for idx, skill in enumerate(skills, start=1):
             target_desc = {
                 "single_enemy": "Single Enemy",
@@ -349,7 +423,7 @@ def _prompt_skill_targets(skill: SkillDef, battle_state: BattleState) -> List[st
 def _prompt_multi_enemy_targets(battle_state: BattleState, max_targets: int) -> List[str]:
     living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
     while True:
-        print("\nSelect targets (comma-separated):")
+        render_heading("Select Targets")
         for idx, enemy in enumerate(living_enemies, start=1):
             print(f"{idx}. {enemy.display_name}")
         raw = input(f"Choose up to {max_targets} targets: ").strip()
@@ -378,7 +452,7 @@ def _prompt_battle_target(battle_state: BattleState, exclude_ids: Sequence[str] 
     exclude_set = set(exclude_ids or [])
     living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive and enemy.instance_id not in exclude_set]
     while True:
-        print("\nChoose target:")
+        render_heading("Choose Target")
         for idx, enemy in enumerate(living_enemies, start=1):
             print(f"{idx}. {enemy.display_name}")
         raw = input("Target #: ").strip()
@@ -392,9 +466,9 @@ def _prompt_battle_target(battle_state: BattleState, exclude_ids: Sequence[str] 
         print("Invalid target.")
 
 
-def _prompt_party_member_choice(state: GameState) -> str:
+def _prompt_party_member_choice(state: GameState, prompt_title: str = "Party Talk") -> str:
     while True:
-        print("\nChoose a party member to speak:")
+        render_heading(prompt_title)
         for idx, member_id in enumerate(state.party_members, start=1):
             print(f"{idx}. {member_id.title()}")
         raw = input("Speaker #: ").strip()
@@ -409,9 +483,12 @@ def _prompt_party_member_choice(state: GameState) -> str:
 
 
 def _render_battle_events(events: List[BattleEvent]) -> None:
+    if not events:
+        return
+    render_events_header()
     for event in events:
         if isinstance(event, BattleStartedEvent):
-            print(f"\nBattle started against {', '.join(event.enemy_names)}.")
+            print(f"- Battle started against {', '.join(event.enemy_names)}.")
         elif isinstance(event, AttackResolvedEvent):
             print(
                 f"- {event.attacker_name} hits {event.target_name} for {event.damage} damage "
@@ -451,6 +528,28 @@ def _format_enemy_hp_display(enemy: BattleCombatantView, *, debug_enabled: bool)
     if not debug_enabled:
         return enemy.hp_display
     return f"{enemy.hp_display} (DEBUG {enemy.current_hp}/{enemy.max_hp})"
+
+
+def _lookup_combatant_name(view: BattleView, combatant_id: str | None) -> str | None:
+    if combatant_id is None:
+        return None
+    for roster in (view.allies, view.enemies):
+        for combatant in roster:
+            if combatant.instance_id == combatant_id:
+                return combatant.name
+    return None
+
+
+def _render_story_if_needed(
+    story_service: StoryService,
+    state: GameState,
+    rendered_flag: bool,
+) -> bool:
+    if rendered_flag:
+        return True
+    node_view = story_service.get_current_node_view(state)
+    render_story(node_view.segments)
+    return True
 
 
 

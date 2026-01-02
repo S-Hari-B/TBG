@@ -88,7 +88,8 @@ Ordered sequence (Slice A):
 4. `emma_encounter` → battle vs `goblin_grunt` (player only)
 5. `emma_join` → Emma formally joins the party
 6. `forest_ambush` → battle vs `goblin_pack_3` (player + Emma)
-7. `forest_aftermath`
+7. `post_ambush_menu` → short rest/menu interlude (player can Party Talk before continuing)
+8. `forest_aftermath`
 
 Node: class_select
 
@@ -176,6 +177,17 @@ Party Talk consumes the active character's turn and prints deterministic knowled
 
 Emma can reveal information about goblins via Party Talk
 Staff-user skills (Firebolt single-target, Ember Wave up to 3) unlock when Emma has the MP to spend.
+
+Next: post_ambush_menu
+
+Node: post_ambush_menu
+
+Purpose: Provide a rest/checkpoint beat where the player can re-enter the camp/game menu, talk with party members, then resume the story.
+
+Effects:
+
+* `enter_game_menu` – halts story flow and drops into the camp menu
+* Menu lets the player: Continue Story (resumes pending node), Party Talk (Emma has new deterministic flavour lines), Quit to Main Menu
 
 Next: forest_aftermath
 

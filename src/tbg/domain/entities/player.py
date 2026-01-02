@@ -19,3 +19,5 @@ class Player:
     extra_weapon_ids: tuple[str, ...] = ()
 
 
+
+

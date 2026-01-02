@@ -19,3 +19,5 @@ class EnemyInstance:
     tags: tuple[str, ...] = ()
 
 
+
+

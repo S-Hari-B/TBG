@@ -17,3 +17,5 @@ class Stats:
     speed: int
 
 
+
+

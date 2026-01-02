@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, List, Sequence, Tuple
+from typing import Dict, Iterable, List, Sequence, Tuple
 
 from tbg.core.rng import RNG
 from tbg.data.repositories import (
@@ -14,7 +14,7 @@ from tbg.data.repositories import (
     WeaponsRepository,
 )
 from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
-from tbg.domain.defs import SkillDef
+from tbg.domain.defs import KnowledgeEntry, SkillDef
 from tbg.domain.entities import Stats
 from tbg.domain.state import GameState
 from tbg.services.errors import FactoryError
@@ -260,11 +260,10 @@ class BattleService:
             self._advance_turn(battle_state, attacker.instance_id)
         return events
 
-    def party_talk(self, battle_state: BattleState, speaker_id: str) -> List[BattleEvent]:
+    def party_talk(self, battle_state: BattleState, speaker_id: str, rng: RNG) -> List[BattleEvent]:
         speaker = self._get_combatant(battle_state, speaker_id)
-        enemy_tags = self._collect_enemy_tags(battle_state)
         source_id = speaker.source_id or speaker.instance_id
-        text = self._build_knowledge_text(source_id, speaker.display_name, enemy_tags)
+        text = self._build_party_talk_text(source_id, speaker.display_name, battle_state, rng)
         events = [PartyTalkEvent(speaker_id=speaker.instance_id, speaker_name=speaker.display_name, text=text)]
         self._advance_turn(battle_state, speaker.instance_id)
         return events
@@ -392,29 +391,33 @@ class BattleService:
             return [result] if result else []
         return []
 
-    def _collect_enemy_tags(self, battle_state: BattleState) -> Sequence[str]:
-        tags: List[str] = []
-        for enemy in battle_state.enemies:
-            if enemy.is_alive:
-                tags.extend(enemy.tags)
-        return tuple(sorted(set(tags)))
-
-    def _build_knowledge_text(self, member_id: str, member_name: str, enemy_tags: Sequence[str]) -> str:
+    def _build_party_talk_text(
+        self,
+        member_id: str,
+        member_name: str,
+        battle_state: BattleState,
+        rng: RNG,
+    ) -> str:
         entries = self._knowledge_repo.get_entries(member_id)
-        tags_set = set(enemy_tags)
-        for entry in entries:
-            if not set(entry.enemy_tags) & tags_set:
+        if not entries:
+            return f"{member_name}: I'm not sure about these foes."
+
+        info_lines: List[str] = []
+        for group in self._group_alive_enemies(battle_state):
+            entry = self._match_knowledge_entry(entries, group["tags"])
+            if not entry:
                 continue
-            parts: List[str] = []
-            if entry.hp_range:
-                parts.append(f"HP tends to be around {entry.hp_range[0]}-{entry.hp_range[1]}.")
+            low, high = self._estimate_hp_range(group["max_hp"], rng)
+            parts = [f"{group['name']} look to have around {low}-{high} HP."]
             if entry.speed_hint:
                 parts.append(entry.speed_hint)
             if entry.behavior:
                 parts.append(entry.behavior)
-            if parts:
-                return f"{member_name}: {' '.join(parts)}"
-        return f"{member_name}: I don't have any insights on these foes yet."
+            info_lines.append(" ".join(parts))
+
+        if not info_lines:
+            return f"{member_name}: I'm not sure about these foes."
+        return f"{member_name}: {' '.join(info_lines)}"
 
     def _to_view(self, combatant: Combatant, *, hide_hp: bool) -> BattleCombatantView:
         if hide_hp:
@@ -482,5 +485,33 @@ class BattleService:
                 raise ValueError("Duplicate targets are not allowed.")
             targets.append(target)
         return targets
+
+    def _group_alive_enemies(self, battle_state: BattleState) -> List[Dict[str, object]]:
+        groups: Dict[str, Dict[str, object]] = {}
+        for enemy in battle_state.enemies:
+            if not enemy.is_alive:
+                continue
+            key = enemy.source_id or enemy.instance_id
+            if key not in groups:
+                groups[key] = {
+                    "name": enemy.display_name,
+                    "tags": tuple(enemy.tags),
+                    "max_hp": enemy.stats.max_hp,
+                }
+        return [groups[key] for key in sorted(groups.keys())]
+
+    @staticmethod
+    def _match_knowledge_entry(entries: Sequence[KnowledgeEntry], tags: Tuple[str, ...]) -> KnowledgeEntry | None:
+        tag_set = set(tags)
+        for entry in entries:
+            if set(entry.enemy_tags) & tag_set:
+                return entry
+        return None
+
+    @staticmethod
+    def _estimate_hp_range(actual_hp: int, rng: RNG) -> Tuple[int, int]:
+        low = max(1, actual_hp + rng.randint(-3, -1))
+        high = max(low, actual_hp + rng.randint(0, 3))
+        return low, high
 
 

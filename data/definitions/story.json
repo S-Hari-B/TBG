@@ -32,6 +32,16 @@
     "forest_ambush": {
       "text": "Rustling. Three goblins step onto the path, fanning out with practiced cruelty.",
       "effects": [{ "type": "start_battle", "enemy_id": "goblin_pack_3" }],
+      "next": "post_ambush_menu"
+    },
+    "post_ambush_menu": {
+      "text": "Emma leans against a tree, gulping air. \"We should regroup before another patrol shows up.\"",
+      "effects": [
+        {
+          "type": "enter_game_menu",
+          "message": "You take a moment to rest, patch gear, and talk before pressing on."
+        }
+      ],
       "next": "forest_aftermath"
     },
     "forest_aftermath": {

@@ -122,11 +122,40 @@ def test_party_talk_returns_expected_knowledge_text_for_goblins() -> None:
     battle_state, _ = service.start_battle("goblin_pack_3", state)
     battle_state.current_actor_id = "party_emma"
 
-    events = service.party_talk(battle_state, "party_emma")
+    events = service.party_talk(battle_state, "party_emma", RNG(7))
 
     talk_events = [evt for evt in events if isinstance(evt, PartyTalkEvent)]
     assert talk_events
-    assert "HP tends to be around" in talk_events[0].text
+    assert "Emma:" in talk_events[0].text
+
+
+def test_party_talk_hp_estimate_is_deterministic() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    battle_state.current_actor_id = "party_emma"
+
+    events = service.party_talk(battle_state, "party_emma", RNG(99))
+    talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
+
+    assert (
+        talk_event.text
+        == "Emma: Goblin Grunt look to have around 20-25 HP. Average, but quicker than most untrained adventurers. Often attack in groups and try to overwhelm isolated targets."
+    )
+
+
+def test_party_talk_without_knowledge_defaults_to_uncertain() -> None:
+    service = _make_battle_service()
+    service._knowledge_repo._ensure_loaded()  # type: ignore[attr-defined]
+    service._knowledge_repo._definitions["emma"] = []  # type: ignore[attr-defined]
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_pack_3", state)
+    battle_state.current_actor_id = "party_emma"
+
+    events = service.party_talk(battle_state, "party_emma", RNG(10))
+    talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
+
+    assert "I'm not sure" in talk_event.text
 
 
 def test_enemy_ai_target_selection_deterministic_for_seed() -> None:

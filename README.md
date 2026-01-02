@@ -19,6 +19,8 @@ Follow the on-screen menu to start a new game or exit. Starting a new game lets 
 
 Data definitions live in `data/definitions/*.json` and are loaded through the data-layer repositories (no presentation or domain code reads JSON directly).
 
+Set `TBG_DEBUG=1` before launching if you want verbose debug output (story node ids, exact HP values, etc.).
+
 ## Running the Tests
 
 ```

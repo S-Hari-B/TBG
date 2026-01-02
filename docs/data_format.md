@@ -371,6 +371,7 @@ Effect types (v1):
 * give_gold { amount: int }
 * start_battle { enemy_id: string | enemy_ids: list[string] }
 * add_party_member { member_id: string }
+* enter_game_menu { message?: string } – halts flow, pushes the player into the camp/game menu before continuing to the node’s `next`.
 
 Note:
 

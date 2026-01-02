@@ -13,6 +13,7 @@ from tbg.data.repositories import (
 from tbg.services.story_service import (
     BattleRequestedEvent,
     ExpGainedEvent,
+    GameMenuEnteredEvent,
     GoldGainedEvent,
     PartyMemberJoinedEvent,
     PlayerClassSetEvent,
@@ -70,7 +71,7 @@ def test_story_flow_advances_and_applies_effects() -> None:
 
     assert BattleRequestedEvent in event_types
     assert PartyMemberJoinedEvent not in event_types
-    post_battle_events = service.resume_after_battle(state)
+    post_battle_events = service.resume_pending_flow(state)
     assert any(isinstance(evt, PartyMemberJoinedEvent) for evt in post_battle_events)
     assert "emma" in state.party_members
 
@@ -110,12 +111,32 @@ def test_first_and_second_battles_have_expected_party() -> None:
     assert state.party_members == []
 
     # Simulate battle victory and resume story (Emma joins after battle).
-    post_battle_events = story_service.resume_after_battle(state)
+    post_battle_events = story_service.resume_pending_flow(state)
     assert any(isinstance(event, PartyMemberJoinedEvent) for event in post_battle_events)
     assert "emma" in state.party_members
 
     second_battle_event = next(event for event in post_battle_events if isinstance(event, BattleRequestedEvent))
     second_battle_state, _ = battle_service.start_battle(second_battle_event.enemy_id, state)
     assert len(second_battle_state.allies) == 2  # player + Emma
+
+
+def test_post_ambush_interlude_triggers_game_menu() -> None:
+    story_service = _make_story_service()
+    state = story_service.start_new_game(seed=2024, player_name="Hero")
+
+    story_service.choose(state, 0)  # class selection
+    story_service.choose(state, 0)  # investigate scream, triggers first battle
+    story_service.resume_pending_flow(state)  # simulate victory
+
+    # Second battle completes
+    interlude_events = story_service.resume_pending_flow(state)
+    assert any(isinstance(evt, GameMenuEnteredEvent) for evt in interlude_events)
+    assert state.current_node_id == "post_ambush_menu"
+    assert state.pending_story_node_id == "forest_aftermath"
+
+    # Continue story after menu interlude
+    post_menu_events = story_service.resume_pending_flow(state)
+    assert any(isinstance(evt, GoldGainedEvent) for evt in post_menu_events)
+    assert state.current_node_id == "forest_aftermath"
 
 

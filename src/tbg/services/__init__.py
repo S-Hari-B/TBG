@@ -5,6 +5,7 @@ from .story_service import (
     BattleRequestedEvent,
     ChoiceResult,
     ExpGainedEvent,
+    GameMenuEnteredEvent,
     GoldGainedEvent,
     PartyMemberJoinedEvent,
     PlayerClassSetEvent,
@@ -18,6 +19,7 @@ __all__ = [
     "BattleRequestedEvent",
     "ChoiceResult",
     "ExpGainedEvent",
+    "GameMenuEnteredEvent",
     "GoldGainedEvent",
     "PartyMemberJoinedEvent",
     "PlayerClassSetEvent",
@@ -25,5 +27,7 @@ __all__ = [
     "StoryService",
     "BattleService",
 ]
+
+
 
 

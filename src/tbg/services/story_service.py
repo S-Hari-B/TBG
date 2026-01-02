@@ -55,6 +55,11 @@ class ExpGainedEvent(StoryEvent):
 
 
 @dataclass(slots=True)
+class GameMenuEnteredEvent(StoryEvent):
+    message: str
+
+
+@dataclass(slots=True)
 class ChoiceResult:
     """Result returned after applying a choice."""
 
@@ -147,6 +152,10 @@ class StoryService:
 
     def resume_after_battle(self, state: GameState) -> List[StoryEvent]:
         """Resume story flow after a blocking battle."""
+        return self.resume_pending_flow(state)
+
+    def resume_pending_flow(self, state: GameState) -> List[StoryEvent]:
+        """Resume story flow after any blocking effect."""
         if not state.pending_story_node_id:
             return []
         next_node_id = state.pending_story_node_id
@@ -189,6 +198,11 @@ class StoryService:
                 amount = self._require_int(effect.data.get("amount"), "give_exp.amount")
                 state.exp += amount
                 emitted.append(ExpGainedEvent(amount=amount, total_exp=state.exp))
+            elif effect_type == "enter_game_menu":
+                message = self._require_optional_str(effect.data.get("message"), "enter_game_menu.message") or ""
+                state.mode = "game_menu"
+                emitted.append(GameMenuEnteredEvent(message=message))
+                halt_flow = True
             else:
                 # Unknown effects are ignored for now to keep the interpreter forward compatible.
                 continue
@@ -204,6 +218,14 @@ class StoryService:
     def _require_int(value: object, context: str) -> int:
         if not isinstance(value, int):
             raise ValueError(f"{context} must be an integer.")
+        return value
+
+    @staticmethod
+    def _require_optional_str(value: object, context: str) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError(f"{context} must be a string if provided.")
         return value
 
 

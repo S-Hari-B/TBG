@@ -37,6 +37,14 @@ Status legend:
 
 ---
 
+## DONE: Ticket-007 – CLI Readability + Camp Interlude
+
+* CLI presentation now uses consistent section headings/separators and hides story node IDs unless `TBG_DEBUG=1`.
+* Party Talk pulls live enemy max HP plus deterministic fuzz (tag-gated) instead of static lore ranges.
+* Added a post-ambush “camp” node that routes into the game menu so players can talk with Emma before continuing to `forest_aftermath`.
+
+---
+
 ## NEXT: Ticket-005.1 – UI Intel Reveal + Knowledge Tracking
 
 Goal:
@@ -65,7 +73,7 @@ Docs that define this slice:
 
 ---
 
-## LATER: Ticket-007 – Status Effects & Ability Expansion
+## LATER: Ticket-008 – Status Effects & Ability Expansion
 
 Goal:
 
