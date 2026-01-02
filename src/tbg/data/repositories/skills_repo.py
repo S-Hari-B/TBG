@@ -107,3 +107,4 @@ class SkillsRepository(RepositoryBase[SkillDef]):
             raise DataValidationError(f"{context} must be one of {sorted(allowed)}.")
         return value
 
+

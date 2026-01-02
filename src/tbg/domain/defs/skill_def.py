@@ -21,3 +21,4 @@ class SkillDef:
     effect_type: str
     gold_value: int
 
+

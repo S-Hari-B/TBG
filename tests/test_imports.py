@@ -12,3 +12,4 @@ def test_import_rng_no_side_effects() -> None:
     value = rng.randint(0, 1)
     assert value in (0, 1)
 
+

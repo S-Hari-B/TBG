@@ -16,3 +16,4 @@ def test_skill_schema_loaded_correctly() -> None:
     assert firebolt.effect_type == "damage"
     assert firebolt.mp_cost == 4
 
+

@@ -27,3 +27,4 @@ Secondary tags (e.g., `slash`, `blunt`, `fire`) can be combined with the primary
 * Knowledge entries reference enemy tags so Party Talk can return deterministic intel lines.
 * Keep tags data-driven—introduce new tags by documenting them here first so all data files stay aligned.
 
+
