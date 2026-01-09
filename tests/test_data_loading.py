@@ -114,8 +114,11 @@ def test_classes_repo_reference_validation_fails_when_weapon_missing(tmp_path: P
         {
             "cloth_robe": {
                 "name": "Cloth Robe",
-                "defense": 1,
-                "value": 5,
+                    "slot": "body",
+                    "defense": 1,
+                    "value": 5,
+                    "tags": ["light"],
+                    "hp_bonus": 0,
             }
         },
     )
@@ -128,7 +131,7 @@ def test_classes_repo_reference_validation_fails_when_weapon_missing(tmp_path: P
                 "base_mp": 25,
                 "speed": 5,
                 "starting_weapon": "missing_weapon",
-                "starting_armour": "cloth_robe",
+                    "starting_armour": {"body": "cloth_robe"},
             }
         },
     )

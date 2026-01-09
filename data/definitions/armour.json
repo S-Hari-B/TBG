@@ -1,6 +1,7 @@
 {
   "heavy_iron_armour_common": {
     "name": "Iron Armour (Common)",
+    "slot": "body",
     "defense": 6,
     "value": 80,
     "tags": ["heavy_armour"],
@@ -8,6 +9,7 @@
   },
   "medium_leather_armour_common": {
     "name": "Leather Armour (Common)",
+    "slot": "body",
     "defense": 4,
     "value": 55,
     "tags": ["medium_armour"],
@@ -15,6 +17,7 @@
   },
   "light_cloth_armour_common": {
     "name": "Cloth Robes (Common)",
+    "slot": "body",
     "defense": 2,
     "value": 30,
     "tags": ["light_armour"],
@@ -22,7 +25,104 @@
   },
   "goblin_rags": {
     "name": "Goblin Rags",
+    "slot": "body",
     "defense": 1,
+    "value": 5,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
+  "iron_war_helm": {
+    "name": "Iron War Helm",
+    "slot": "head",
+    "defense": 2,
+    "value": 35,
+    "tags": ["heavy_armour"],
+    "hp_bonus": 2
+  },
+  "iron_gauntlets": {
+    "name": "Iron Gauntlets",
+    "slot": "hands",
+    "defense": 2,
+    "value": 30,
+    "tags": ["heavy_armour"],
+    "hp_bonus": 1
+  },
+  "iron_greaves": {
+    "name": "Iron Greaves",
+    "slot": "boots",
+    "defense": 2,
+    "value": 30,
+    "tags": ["heavy_armour"],
+    "hp_bonus": 1
+  },
+  "leather_cap": {
+    "name": "Leather Cap",
+    "slot": "head",
+    "defense": 1,
+    "value": 20,
+    "tags": ["medium_armour"],
+    "hp_bonus": 1
+  },
+  "leather_gloves": {
+    "name": "Leather Gloves",
+    "slot": "hands",
+    "defense": 1,
+    "value": 18,
+    "tags": ["medium_armour"],
+    "hp_bonus": 1
+  },
+  "leather_boots": {
+    "name": "Leather Boots",
+    "slot": "boots",
+    "defense": 1,
+    "value": 18,
+    "tags": ["medium_armour"],
+    "hp_bonus": 1
+  },
+  "cloth_headwrap": {
+    "name": "Cloth Headwrap",
+    "slot": "head",
+    "defense": 1,
+    "value": 12,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
+  "cloth_gloves": {
+    "name": "Cloth Gloves",
+    "slot": "hands",
+    "defense": 0,
+    "value": 10,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
+  "cloth_boots": {
+    "name": "Cloth Boots",
+    "slot": "boots",
+    "defense": 0,
+    "value": 10,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
+  "goblin_cap": {
+    "name": "Goblin Cap",
+    "slot": "head",
+    "defense": 0,
+    "value": 6,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
+  "goblin_wrappings": {
+    "name": "Goblin Wrappings",
+    "slot": "hands",
+    "defense": 0,
+    "value": 5,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
+  "goblin_sandals": {
+    "name": "Goblin Sandals",
+    "slot": "boots",
+    "defense": 0,
     "value": 5,
     "tags": ["light_armour"],
     "hp_bonus": 0

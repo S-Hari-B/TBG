@@ -6,7 +6,12 @@
     "speed": 4,
     "starting_weapon": "iron_sword",
     "starting_weapons": ["iron_sword", "wooden_shield"],
-    "starting_armour": "heavy_iron_armour_common",
+    "starting_armour": {
+      "body": "heavy_iron_armour_common",
+      "head": "iron_war_helm",
+      "hands": "iron_gauntlets",
+      "boots": "iron_greaves"
+    },
     "starting_items": {
       "potion_hp_small": 2,
       "potion_energy_small": 1
@@ -19,7 +24,12 @@
     "speed": 7,
     "starting_weapon": "iron_dagger",
     "starting_weapons": ["iron_dagger", "iron_dagger", "shortbow"],
-    "starting_armour": "medium_leather_armour_common",
+    "starting_armour": {
+      "body": "medium_leather_armour_common",
+      "head": "leather_cap",
+      "hands": "leather_gloves",
+      "boots": "leather_boots"
+    },
     "starting_items": {
       "potion_hp_small": 2,
       "potion_energy_small": 1
@@ -32,7 +42,12 @@
     "speed": 5,
     "starting_weapon": "fire_staff",
     "starting_weapons": ["fire_staff"],
-    "starting_armour": "light_cloth_armour_common",
+    "starting_armour": {
+      "body": "light_cloth_armour_common",
+      "head": "cloth_headwrap",
+      "hands": "cloth_gloves",
+      "boots": "cloth_boots"
+    },
     "starting_items": {
       "potion_hp_small": 1,
       "potion_energy_small": 2
@@ -46,7 +61,12 @@
     "speed": 4,
     "starting_weapon": "wooden_club",
     "starting_weapons": ["wooden_club"],
-    "starting_armour": "light_cloth_armour_common",
+    "starting_armour": {
+      "body": "light_cloth_armour_common",
+      "head": "cloth_headwrap",
+      "hands": "cloth_gloves",
+      "boots": "cloth_boots"
+    },
     "starting_items": {
       "potion_hp_small": 1
     }

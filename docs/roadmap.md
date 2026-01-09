@@ -43,6 +43,12 @@ Status legend:
 * Party Talk pulls live enemy max HP plus deterministic fuzz (tag-gated) instead of static lore ranges.
 * Added a post-ambush “camp” node that routes into the game menu so players can talk with Emma before continuing to `forest_aftermath`.
 
+## DONE: Ticket-008 – Inventory & Equipment System
+
+* Added shared party inventory with deterministic equip/unequip flows and per-member loadouts (two weapon slots + four armour slots).
+* Weapons now enforce slot_cost (1H vs 2H) and armour specifies slot metadata; data definitions and validation updated accordingly.
+* Game menu exposes an Inventory / Equipment option that lets players inspect party members and swap gear before resuming the story.
+
 ---
 
 ## NEXT: Ticket-005.1 – UI Intel Reveal + Knowledge Tracking

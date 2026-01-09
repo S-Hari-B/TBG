@@ -16,6 +16,7 @@ from tbg.data.repositories import (
 from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
 from tbg.domain.defs import KnowledgeEntry, SkillDef
 from tbg.domain.entities import Stats
+from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment
 from tbg.domain.state import GameState
 from tbg.services.errors import FactoryError
 from tbg.services.factories import create_enemy_instance, make_instance_id
@@ -304,8 +305,11 @@ class BattleService:
     # -----------------------
     def _player_to_combatant(self, state: GameState) -> Combatant:
         assert state.player is not None
-        weapon_ids: List[str] = [state.player.equipment.weapon.id]
-        weapon_ids.extend(state.player.extra_weapon_ids)
+        equipment = state.equipment.get(state.player.id)
+        weapon_ids = self._weapon_ids_from_equipment(equipment)
+        armour_ids = self._armour_ids_from_equipment(equipment)
+        state.player.stats.attack = self._calculate_attack(weapon_ids, state.player.stats.attack)
+        state.player.stats.defense = self._calculate_defense(armour_ids, state.player.stats.defense)
         return Combatant(
             instance_id=state.player.id,
             display_name=state.player.name,
@@ -318,19 +322,27 @@ class BattleService:
 
     def _party_member_to_combatant(self, member_id: str, state: GameState) -> Combatant:
         member_def = self._party_members_repo.get(member_id)
-        weapon_attack = 1
-        weapon_ids = list(member_def.weapon_ids)
-        if weapon_ids:
-            weapon = self._weapons_repo.get(weapon_ids[0])
-            weapon_attack = weapon.attack
-        armour_def = self._armour_repo.get(member_def.armour_id) if member_def.armour_id else None
+        equipment = state.equipment.get(member_id)
+        weapon_ids = self._weapon_ids_from_equipment(equipment)
+        armour_ids = self._armour_ids_from_equipment(equipment)
+        if not weapon_ids:
+            weapon_ids = list(member_def.weapon_ids[:2])
+        if not armour_ids and member_def.armour_slots:
+            armour_ids = list(member_def.armour_slots.values())
+        base_attack = 1
+        if member_def.weapon_ids:
+            try:
+                base_attack = self._weapons_repo.get(member_def.weapon_ids[0]).attack
+            except KeyError:
+                base_attack = 1
+        base_defense = 0
         stats = Stats(
             max_hp=member_def.base_hp,
             hp=member_def.base_hp,
             max_mp=member_def.base_mp,
             mp=member_def.base_mp,
-            attack=weapon_attack,
-            defense=armour_def.defense if armour_def else 0,
+            attack=self._calculate_attack(weapon_ids, base_attack),
+            defense=self._calculate_defense(armour_ids, base_defense),
             speed=member_def.speed,
         )
         return Combatant(
@@ -443,6 +455,44 @@ class BattleService:
                 continue
             tags.update(weapon.tags)
         return tuple(sorted(tags))
+
+    def _weapon_ids_from_equipment(self, equipment: MemberEquipment | None) -> List[str]:
+        if equipment is None:
+            return []
+        ordered: List[str] = []
+        for weapon_id in equipment.weapon_slots:
+            if weapon_id and weapon_id not in ordered:
+                ordered.append(weapon_id)
+        return ordered
+
+    def _armour_ids_from_equipment(self, equipment: MemberEquipment | None) -> List[str]:
+        if equipment is None:
+            return []
+        ids: List[str] = []
+        for slot in ARMOUR_SLOTS:
+            armour_id = equipment.armour_slots.get(slot)
+            if armour_id:
+                ids.append(armour_id)
+        return ids
+
+    def _calculate_attack(self, weapon_ids: Sequence[str], fallback: int) -> int:
+        for weapon_id in weapon_ids:
+            try:
+                weapon_def = self._weapons_repo.get(weapon_id)
+            except KeyError:
+                continue
+            return max(1, weapon_def.attack)
+        return max(1, fallback)
+
+    def _calculate_defense(self, armour_ids: Sequence[str], fallback: int) -> int:
+        total = 0
+        for armour_id in armour_ids:
+            try:
+                armour_def = self._armour_repo.get(armour_id)
+            except KeyError:
+                continue
+            total += armour_def.defense
+        return total if total > 0 else max(0, fallback)
 
     def _resolve_damage(self, attacker: Combatant, target: Combatant, *, bonus_power: int, minimum: int) -> int:
         base_damage = max(minimum, attacker.stats.attack + bonus_power - target.stats.defense)

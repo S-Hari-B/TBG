@@ -187,7 +187,7 @@ Purpose: Provide a rest/checkpoint beat where the player can re-enter the camp/g
 Effects:
 
 * `enter_game_menu` – halts story flow and drops into the camp menu
-* Menu lets the player: Continue Story (resumes pending node), Party Talk (Emma has new deterministic flavour lines), Quit to Main Menu
+* Menu lets the player: Continue Story (resumes pending node), Inventory / Equipment (manage the shared party loadout), Party Talk (Emma has new deterministic flavour lines), Quit to Main Menu
 
 Next: forest_aftermath
 

@@ -1,7 +1,8 @@
 """Player class definition structures."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Dict, Tuple
 
 
 @dataclass(slots=True)
@@ -15,6 +16,6 @@ class ClassDef:
     speed: int
     starting_weapon_id: str
     starting_armour_id: str
-    starting_weapons: tuple[str, ...] = ()
-
-
+    starting_weapons: Tuple[str, ...] = ()
+    starting_armour_slots: Dict[str, str] = field(default_factory=dict)
+    starting_items: Dict[str, int] = field(default_factory=dict)

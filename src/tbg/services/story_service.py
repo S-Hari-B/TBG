@@ -5,10 +5,17 @@ from dataclasses import dataclass, field
 from typing import List, Sequence, Tuple
 
 from tbg.core.rng import RNG
-from tbg.data.repositories import ArmourRepository, ClassesRepository, StoryRepository, WeaponsRepository
+from tbg.data.repositories import (
+    ArmourRepository,
+    ClassesRepository,
+    PartyMembersRepository,
+    StoryRepository,
+    WeaponsRepository,
+)
 from tbg.domain.defs import StoryEffectDef, StoryNodeDef
 from tbg.domain.state import GameState
 from tbg.services.factories import create_player_from_class_id
+from tbg.services.inventory_service import InventoryService
 
 
 @dataclass(slots=True)
@@ -76,12 +83,21 @@ class StoryService:
         classes_repo: ClassesRepository,
         weapons_repo: WeaponsRepository,
         armour_repo: ArmourRepository,
+        party_members_repo: PartyMembersRepository,
+        *,
+        inventory_service: InventoryService | None = None,
         default_player_name: str = "Hero",
     ) -> None:
         self._story_repo = story_repo
         self._classes_repo = classes_repo
         self._weapons_repo = weapons_repo
         self._armour_repo = armour_repo
+        self._party_members_repo = party_members_repo
+        self._inventory_service = inventory_service or InventoryService(
+            weapons_repo=self._weapons_repo,
+            armour_repo=self._armour_repo,
+            party_members_repo=self._party_members_repo,
+        )
         self._default_player_name = default_player_name
 
     def start_new_game(self, seed: int, player_name: str | None = None) -> GameState:
@@ -171,6 +187,7 @@ class StoryService:
             effect_type = effect.type
             if effect_type == "set_class":
                 class_id = self._require_str(effect.data.get("class_id"), "set_class.class_id")
+                class_def = self._classes_repo.get(class_id)
                 player = create_player_from_class_id(
                     class_id=class_id,
                     name=state.player_name,
@@ -180,6 +197,7 @@ class StoryService:
                     rng=state.rng,
                 )
                 state.player = player
+                self._inventory_service.initialize_player_loadout(state, player.id, class_def)
                 emitted.append(PlayerClassSetEvent(class_id=class_id, player_id=player.id))
             elif effect_type == "start_battle":
                 enemy_id = self._require_str(effect.data.get("enemy_id"), "start_battle.enemy_id")
@@ -189,6 +207,11 @@ class StoryService:
                 member_id = self._require_str(effect.data.get("member_id"), "add_party_member.member_id")
                 if member_id not in state.party_members:
                     state.party_members.append(member_id)
+                    try:
+                        member_def = self._party_members_repo.get(member_id)
+                        self._inventory_service.initialize_party_member_loadout(state, member_id, member_def)
+                    except KeyError:
+                        pass
                 emitted.append(PartyMemberJoinedEvent(member_id=member_id))
             elif effect_type == "give_gold":
                 amount = self._require_int(effect.data.get("amount"), "give_gold.amount")

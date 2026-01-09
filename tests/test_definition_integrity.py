@@ -92,11 +92,13 @@ def _validate_armour(definitions_dir: Path) -> set[str]:
         mapping = _require_mapping(payload, f"armour '{armour_id}'")
         _assert_allowed_fields(
             mapping,
-            required={"name", "defense", "value"},
+            required={"name", "slot", "defense", "value"},
             optional={"tags", "hp_bonus"},
             context=f"armour '{armour_id}'",
         )
         _require_str(mapping["name"], f"armour '{armour_id}' name")
+        slot = _require_str(mapping["slot"], f"armour '{armour_id}' slot")
+        assert slot in {"head", "body", "hands", "boots"}, f"armour '{armour_id}' has invalid slot '{slot}'"
         _require_int(mapping["defense"], f"armour '{armour_id}' defense")
         _require_int(mapping["value"], f"armour '{armour_id}' value")
         if "tags" in mapping:
@@ -197,24 +199,43 @@ def _validate_classes(
         starting_weapon = _require_str(
             mapping["starting_weapon"], f"class '{class_id}' starting_weapon"
         )
-        starting_armour = _require_str(
-            mapping["starting_armour"], f"class '{class_id}' starting_armour"
-        )
         assert (
             starting_weapon in weapon_ids
         ), f"class '{class_id}' references missing weapon '{starting_weapon}'"
-        assert (
-            starting_armour in armour_ids
-        ), f"class '{class_id}' references missing armour '{starting_armour}'"
 
+        starting_weapons = []
         if "starting_weapons" in mapping:
-            _require_str_list(
+            starting_weapons = _require_str_list(
                 mapping["starting_weapons"], f"class '{class_id}' starting_weapons"
             )
-            for extra_weapon in mapping["starting_weapons"]:
+            for extra_weapon in starting_weapons:
                 assert (
                     extra_weapon in weapon_ids
                 ), f"class '{class_id}' starting_weapons includes unknown weapon '{extra_weapon}'"
+        else:
+            starting_weapons = [starting_weapon]
+        if starting_weapon not in starting_weapons:
+            starting_weapons.insert(0, starting_weapon)
+
+        armour_slots: dict[str, str] = {}
+        raw_armour = mapping["starting_armour"]
+        if isinstance(raw_armour, str):
+            armour_id = _require_str(raw_armour, f"class '{class_id}' starting_armour")
+            assert (
+                armour_id in armour_ids
+            ), f"class '{class_id}' references missing armour '{armour_id}' in body slot"
+            armour_slots["body"] = armour_id
+        else:
+            slots_map = _require_mapping(raw_armour, f"class '{class_id}' starting_armour")
+            for slot_name, armour_id in slots_map.items():
+                slot = _require_str(slot_name, f"class '{class_id}' starting_armour slot")
+                assert slot in {"head", "body", "hands", "boots"}
+                armour_id_str = _require_str(armour_id, f"class '{class_id}' starting_armour slot {slot}")
+                assert (
+                    armour_id_str in armour_ids
+                ), f"class '{class_id}' references missing armour '{armour_id_str}' in slot '{slot}'"
+                armour_slots[slot] = armour_id_str
+        assert "body" in armour_slots, f"class '{class_id}' must include a body armour slot"
 
         if "starting_items" in mapping:
             items_mapping = _require_mapping(

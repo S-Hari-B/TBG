@@ -20,14 +20,25 @@ from tbg.services.story_service import (
     StoryService,
 )
 from tbg.services.battle_service import BattleService
+from tbg.services.inventory_service import InventoryService
 
 
 def _make_story_service() -> StoryService:
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    party_repo = PartyMembersRepository()
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
     return StoryService(
         story_repo=StoryRepository(),
-        classes_repo=ClassesRepository(),
-        weapons_repo=WeaponsRepository(),
-        armour_repo=ArmourRepository(),
+        classes_repo=ClassesRepository(weapons_repo=weapons_repo, armour_repo=armour_repo),
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+        inventory_service=inventory_service,
     )
 
 

@@ -31,7 +31,7 @@ class WeaponsRepository(RepositoryBase[WeaponDef]):
             attack = self._require_int(weapon_data["attack"], f"weapon '{raw_id}' attack")
             value = self._require_int(weapon_data["value"], f"weapon '{raw_id}' value")
 
-            tags = tuple(weapon_data.get("tags", [])) if isinstance(weapon_data.get("tags", []), list) else ()
+            tags = tuple(self._require_str_list(weapon_data.get("tags", []), f"weapon '{raw_id}' tags"))
             slot_cost = self._require_int(weapon_data.get("slot_cost", 1), f"weapon '{raw_id}' slot_cost")
             default_basic_attack_id = weapon_data.get("default_basic_attack_id")
             if default_basic_attack_id is not None:
@@ -63,6 +63,19 @@ class WeaponsRepository(RepositoryBase[WeaponDef]):
         if not isinstance(value, int):
             raise DataValidationError(f"{context} must be an integer.")
         return value
+
+    @staticmethod
+    def _require_str_list(value: object, context: str) -> list[str]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise DataValidationError(f"{context} must be a list.")
+        result: list[str] = []
+        for entry in value:
+            if not isinstance(entry, str):
+                raise DataValidationError(f"{context} entries must be strings.")
+            result.append(entry)
+        return result
 
     @staticmethod
     def _assert_exact_fields(

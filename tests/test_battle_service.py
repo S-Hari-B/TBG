@@ -19,6 +19,7 @@ from tbg.services.battle_service import (
     SkillUsedEvent,
 )
 from tbg.services.factories import create_player_from_class_id
+from tbg.services.inventory_service import InventoryService
 
 
 def _make_battle_service() -> BattleService:
@@ -35,9 +36,15 @@ def _make_battle_service() -> BattleService:
 def _make_state(seed: int = 123, with_party: bool = True, class_id: str = "warrior") -> GameState:
     rng = RNG(seed)
     state = GameState(seed=seed, rng=rng, mode="game_menu", current_node_id="class_select")
-    classes_repo = ClassesRepository()
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
+    classes_repo = ClassesRepository(weapons_repo=weapons_repo, armour_repo=armour_repo)
+    party_repo = PartyMembersRepository()
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
     player = create_player_from_class_id(
         class_id=class_id,
         name="Tester",
@@ -47,8 +54,12 @@ def _make_state(seed: int = 123, with_party: bool = True, class_id: str = "warri
         rng=rng,
     )
     state.player = player
+    class_def = classes_repo.get(class_id)
+    inventory_service.initialize_player_loadout(state, player.id, class_def)
     if with_party:
         state.party_members = ["emma"]
+        member_def = party_repo.get("emma")
+        inventory_service.initialize_party_member_loadout(state, "emma", member_def)
     return state
 
 

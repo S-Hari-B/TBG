@@ -4,12 +4,7 @@ from pathlib import Path
 import pytest
 
 from tbg.core.rng import RNG
-from tbg.data.repositories import (
-    ArmourRepository,
-    ClassesRepository,
-    EnemiesRepository,
-    WeaponsRepository,
-)
+from tbg.data.repositories import ArmourRepository, ClassesRepository, EnemiesRepository, WeaponsRepository
 from tbg.services.errors import FactoryError
 from tbg.services.factories import (
     create_enemy_instance,
@@ -39,8 +34,8 @@ def test_create_player_from_class_builds_expected_stats_and_equipment(tmp_path: 
     assert player.name == "Aldric"
     assert player.stats.hp == player.stats.max_hp == 50
     assert player.stats.mp == player.stats.max_mp == 10
-    assert player.stats.attack == player.equipment.weapon.attack == 3
-    assert player.stats.defense == player.equipment.armour.defense == 2
+    assert player.stats.attack == 3
+    assert player.stats.defense == 2
     assert player.stats.speed == 4
     assert player.id.startswith("player_")
 
@@ -107,6 +102,10 @@ def _seed_minimal_player_definitions(definitions_dir: Path) -> None:
                 "name": "Fighter Blade",
                 "attack": 3,
                 "value": 10,
+                "tags": ["sword"],
+                "slot_cost": 1,
+                "default_basic_attack_id": "basic_slash",
+                "energy_bonus": 0,
             }
         },
     )
@@ -115,8 +114,11 @@ def _seed_minimal_player_definitions(definitions_dir: Path) -> None:
         {
             "fighter_mail": {
                 "name": "Fighter Mail",
+                "slot": "body",
                 "defense": 2,
                 "value": 12,
+                "tags": ["heavy"],
+                "hp_bonus": 0,
             }
         },
     )
@@ -129,7 +131,7 @@ def _seed_minimal_player_definitions(definitions_dir: Path) -> None:
                 "base_mp": 10,
                 "speed": 4,
                 "starting_weapon": "fighter_blade",
-                "starting_armour": "fighter_mail",
+                "starting_armour": {"body": "fighter_mail"},
             }
         },
     )

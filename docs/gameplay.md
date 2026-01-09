@@ -17,7 +17,7 @@ Continue story
 
 Party status (future to include party talk)
 
-Inventory
+Inventory / Equipment – opens the shared inventory where you can inspect party members, equip/unequip weapons and armour, and view remaining supplies. Accessible during camp interludes and future out-of-combat scenes.
 
 Save Game (future)
 
@@ -55,9 +55,7 @@ gold is stored on Player
 
 Equipment and derived stats
 
-Equipped weapon defines “basic attack” and attack power.
-
-Equipped armour defines defense.
+Each party member has two weapon slots and four armour slots (head, body, hands, boots). Weapons with a slot_cost of 2 occupy both weapon slots; equipping them replaces any currently equipped one-handed weapons. Armour is one piece per slot. Equipping and unequipping gear is driven through the shared inventory menu. Equipped weapons determine basic attack power and available skill tags, while equipped armour pieces contribute to total defense.
 
 Combat (v1)
 Participants

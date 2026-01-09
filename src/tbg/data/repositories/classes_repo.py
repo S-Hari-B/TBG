@@ -46,29 +46,44 @@ class ClassesRepository(RepositoryBase[ClassDef]):
             starting_weapon = self._require_str(
                 class_data["starting_weapon"], f"class '{raw_id}' starting_weapon"
             )
-            starting_armour = self._require_str(
-                class_data["starting_armour"], f"class '{raw_id}' starting_armour"
-            )
-
             if starting_weapon not in weapon_ids:
                 raise DataReferenceError(
                     f"class '{raw_id}' references missing weapon '{starting_weapon}'."
                 )
-            if starting_armour not in armour_ids:
-                raise DataReferenceError(
-                    f"class '{raw_id}' references missing armour '{starting_armour}'."
-                )
 
-            extra_weapons: list[str] = []
+            starting_weapons: list[str] = []
             if "starting_weapons" in class_data:
-                extra_weapons = self._require_str_list(
+                starting_weapons = self._require_str_list(
                     class_data["starting_weapons"], f"class '{raw_id}' starting_weapons"
                 )
-                for weapon_id in extra_weapons:
-                    if weapon_id not in weapon_ids:
-                        raise DataReferenceError(
-                            f"class '{raw_id}' references missing weapon '{weapon_id}' in starting_weapons."
-                        )
+            if not starting_weapons:
+                starting_weapons = [starting_weapon]
+            elif starting_weapon not in starting_weapons:
+                starting_weapons.insert(0, starting_weapon)
+            for weapon_id in starting_weapons:
+                if weapon_id not in weapon_ids:
+                    raise DataReferenceError(
+                        f"class '{raw_id}' references missing weapon '{weapon_id}' in starting_weapons."
+                    )
+
+            armour_slots = self._parse_starting_armour(
+                class_data["starting_armour"], armour_ids, raw_id
+            )
+            starting_armour = armour_slots.get("body")
+            if not starting_armour:
+                raise DataValidationError(
+                    f"class '{raw_id}' starting_armour must include a body slot."
+                )
+
+            starting_items: dict[str, int] = {}
+            if "starting_items" in class_data:
+                items = self._require_mapping(class_data["starting_items"], f"class '{raw_id}' starting_items")
+                for item_id, qty in items.items():
+                    starting_items[self._require_str(item_id, "item id")] = self._require_int(
+                        qty, f"class '{raw_id}' starting_items[{item_id}]"
+                    )
+            else:
+                starting_items = {}
 
             classes[raw_id] = ClassDef(
                 id=raw_id,
@@ -78,7 +93,9 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 speed=speed,
                 starting_weapon_id=starting_weapon,
                 starting_armour_id=starting_armour,
-                starting_weapons=tuple(extra_weapons),
+                starting_weapons=tuple(starting_weapons),
+                starting_armour_slots=armour_slots,
+                starting_items=starting_items,
             )
         return classes
 
@@ -124,5 +141,43 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 raise DataValidationError(f"{context} entries must be strings.")
             result.append(entry)
         return result
+
+    @staticmethod
+    def _require_mapping(value: object, context: str) -> dict[str, object]:
+        if not isinstance(value, dict):
+            raise DataValidationError(f"{context} must be an object.")
+        return value
+
+    @staticmethod
+    def _require_slot_name(slot: str, context: str) -> str:
+        if slot not in {"head", "body", "hands", "boots"}:
+            raise DataValidationError(f"{context} must be one of head, body, hands, boots.")
+        return slot
+
+    def _parse_starting_armour(
+        self,
+        raw_value: object,
+        armour_ids: set[str],
+        class_id: str,
+    ) -> dict[str, str]:
+        context = f"class '{class_id}' starting_armour"
+        armour_slots: dict[str, str] = {}
+        if isinstance(raw_value, str):
+            armour_id = self._require_str(raw_value, context)
+            if armour_id not in armour_ids:
+                raise DataReferenceError(f"{context} references missing armour '{armour_id}'.")
+            armour_slots["body"] = armour_id
+            return armour_slots
+
+        slot_mapping = self._require_mapping(raw_value, context)
+        for slot_name, armour_id in slot_mapping.items():
+            slot = self._require_slot_name(slot_name, f"{context}.{slot_name}")
+            armour_id_str = self._require_str(armour_id, f"{context}.{slot_name}")
+            if armour_id_str not in armour_ids:
+                raise DataReferenceError(
+                    f"{context} references missing armour '{armour_id_str}' in slot '{slot}'."
+                )
+            armour_slots[slot] = armour_id_str
+        return armour_slots
 
 

@@ -121,31 +121,27 @@ Example:
 
 ## Armour (`armour.json`)
 
-Armour is passive defense and modifiers.
+Armour pieces explicitly declare which slot they occupy. Valid slots are `head`, `body`, `hands`, and `boots`.
 
-Fields (v1):
+Fields:
 
-* id: string
-* name: string
-* description: string
-* slot: string (v1: "body")
-* base_defense: int
-* tags: list[string]
-* bonus_max_hp: int
-* value_gold: int
+* `name`: string
+* `slot`: string (`"head"`, `"body"`, `"hands"`, `"boots"`)
+* `defense`: int
+* `value`: int
+* `tags`: list[string]
+* `hp_bonus`: int
 
 Example:
 
 ```json
-{
-  "id": "iron_armour_common",
-  "name": "Iron Armour (Common)",
-  "description": "Standard issue protection.",
-  "slot": "body",
-  "base_defense": 6,
+"iron_war_helm": {
+  "name": "Iron War Helm",
+  "slot": "head",
+  "defense": 2,
+  "value": 35,
   "tags": ["heavy_armour"],
-  "bonus_max_hp": 10,
-  "value_gold": 80
+  "hp_bonus": 2
 }
 ```
 
@@ -308,39 +304,48 @@ Example:
 
 ## Classes (`classes.json`)
 
-Classes determine starting loadout only.
-No long-term class lock-in.
+Classes determine starting loadouts and initial inventory. No long-term class lock-in.
 
-Fields (v1):
+Fields:
 
-* id: string
-* name: string
-* description: string
-* starting_stats: { max_hp: int, max_energy: int, speed: int }
-* starting_equipment:
-
-  * weapon_ids: list[string]
-  * armour_id: string
-* starting_items: list[{ item_id: string, quantity: int }]
+* `name`: string
+* `base_hp`: int
+* `base_mp`: int
+* `speed`: int
+* `starting_weapon`: string (primary weapon id)
+* `starting_weapons`: list[string] – ordered list of weapons to attempt to equip. Two-handed items consume both slots; extra items that cannot be equipped are added to the shared inventory.
+* `starting_armour`: object mapping slot (`head`, `body`, `hands`, `boots`) to armour ids
+* `starting_items`: object mapping item ids to stack counts
+* `starting_abilities`: optional list of ability ids
 
 Example:
 
 ```json
-{
-  "id": "warrior",
+"warrior": {
   "name": "Warrior",
-  "description": "Sword and shield, heavy armour, steady fundamentals.",
-  "starting_stats": { "max_hp": 40, "max_energy": 6, "speed": 4 },
-  "starting_equipment": {
-    "weapon_ids": ["iron_sword", "wooden_shield"],
-    "armour_id": "iron_armour_common"
+  "base_hp": 40,
+  "base_mp": 6,
+  "speed": 4,
+  "starting_weapon": "iron_sword",
+  "starting_weapons": ["iron_sword", "wooden_shield"],
+  "starting_armour": {
+    "body": "heavy_iron_armour_common",
+    "head": "iron_war_helm",
+    "hands": "iron_gauntlets",
+    "boots": "iron_greaves"
   },
-  "starting_items": [
-    { "item_id": "potion_hp_small", "quantity": 2 },
-    { "item_id": "potion_energy_small", "quantity": 1 }
-  ]
+  "starting_items": {
+    "potion_hp_small": 2,
+    "potion_energy_small": 1
+  }
 }
 ```
+
+---
+
+## Party Inventory (runtime state)
+
+`GameState` tracks a shared `inventory` object containing `weapons`, `armour`, and `items` maps (id → quantity). Each party member also has an `equipment` entry containing two `weapon_slots` and four `armour_slots` (`head`, `body`, `hands`, `boots`). The inventory/equipment UI manipulates these structures directly, and unequipping always returns the item to the shared pool.
 
 ---
 
