@@ -33,6 +33,7 @@ class PartyMembersRepository(RepositoryBase[PartyMemberDef]):
                 base_hp=self._require_int(base_stats.get("max_hp"), f"party member '{raw_id}' base_stats.max_hp"),
                 base_mp=self._require_int(base_stats.get("max_mp"), f"party member '{raw_id}' base_stats.max_mp"),
                 speed=self._require_int(base_stats.get("speed"), f"party member '{raw_id}' base_stats.speed"),
+                starting_level=self._require_int(member_data.get("starting_level"), f"party member '{raw_id}' starting_level"),
                 weapon_ids=weapon_ids,
                 armour_id=armour_id,
                 armour_slots=armour_slots,

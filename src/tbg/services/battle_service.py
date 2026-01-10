@@ -8,13 +8,15 @@ from tbg.core.rng import RNG
 from tbg.data.repositories import (
     ArmourRepository,
     EnemiesRepository,
+    ItemsRepository,
     KnowledgeRepository,
+    LootTablesRepository,
     PartyMembersRepository,
     SkillsRepository,
     WeaponsRepository,
 )
 from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
-from tbg.domain.defs import KnowledgeEntry, SkillDef
+from tbg.domain.defs import KnowledgeEntry, LootTableDef, SkillDef
 from tbg.domain.entities import Stats
 from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment
 from tbg.domain.state import GameState
@@ -97,6 +99,39 @@ class SkillFailedEvent(BattleEvent):
     reason: str
 
 
+@dataclass(slots=True)
+class BattleRewardsHeaderEvent(BattleEvent):
+    pass
+
+
+@dataclass(slots=True)
+class BattleGoldRewardEvent(BattleEvent):
+    amount: int
+    total_gold: int
+
+
+@dataclass(slots=True)
+class BattleExpRewardEvent(BattleEvent):
+    member_id: str
+    member_name: str
+    amount: int
+    new_level: int
+
+
+@dataclass(slots=True)
+class BattleLevelUpEvent(BattleEvent):
+    member_id: str
+    member_name: str
+    new_level: int
+
+
+@dataclass(slots=True)
+class LootAcquiredEvent(BattleEvent):
+    item_id: str
+    item_name: str
+    quantity: int
+
+
 class BattleService:
     """Deterministic battle orchestrator supporting basic attacks and party talk."""
 
@@ -108,6 +143,8 @@ class BattleService:
         weapons_repo: WeaponsRepository,
         armour_repo: ArmourRepository,
         skills_repo: SkillsRepository,
+        items_repo: ItemsRepository,
+        loot_tables_repo: LootTablesRepository,
     ) -> None:
         self._enemies_repo = enemies_repo
         self._party_members_repo = party_members_repo
@@ -115,6 +152,9 @@ class BattleService:
         self._weapons_repo = weapons_repo
         self._armour_repo = armour_repo
         self._skills_repo = skills_repo
+        self._items_repo = items_repo
+        self._loot_tables_repo = loot_tables_repo
+        self._loot_tables_cache: List[LootTableDef] | None = None
 
     # -----------------------
     # Battle Lifecycle
@@ -146,6 +186,7 @@ class BattleService:
                 )
             )
 
+        self._disambiguate_enemy_names(enemies)
         allies = [self._player_to_combatant(state)]
         for member_id in state.party_members:
             allies.append(self._party_member_to_combatant(member_id, state))
@@ -456,6 +497,16 @@ class BattleService:
             tags.update(weapon.tags)
         return tuple(sorted(tags))
 
+    def _disambiguate_enemy_names(self, enemies: List[Combatant]) -> None:
+        name_groups: Dict[str, List[Combatant]] = {}
+        for enemy in enemies:
+            name_groups.setdefault(enemy.display_name, []).append(enemy)
+        for base_name, group in name_groups.items():
+            if len(group) <= 1:
+                continue
+            for idx, combatant in enumerate(group, start=1):
+                combatant.display_name = f"{base_name} ({idx})"
+
     def _weapon_ids_from_equipment(self, equipment: MemberEquipment | None) -> List[str]:
         if equipment is None:
             return []
@@ -563,5 +614,145 @@ class BattleService:
         low = max(1, actual_hp + rng.randint(-3, -1))
         high = max(low, actual_hp + rng.randint(0, 3))
         return low, high
+
+    # -----------------------
+    # Rewards & Loot
+    # -----------------------
+    def apply_victory_rewards(self, battle_state: BattleState, state: GameState) -> List[BattleEvent]:
+        if not state.player:
+            return []
+        defeated: List[tuple[Combatant, object]] = []
+        total_gold = 0
+        total_exp = 0
+        for enemy in battle_state.enemies:
+            if enemy.source_id is None:
+                continue
+            try:
+                enemy_def = self._enemies_repo.get(enemy.source_id)
+            except KeyError:
+                continue
+            total_gold += getattr(enemy_def, "rewards_gold", 0) or 0
+            total_exp += getattr(enemy_def, "rewards_exp", 0) or 0
+            defeated.append((enemy, enemy_def))
+
+        reward_events: List[BattleEvent] = []
+        if total_gold <= 0 and total_exp <= 0 and not defeated:
+            return reward_events
+
+        reward_events.append(BattleRewardsHeaderEvent())
+        if total_gold > 0:
+            state.gold += total_gold
+            reward_events.append(BattleGoldRewardEvent(amount=total_gold, total_gold=state.gold))
+
+        if total_exp > 0:
+            participants = self._active_party_ids(state)
+            if participants:
+                base = total_exp // len(participants)
+                remainder = total_exp % len(participants)
+                for member_id in participants:
+                    share = base
+                    if member_id == state.player.id:
+                        share += remainder
+                    if share > 0:
+                        reward_events.extend(self._award_exp(state, member_id, share))
+
+        reward_events.extend(self._roll_loot(defeated, state))
+        if len(reward_events) == 1:
+            return []
+        return reward_events
+
+    def _active_party_ids(self, state: GameState) -> List[str]:
+        ids: List[str] = []
+        if state.player:
+            ids.append(state.player.id)
+        ids.extend(state.party_members)
+        return ids
+
+    def _award_exp(self, state: GameState, member_id: str, amount: int) -> List[BattleEvent]:
+        if amount <= 0:
+            return []
+        events: List[BattleEvent] = []
+        current_level = state.member_levels.get(member_id, 1)
+        current_exp = state.member_exp.get(member_id, 0)
+        current_exp += amount
+        leveled: List[int] = []
+        threshold = self._xp_to_next_level(current_level)
+        while current_exp >= threshold:
+            current_exp -= threshold
+            current_level += 1
+            leveled.append(current_level)
+            threshold = self._xp_to_next_level(current_level)
+        state.member_levels[member_id] = current_level
+        state.member_exp[member_id] = current_exp
+        member_name = self._resolve_member_name(state, member_id)
+        events.append(
+            BattleExpRewardEvent(
+                member_id=member_id,
+                member_name=member_name,
+                amount=amount,
+                new_level=current_level,
+            )
+        )
+        for level in leveled:
+            events.append(BattleLevelUpEvent(member_id=member_id, member_name=member_name, new_level=level))
+        return events
+
+    @staticmethod
+    def _xp_to_next_level(level: int) -> int:
+        return 10 + (level - 1) * 5
+
+    def _roll_loot(self, defeated: List[tuple[Combatant, object]], state: GameState) -> List[BattleEvent]:
+        loot_events: List[BattleEvent] = []
+        for combatant, _enemy_def in defeated:
+            tags = set(combatant.tags)
+            for table in self._loot_tables():
+                if not self._loot_table_matches(table, tags):
+                    continue
+                for drop in table.drops:
+                    roll = state.rng.random()
+                    if roll > drop.chance:
+                        continue
+                    quantity = drop.min_qty if drop.min_qty == drop.max_qty else state.rng.randint(drop.min_qty, drop.max_qty)
+                    if quantity <= 0:
+                        continue
+                    state.inventory.add_item(drop.item_id, quantity)
+                    loot_events.append(
+                        LootAcquiredEvent(
+                            item_id=drop.item_id,
+                            item_name=self._get_item_name(drop.item_id),
+                            quantity=quantity,
+                        )
+                    )
+        return loot_events
+
+    def _loot_tables(self) -> List[LootTableDef]:
+        if self._loot_tables_cache is None:
+            self._loot_tables_cache = list(self._loot_tables_repo.all())
+        return self._loot_tables_cache
+
+    @staticmethod
+    def _loot_table_matches(table: LootTableDef, enemy_tags: set[str]) -> bool:
+        required = set(table.required_tags)
+        forbidden = set(table.forbidden_tags)
+        if required and not required.issubset(enemy_tags):
+            return False
+        if forbidden and forbidden & enemy_tags:
+            return False
+        return True
+
+    def _get_item_name(self, item_id: str) -> str:
+        try:
+            return self._items_repo.get(item_id).name
+        except KeyError:
+            return item_id
+
+    def _resolve_member_name(self, state: GameState, member_id: str) -> str:
+        if state.player and member_id == state.player.id:
+            return state.player.name
+        try:
+            member = self._party_members_repo.get(member_id)
+            return member.name
+        except KeyError:
+            return member_id
 
 

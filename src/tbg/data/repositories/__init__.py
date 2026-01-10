@@ -9,6 +9,7 @@ from .classes_repo import ClassesRepository
 from .party_members_repo import PartyMembersRepository
 from .knowledge_repo import KnowledgeRepository
 from .skills_repo import SkillsRepository
+from .loot_tables_repo import LootTablesRepository
 
 __all__ = [
     "ItemsRepository",
@@ -20,6 +21,7 @@ __all__ = [
     "PartyMembersRepository",
     "KnowledgeRepository",
     "SkillsRepository",
+    "LootTablesRepository",
 ]
 
 

@@ -19,17 +19,15 @@ def test_items_repo_loads_two_items(tmp_path: Path) -> None:
         {
             "hp_potion": {
                 "name": "HP Potion",
-                "description": "Restores health.",
-                "type": "consumable",
-                "effects": [{"kind": "heal_hp", "amount": 10}],
+                "kind": "consumable",
                 "value": 5,
+                "heal_hp": 10,
             },
             "mp_potion": {
                 "name": "MP Potion",
-                "description": "Restores mana.",
-                "type": "consumable",
-                "effects": [{"kind": "heal_mp", "amount": 7}],
+                "kind": "consumable",
                 "value": 6,
+                "heal_mp": 7,
             },
         },
     )
@@ -64,10 +62,9 @@ def test_validation_rejects_unknown_field(tmp_path: Path) -> None:
         {
             "bad_item": {
                 "name": "Bad",
-                "description": "Invalid",
-                "type": "consumable",
-                "effects": [],
+                "kind": "material",
                 "value": 1,
+                "heal_hp": 0,
                 "extra": "nope",
             }
         },

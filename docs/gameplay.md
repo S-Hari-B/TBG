@@ -30,7 +30,7 @@ Party
 
 Max party size is 4.
 
-Party members can be added or removed through story effects.
+Party members can be added or removed through story effects. Each recruit now carries a defined `starting_level` so Emma joins the slice at level 3 instead of restarting at level 1.
 
 If party is full, adding a member must either fail with a message or require replacing someone (future decision; v1 can “fail with message”).
 
@@ -55,7 +55,7 @@ gold is stored on Player
 
 Equipment and derived stats
 
-Each party member has two weapon slots and four armour slots (head, body, hands, boots). Weapons with a slot_cost of 2 occupy both weapon slots; equipping them replaces any currently equipped one-handed weapons. Armour is one piece per slot. Equipping and unequipping gear is driven through the shared inventory menu. Equipped weapons determine basic attack power and available skill tags, while equipped armour pieces contribute to total defense.
+Each party member has two weapon slots and four armour slots (head, body, hands, boots). Weapons with a slot_cost of 2 occupy both weapon slots; equipping them replaces any currently equipped one-handed weapons. Armour is one piece per slot. Equipping and unequipping gear is driven through the shared inventory menu. Equipped weapons determine basic attack power and available skill tags (including the new spear polearms), while equipped armour pieces contribute to total defense.
 
 Combat (v1)
 Participants
@@ -96,18 +96,27 @@ Tie-break roll is a d20 by default
 
 * Available whenever at least one party member is present (Emma in Slice A).
 * Consumes the acting character’s turn.
-* Prints deterministic intel lines from `knowledge.json`. Enemy HP stays hidden (`???`) unless `TBG_DEBUG=1` is set for development.
+* Prints deterministic intel lines from `knowledge.json`. Enemy HP stays hidden (`???`) in normal play; when `TBG_DEBUG=1` is set the actual HP is displayed alongside the enemy list rather than inside the combat log.
 
 Item (later, ability to use items)
 
 Flee (A chance to flee battle. If success, no rewards gained but retreats back to previous state before battle started. If failed will result in player and all party member turns skipped and enemy gets to complete their turn)
+
+Identical enemies in the same encounter are suffixed deterministically (“Goblin Grunt (1)”, “Goblin Grunt (2)”, …) so the CLI, events, and target prompts always stay in sync.
 
 Winning and losing
 Victory
 
 All enemies defeated
 
-Rewards are applied: exp, gold, drops (drops can be v1.1 if we want)
+Rewards are applied: exp, gold, deterministic loot rolls using the shared RNG.
+
+### Battle Rewards
+
+* Gold: Sum the `rewards_gold` fields for defeated enemies; the total is added to the shared party stash and surfaced in a “Battle Rewards” block.
+* EXP: Sum `rewards_exp`, split evenly across the player plus every recruited party member. Any remainder goes to the player. Experience thresholds use `xp_to_next = 10 + (level - 1) * 5`, so the Hero reaches Level 2 immediately after clearing `goblin_pack_3`.
+* Levels: Each character keeps independent `level` and `exp` values so Emma remains level 3 when she joins. Level-ups generate their own reward events.
+* Loot: `loot_tables.json` defines tag-driven drops. Every defeated enemy is matched against all tables whose required tags are satisfied (and forbidden tags avoided). Each drop entry rolls a deterministic chance using the game RNG; successes roll quantities and the resulting items are deposited into the shared inventory. Goblins always award `goblin_horn`, while optional drops such as potions use <100% chances so tests can assert deterministic seeds.
 
 Defeat
 

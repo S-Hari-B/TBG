@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
+
 from tbg.core.rng import RNG
 from tbg.data.repositories import (
     ArmourRepository,
     ClassesRepository,
     EnemiesRepository,
+    ItemsRepository,
     KnowledgeRepository,
+    LootTablesRepository,
     PartyMembersRepository,
     SkillsRepository,
     WeaponsRepository,
@@ -15,6 +19,7 @@ from tbg.services.battle_service import (
     AttackResolvedEvent,
     BattleService,
     GuardAppliedEvent,
+    LootAcquiredEvent,
     PartyTalkEvent,
     SkillUsedEvent,
 )
@@ -30,6 +35,8 @@ def _make_battle_service() -> BattleService:
         weapons_repo=WeaponsRepository(),
         armour_repo=ArmourRepository(),
         skills_repo=SkillsRepository(),
+        items_repo=ItemsRepository(),
+        loot_tables_repo=LootTablesRepository(),
     )
 
 
@@ -56,10 +63,14 @@ def _make_state(seed: int = 123, with_party: bool = True, class_id: str = "warri
     state.player = player
     class_def = classes_repo.get(class_id)
     inventory_service.initialize_player_loadout(state, player.id, class_def)
+    state.member_levels[player.id] = classes_repo.get_starting_level(class_id)
+    state.member_exp[player.id] = 0
     if with_party:
         state.party_members = ["emma"]
         member_def = party_repo.get("emma")
         inventory_service.initialize_party_member_loadout(state, "emma", member_def)
+        state.member_levels["emma"] = member_def.starting_level
+        state.member_exp["emma"] = 0
     return state
 
 
@@ -81,6 +92,9 @@ def test_start_battle_group_enemy_creates_multiple_enemies() -> None:
     battle_state, _ = service.start_battle("goblin_pack_3", state)
 
     assert len(battle_state.enemies) == 3
+    names = [enemy.display_name for enemy in battle_state.enemies]
+    assert len(set(names)) == len(names)
+    assert all("(" in name for name in names)
 
 
 def test_basic_attack_reduces_hp_and_can_kill() -> None:
@@ -184,6 +198,62 @@ def test_enemy_ai_target_selection_deterministic_for_seed() -> None:
     target_b = next(evt.target_id for evt in events_b if isinstance(evt, AttackResolvedEvent))
 
     assert target_a == target_b
+
+
+def test_apply_victory_rewards_grants_gold_exp_and_loot() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_pack_3", state)
+    for enemy in battle_state.enemies:
+        enemy.stats.hp = 0
+    state.rng = RNG(1)
+    events = service.apply_victory_rewards(battle_state, state)
+
+    assert state.gold >= 9
+    assert state.member_levels[state.player.id] >= 2
+    assert any(isinstance(evt, LootAcquiredEvent) for evt in events)
+
+
+def test_optional_loot_drop_is_deterministic_by_seed(tmp_path) -> None:
+    loot_dir = tmp_path / "loot_defs"
+    loot_dir.mkdir()
+    (loot_dir / "loot_tables.json").write_text(
+        json.dumps(
+            [
+                {
+                    "id": "test_goblin_drops",
+                    "required_enemy_tags": ["goblin"],
+                    "drops": [
+                        {"item_id": "potion_energy_small", "chance": 0.5, "min_qty": 1, "max_qty": 1},
+                    ],
+                }
+            ],
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    def _drops(seed: int) -> bool:
+        service = BattleService(
+            enemies_repo=EnemiesRepository(),
+            party_members_repo=PartyMembersRepository(),
+            knowledge_repo=KnowledgeRepository(),
+            weapons_repo=WeaponsRepository(),
+            armour_repo=ArmourRepository(),
+            skills_repo=SkillsRepository(),
+            items_repo=ItemsRepository(),
+            loot_tables_repo=LootTablesRepository(base_path=loot_dir),
+        )
+        state = _make_state(with_party=False)
+        battle_state, _ = service.start_battle("goblin_grunt", state)
+        for enemy in battle_state.enemies:
+            enemy.stats.hp = 0
+        state.rng = RNG(seed)
+        events = service.apply_victory_rewards(battle_state, state)
+        return any(isinstance(evt, LootAcquiredEvent) and evt.item_id == "potion_energy_small" for evt in events)
+
+    assert _drops(1) is True
+    assert _drops(2) is False
 
 
 def test_skill_eligibility_by_weapon_tags() -> None:

@@ -177,6 +177,7 @@ Party Talk consumes the active character's turn and prints deterministic knowled
 
 Emma can reveal information about goblins via Party Talk
 Staff-user skills (Firebolt single-target, Ember Wave up to 3) unlock when Emma has the MP to spend.
+Victory rewards: defeating the goblin pack yields enough EXP for the Hero to reach Level 2, grants Emma her share (without changing her level 3 baseline), and always drops a `goblin_horn` plus a deterministic chance at bonus supplies.
 
 Next: post_ambush_menu
 
@@ -208,7 +209,7 @@ Design Notes
 Enemy stats are hidden by default
 Battles now run directly inside the CLI with deterministic turn order and offer Basic Attack, Use Skill (weapon-tag gated), and Party Talk actions.
 Party Talk currently prints structured knowledge text directly (UI intel reveal remains future work and enemy HP stays `???`).
-
 Information is revealed only through Party Talk
+Additional enemies (wolves, boars, bandits, slimes, goblin archers) plus the spear weapon line exist in the data to support future encounters even though Slice A focuses on goblins.
 
 This slice establishes party members as strategic assets, not just combat units

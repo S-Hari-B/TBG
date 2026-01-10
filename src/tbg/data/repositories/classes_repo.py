@@ -22,10 +22,12 @@ class ClassesRepository(RepositoryBase[ClassDef]):
         super().__init__("classes.json", base_path)
         self._weapons_repo = weapons_repo or WeaponsRepository(base_path=base_path)
         self._armour_repo = armour_repo or ArmourRepository(base_path=base_path)
+        self._starting_levels: Dict[str, int] = {}
 
     def _build(self, raw: dict[str, object]) -> Dict[str, ClassDef]:
         weapon_ids = {weapon.id for weapon in self._weapons_repo.all()}
         armour_ids = {armour.id for armour in self._armour_repo.all()}
+        self._starting_levels = {}
 
         classes: Dict[str, ClassDef] = {}
         for raw_id, payload in raw.items():
@@ -36,7 +38,7 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 class_data,
                 {"name", "base_hp", "base_mp", "speed", "starting_weapon", "starting_armour"},
                 f"class '{raw_id}'",
-                optional_fields={"starting_weapons", "starting_items", "starting_abilities"},
+                optional_fields={"starting_weapons", "starting_items", "starting_abilities", "starting_level"},
             )
 
             name = self._require_str(class_data["name"], f"class '{raw_id}' name")
@@ -84,6 +86,8 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                     )
             else:
                 starting_items = {}
+            starting_level = self._require_int(class_data.get("starting_level", 1), f"class '{raw_id}' starting_level")
+            self._starting_levels[raw_id] = starting_level
 
             classes[raw_id] = ClassDef(
                 id=raw_id,
@@ -98,6 +102,10 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 starting_items=starting_items,
             )
         return classes
+
+    def get_starting_level(self, class_id: str) -> int:
+        self._ensure_loaded()
+        return self._starting_levels.get(class_id, 1)
 
     @staticmethod
     def _require_str(value: object, context: str) -> str:

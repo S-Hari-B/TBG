@@ -61,5 +61,50 @@
     "slot_cost": 1,
     "default_basic_attack_id": "basic_stab",
     "energy_bonus": 0
+  },
+  "wooden_spear": {
+    "name": "Wooden Spear",
+    "attack": 5,
+    "value": 20,
+    "tags": ["spear", "pierce"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_thrust",
+    "energy_bonus": 0
+  },
+  "iron_spear": {
+    "name": "Iron Spear",
+    "attack": 9,
+    "value": 70,
+    "tags": ["spear", "pierce"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_thrust",
+    "energy_bonus": 0
+  },
+  "bandit_pike": {
+    "name": "Bandit Pike",
+    "attack": 11,
+    "value": 90,
+    "tags": ["spear", "pierce"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_thrust",
+    "energy_bonus": 0
+  },
+  "hunter_spear": {
+    "name": "Hunter's Spear",
+    "attack": 7,
+    "value": 55,
+    "tags": ["spear", "pierce"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_thrust",
+    "energy_bonus": 0
+  },
+  "steel_lance": {
+    "name": "Steel Lance",
+    "attack": 13,
+    "value": 110,
+    "tags": ["spear", "pierce"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_thrust",
+    "energy_bonus": 0
   }
 }

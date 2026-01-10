@@ -1,0 +1,44 @@
+[
+  {
+    "id": "global_basic",
+    "required_enemy_tags": [],
+    "drops": [
+      {
+        "item_id": "potion_hp_small",
+        "chance": 0.2,
+        "min_qty": 1,
+        "max_qty": 1
+      }
+    ]
+  },
+  {
+    "id": "goblin_horn_drop",
+    "required_enemy_tags": ["goblin"],
+    "drops": [
+      {
+        "item_id": "goblin_horn",
+        "chance": 0.2,
+        "min_qty": 1,
+        "max_qty": 1
+      },
+      {
+        "item_id": "potion_energy_small",
+        "chance": 0.25,
+        "min_qty": 1,
+        "max_qty": 1
+      }
+    ]
+  },
+  {
+    "id": "beast_materials",
+    "required_enemy_tags": ["beast"],
+    "drops": [
+      {
+        "item_id": "potion_hp_small",
+        "chance": 0.15,
+        "min_qty": 1,
+        "max_qty": 1
+      }
+    ]
+  }
+]

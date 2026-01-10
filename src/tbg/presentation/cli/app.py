@@ -9,7 +9,9 @@ from tbg.data.repositories import (
     ArmourRepository,
     ClassesRepository,
     EnemiesRepository,
+    ItemsRepository,
     KnowledgeRepository,
+    LootTablesRepository,
     PartyMembersRepository,
     StoryRepository,
     SkillsRepository,
@@ -33,15 +35,20 @@ from tbg.services import (
 from tbg.services.battle_service import (
     AttackResolvedEvent,
     BattleEvent,
+    BattleExpRewardEvent,
+    BattleLevelUpEvent,
     BattleResolvedEvent,
+    BattleRewardsHeaderEvent,
     BattleService,
     BattleStartedEvent,
     BattleView,
     CombatantDefeatedEvent,
     GuardAppliedEvent,
+    LootAcquiredEvent,
     PartyTalkEvent,
     SkillFailedEvent,
     SkillUsedEvent,
+    BattleGoldRewardEvent,
 )
 from tbg.services.inventory_service import (
     ArmourSlotView,
@@ -127,6 +134,8 @@ def _build_services() -> tuple[StoryService, BattleService, InventoryService]:
     enemies_repo = EnemiesRepository()
     knowledge_repo = KnowledgeRepository()
     skills_repo = SkillsRepository()
+    items_repo = ItemsRepository()
+    loot_repo = LootTablesRepository()
     battle_service = BattleService(
         enemies_repo=enemies_repo,
         party_members_repo=party_repo,
@@ -134,6 +143,8 @@ def _build_services() -> tuple[StoryService, BattleService, InventoryService]:
         weapons_repo=weapons_repo,
         armour_repo=armour_repo,
         skills_repo=skills_repo,
+        items_repo=items_repo,
+        loot_tables_repo=loot_repo,
     )
     return story_service, battle_service, inventory_service
 
@@ -654,6 +665,9 @@ def _run_battle_loop(battle_service: BattleService, battle_state: BattleState, s
         else:
             events = battle_service.run_enemy_turn(battle_state, state.rng)
         _render_battle_events(events)
+    if battle_state.victor == "allies":
+        reward_events = battle_service.apply_victory_rewards(battle_state, state)
+        _render_battle_events(reward_events)
     return battle_state.victor == "allies"
 
 
@@ -804,30 +818,40 @@ def _prompt_party_member_choice(state: GameState, prompt_title: str = "Party Tal
 def _render_battle_events(events: List[BattleEvent]) -> None:
     if not events:
         return
-    render_events_header()
+    standard_header_printed = False
+    in_rewards_block = False
     for event in events:
+        if isinstance(event, BattleRewardsHeaderEvent):
+            render_heading("Battle Rewards")
+            in_rewards_block = True
+            continue
+        if not in_rewards_block and not standard_header_printed:
+            render_events_header()
+            standard_header_printed = True
         if isinstance(event, BattleStartedEvent):
             print(f"- Battle started against {', '.join(event.enemy_names)}.")
         elif isinstance(event, AttackResolvedEvent):
-            print(
-                f"- {event.attacker_name} hits {event.target_name} for {event.damage} damage "
-                f"(HP now {event.target_hp})."
-            )
+            print(f"- {event.attacker_name} hits {event.target_name} for {event.damage} damage.")
         elif isinstance(event, CombatantDefeatedEvent):
             print(f"- {event.combatant_name} is defeated.")
         elif isinstance(event, PartyTalkEvent):
             print(f"- {event.text}")
         elif isinstance(event, SkillUsedEvent):
-            print(
-                f"- {event.attacker_name} uses {event.skill_name} on {event.target_name} "
-                f"for {event.damage} damage (HP now {event.target_hp})."
-            )
+            print(f"- {event.attacker_name} uses {event.skill_name} on {event.target_name} for {event.damage} damage.")
         elif isinstance(event, GuardAppliedEvent):
             print(f"- {event.combatant_name} braces, reducing the next hit by {event.amount}.")
         elif isinstance(event, SkillFailedEvent):
             print(f"- {event.combatant_name} cannot use that skill ({event.reason}).")
         elif isinstance(event, BattleResolvedEvent):
             print(f"- Battle resolved. Victor: {event.victor.title()}")
+        elif isinstance(event, BattleGoldRewardEvent):
+            print(f"- Gained {event.amount} gold (Total: {event.total_gold}).")
+        elif isinstance(event, BattleExpRewardEvent):
+            print(f"- {event.member_name} gains {event.amount} EXP (Level {event.new_level}).")
+        elif isinstance(event, BattleLevelUpEvent):
+            print(f"- {event.member_name} reached Level {event.new_level}!")
+        elif isinstance(event, LootAcquiredEvent):
+            print(f"- Loot: {event.item_name} x{event.quantity}")
         else:
             print(f"- {event}")
 
@@ -846,7 +870,7 @@ def _format_enemy_hp_display(enemy: BattleCombatantView, *, debug_enabled: bool)
         return "DOWN"
     if not debug_enabled:
         return enemy.hp_display
-    return f"{enemy.hp_display} (DEBUG {enemy.current_hp}/{enemy.max_hp})"
+    return f"{enemy.hp_display} [{enemy.current_hp}/{enemy.max_hp}]"
 
 
 def _lookup_combatant_name(view: BattleView, combatant_id: str | None) -> str | None:

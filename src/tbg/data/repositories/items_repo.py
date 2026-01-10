@@ -5,7 +5,7 @@ from typing import Dict, List
 
 from tbg.data.errors import DataValidationError
 from tbg.data.repositories.base import RepositoryBase
-from tbg.domain.defs import EffectDef, ItemDef
+from tbg.domain.defs import ItemDef
 
 
 class ItemsRepository(RepositoryBase[ItemDef]):
@@ -20,40 +20,30 @@ class ItemsRepository(RepositoryBase[ItemDef]):
             if not isinstance(raw_id, str):
                 raise DataValidationError("Item IDs must be strings.")
             item_data = self._require_mapping(payload, f"item '{raw_id}'")
-            self._assert_exact_fields(
+            self._assert_allowed_fields(
                 item_data,
-                {"name", "description", "type", "effects", "value"},
-                f"item '{raw_id}'",
+                required={"name", "kind", "value"},
+                optional={"heal_hp", "heal_mp", "restore_energy"},
+                context=f"item '{raw_id}'",
             )
 
             name = self._require_str(item_data["name"], f"item '{raw_id}' name")
-            description = self._require_str(item_data["description"], f"item '{raw_id}' description")
-            item_type = self._require_str(item_data["type"], f"item '{raw_id}' type")
+            kind = self._require_str(item_data["kind"], f"item '{raw_id}' kind")
             value = self._require_int(item_data["value"], f"item '{raw_id}' value")
-            effects = self._parse_effects(item_data["effects"], raw_id)
+            heal_hp = self._require_int(item_data.get("heal_hp", 0), f"item '{raw_id}' heal_hp")
+            heal_mp = self._require_int(item_data.get("heal_mp", 0), f"item '{raw_id}' heal_mp")
+            restore = self._require_int(item_data.get("restore_energy", 0), f"item '{raw_id}' restore_energy")
 
             items[raw_id] = ItemDef(
                 id=raw_id,
                 name=name,
-                description=description,
-                type=item_type,
-                effects=effects,
+                kind=kind,
                 value=value,
+                heal_hp=heal_hp,
+                heal_mp=heal_mp,
+                restore_energy=restore,
             )
         return items
-
-    def _parse_effects(self, raw_effects: object, item_id: str) -> List[EffectDef]:
-        if not isinstance(raw_effects, list):
-            raise DataValidationError(f"item '{item_id}' effects must be a list.")
-        effects: List[EffectDef] = []
-        for index, entry in enumerate(raw_effects):
-            effect_context = f"item '{item_id}' effects[{index}]"
-            effect_data = self._require_mapping(entry, effect_context)
-            self._assert_exact_fields(effect_data, {"kind", "amount"}, effect_context)
-            kind = self._require_str(effect_data["kind"], f"{effect_context} kind")
-            amount = self._require_int(effect_data["amount"], f"{effect_context} amount")
-            effects.append(EffectDef(kind=kind, amount=amount))
-        return effects
 
     @staticmethod
     def _require_str(value: object, context: str) -> str:
@@ -68,16 +58,24 @@ class ItemsRepository(RepositoryBase[ItemDef]):
         return value
 
     @staticmethod
-    def _assert_exact_fields(payload: dict[str, object], expected_keys: set[str], context: str) -> None:
-        actual_keys = set(payload.keys())
-        if actual_keys != expected_keys:
-            missing = expected_keys - actual_keys
-            unknown = actual_keys - expected_keys
-            pieces = []
+    def _assert_allowed_fields(
+        mapping: dict[str, object],
+        *,
+        required: List[str],
+        optional: List[str],
+        context: str,
+    ) -> None:
+        required_set = set(required)
+        optional_set = set(optional)
+        actual = set(mapping.keys())
+        missing = required_set - actual
+        unknown = actual - required_set - optional_set
+        if missing or unknown:
+            msg = []
             if missing:
-                pieces.append(f"missing fields: {sorted(missing)}")
+                msg.append(f"missing fields: {sorted(missing)}")
             if unknown:
-                pieces.append(f"unknown fields: {sorted(unknown)}")
-            raise DataValidationError(f"{context} has schema issues ({'; '.join(pieces)}).")
+                msg.append(f"unknown fields: {sorted(unknown)}")
+            raise DataValidationError(f"{context} has schema issues ({'; '.join(msg)}).")
 
 

@@ -1,7 +1,6 @@
 {
   "emma": {
     "name": "Emma",
-    "level": 1,
     "role": "mage",
     "description": "A young adventurer heading to the capital. Capable, but still learning.",
     "tags": ["human", "mage", "adventurer"],
@@ -19,6 +18,7 @@
         "boots": "cloth_boots"
       }
     },
+    "starting_level": 3,
     "starting_abilities": [
       "firebolt",
       "fireburst"

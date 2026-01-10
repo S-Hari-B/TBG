@@ -15,7 +15,8 @@
     "starting_items": {
       "potion_hp_small": 2,
       "potion_energy_small": 1
-    }
+    },
+    "starting_level": 1
   },
   "rogue": {
     "name": "Rogue",
@@ -33,7 +34,8 @@
     "starting_items": {
       "potion_hp_small": 2,
       "potion_energy_small": 1
-    }
+    },
+    "starting_level": 1
   },
   "mage": {
     "name": "Mage",
@@ -52,7 +54,8 @@
       "potion_hp_small": 1,
       "potion_energy_small": 2
     },
-    "starting_abilities": ["firebolt", "fireburst"]
+    "starting_abilities": ["firebolt", "fireburst"],
+    "starting_level": 1
   },
   "commoner": {
     "name": "Commoner",
@@ -69,6 +72,7 @@
     },
     "starting_items": {
       "potion_hp_small": 1
-    }
+    },
+    "starting_level": 1
   }
 }

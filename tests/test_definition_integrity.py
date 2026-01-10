@@ -26,6 +26,7 @@ def definitions_dir() -> Path:
         "story.json",
         "abilities.json",
         "skills.json",
+        "loot_tables.json",
     ],
 )
 def test_definition_files_are_valid_json(definitions_dir: Path, filename: str) -> None:
@@ -47,6 +48,7 @@ def test_definition_integrity_and_references(definitions_dir: Path) -> None:
     skills = _validate_skills(definitions_dir)
     classes = _validate_classes(definitions_dir, weapons, armour, items)
     enemies = _validate_enemies(definitions_dir, weapons, armour)
+    _validate_loot_tables(definitions_dir, items)
     _validate_story(definitions_dir, classes, enemies)
     _validate_abilities(definitions_dir)
     assert skills  # ensure skills file not empty
@@ -189,7 +191,7 @@ def _validate_classes(
                 "starting_weapon",
                 "starting_armour",
             },
-            optional={"starting_weapons", "starting_items", "starting_abilities"},
+            optional={"starting_weapons", "starting_items", "starting_abilities", "starting_level"},
             context=f"class '{class_id}'",
         )
         _require_str(mapping["name"], f"class '{class_id}' name")
@@ -246,6 +248,8 @@ def _validate_classes(
                 assert (
                     item_id in item_ids
                 ), f"class '{class_id}' references missing item '{item_id}'"
+
+        _require_int(mapping.get("starting_level", 1), f"class '{class_id}' starting_level")
 
         if "starting_abilities" in mapping:
             _require_str_list(
@@ -496,6 +500,41 @@ def _require_str_list(value: Any, context: str) -> list[str]:
     for entry in value:
         result.append(_require_str(entry, context))
     return result
+
+
+def _validate_loot_tables(definitions_dir: Path, item_ids: set[str]) -> None:
+    path = definitions_dir / "loot_tables.json"
+    if not path.exists():
+        return
+    data = load_json(path)
+    assert isinstance(data, list), "loot_tables.json must contain a list."
+    for index, entry in enumerate(data):
+        context = f"loot_tables[{index}]"
+        mapping = _require_mapping(entry, context)
+        _require_str(mapping.get("id"), f"{context}.id")
+        _require_str_list(mapping.get("required_enemy_tags", []), f"{context}.required_enemy_tags")
+        _require_str_list(mapping.get("forbidden_enemy_tags", []), f"{context}.forbidden_enemy_tags")
+        drops = _require_list(mapping.get("drops"), f"{context}.drops")
+        for drop_index, drop in enumerate(drops):
+            drop_ctx = f"{context}.drops[{drop_index}]"
+            drop_map = _require_mapping(drop, drop_ctx)
+            item_id = _require_str(drop_map.get("item_id"), f"{drop_ctx}.item_id")
+            assert item_id in item_ids, f"{drop_ctx}.item_id '{item_id}' not found in items.json"
+            chance = _require_float(drop_map.get("chance", 0.0), f"{drop_ctx}.chance")
+            assert 0.0 <= chance <= 1.0, f"{drop_ctx}.chance must be between 0 and 1"
+            min_qty = _require_int(drop_map.get("min_qty", 1), f"{drop_ctx}.min_qty")
+            max_qty = _require_int(drop_map.get("max_qty", min_qty), f"{drop_ctx}.max_qty")
+            assert min_qty > 0 and max_qty >= min_qty, f"{drop_ctx} quantity range invalid"
+
+
+def _require_list(value: Any, context: str) -> list[Any]:
+    assert isinstance(value, list), f"{context} must be a list."
+    return value
+
+
+def _require_float(value: Any, context: str) -> float:
+    assert isinstance(value, (int, float)) and not isinstance(value, bool), f"{context} must be a number."
+    return float(value)
 
 
 def _require_number(value: Any, context: str) -> float:

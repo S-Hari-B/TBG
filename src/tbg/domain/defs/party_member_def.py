@@ -14,6 +14,7 @@ class PartyMemberDef:
     base_hp: int
     base_mp: int
     speed: int
+    starting_level: int
     weapon_ids: Tuple[str, ...]
     armour_id: str | None
     armour_slots: Dict[str, str] = field(default_factory=dict)

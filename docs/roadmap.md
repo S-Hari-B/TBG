@@ -49,6 +49,12 @@ Status legend:
 * Weapons now enforce slot_cost (1H vs 2H) and armour specifies slot metadata; data definitions and validation updated accordingly.
 * Game menu exposes an Inventory / Equipment option that lets players inspect party members and swap gear before resuming the story.
 
+## DONE: Ticket-009 – Battle Rewards, Loot Tables, and Content Expansion
+
+* Victories now grant deterministic gold, EXP splits, and loot rolls driven by tag-based drop tables; level-ups emit explicit events and Emma joins at level 3.
+* Added `loot_tables.json`, goblin horn drops, optional potion rewards, a spear weapon line, new spear skills, and five additional enemies (wolf, boar, bandit scout, spore slime, goblin archer) for future encounters.
+* Battle UI improvements: identical enemies gain numbered suffixes, debug HP is shown beside the `???` placeholder instead of event spam, and reward blocks render under a dedicated heading.
+
 ---
 
 ## NEXT: Ticket-005.1 – UI Intel Reveal + Knowledge Tracking

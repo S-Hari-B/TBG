@@ -13,5 +13,10 @@
     "heal_hp": 0,
     "heal_mp": 15,
     "restore_energy": 15
+  },
+  "goblin_horn": {
+    "name": "Goblin Horn",
+    "kind": "material",
+    "value": 12
   }
 }

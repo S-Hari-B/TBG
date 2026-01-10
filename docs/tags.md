@@ -11,6 +11,7 @@ Tags are short lowercase identifiers used across definitions for gating and look
 | dagger | Light blades (Quick Stab)           |
 | club   | Blunt weapons (Skull Thump)         |
 | staff  | Focus items for mages (Firebolt/Ember Wave) |
+| spear  | Polearms (Piercing Thrust, Sweeping Polearm) |
 
 Secondary tags (e.g., `slash`, `blunt`, `fire`) can be combined with the primary tags for future resistances and knowledge hooks.
 
@@ -20,6 +21,10 @@ Secondary tags (e.g., `slash`, `blunt`, `fire`) can be combined with the primary
 |---------|---------------------------------------|
 | goblin  | Goblin foes (Emma’s knowledge entry)  |
 | humanoid| Used for general lore/knowledge hooks |
+| beast   | Wolves, boars, other animals          |
+| bandit  | Human raiders (future story beats)    |
+| slime   | Slime creatures                        |
+| ooze    | Variant of slime enemies               |
 
 ## Usage Summary
 

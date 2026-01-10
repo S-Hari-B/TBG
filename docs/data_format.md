@@ -269,17 +269,15 @@ Example:
 
 ## Enemies (`enemies.json`)
 
-Enemy combat identity is a mix of base stats, equipment, and tags.
+Enemy combat identity is a mix of base stats, tags, and optional equipment overrides.
 
 Fields (v1):
 
-* id: string
-* name: string
-* level: int
-* tags: list[string]
-* base_stats: { max_hp: int, max_energy: int, speed: int }
-* equipment: { weapon_ids: list[string], armour_id: string }
-* rewards: { exp: int, gold: int }
+* `name`: string
+* `hp`, `mp`, `attack`, `defense`, `speed`: ints
+* `tags`: list[string]
+* `equipment`: optional { `weapons`: list[string], `armour`: string }
+* `rewards_exp`, `rewards_gold`: ints
 
 Notes:
 
@@ -290,13 +288,16 @@ Example:
 
 ```json
 {
-  "id": "goblin_grunt",
   "name": "Goblin Grunt",
-  "level": 1,
+  "hp": 22,
+  "mp": 0,
+  "attack": 5,
+  "defense": 2,
+  "speed": 6,
+  "rewards_exp": 8,
+  "rewards_gold": 3,
   "tags": ["goblin", "humanoid"],
-  "base_stats": { "max_hp": 22, "max_energy": 0, "speed": 5 },
-  "equipment": { "weapon_ids": ["rusty_dagger"], "armour_id": "leather_rags" },
-  "rewards": { "exp": 6, "gold": 3 }
+  "equipment": { "weapons": ["goblin_dagger"], "armour": "goblin_rags" }
 }
 ```
 
@@ -317,6 +318,7 @@ Fields:
 * `starting_armour`: object mapping slot (`head`, `body`, `hands`, `boots`) to armour ids
 * `starting_items`: object mapping item ids to stack counts
 * `starting_abilities`: optional list of ability ids
+* `starting_level`: int (defaults to 1 if omitted; used for XP distribution and level-up pacing)
 
 Example:
 
@@ -337,15 +339,54 @@ Example:
   "starting_items": {
     "potion_hp_small": 2,
     "potion_energy_small": 1
-  }
+  },
+  "starting_level": 1
 }
 ```
+
+---
+
+## Party Members (`party_members.json`)
+
+Party members define recruitable allies such as Emma. Fields mirror the class definition but also declare the exact level a recruit joins at:
+
+* `name`: string
+* `starting_level`: int (Emma is 3)
+* `tags`: list[string]
+* `base_stats`: { `max_hp`, `max_mp`, `speed` }
+* `equipment`: { `weapons`: list[string], `armour_slots`: { slot: armour_id } }
 
 ---
 
 ## Party Inventory (runtime state)
 
 `GameState` tracks a shared `inventory` object containing `weapons`, `armour`, and `items` maps (id → quantity). Each party member also has an `equipment` entry containing two `weapon_slots` and four `armour_slots` (`head`, `body`, `hands`, `boots`). The inventory/equipment UI manipulates these structures directly, and unequipping always returns the item to the shared pool.
+
+---
+
+## Loot Tables (`loot_tables.json`)
+
+Loot tables are stored as a list. Each entry contains:
+
+* `id`: string
+* `required_enemy_tags`: list[string] – all tags must be present on the defeated enemy
+* `forbidden_enemy_tags`: optional list[string]
+* `drops`: list of `{ "item_id": str, "chance": float (0-1), "min_qty": int, "max_qty": int }`
+
+Example:
+
+```json
+{
+  "id": "goblin_horn_drop",
+  "required_enemy_tags": ["goblin"],
+  "drops": [
+    { "item_id": "goblin_horn", "chance": 1.0, "min_qty": 1, "max_qty": 1 },
+    { "item_id": "potion_energy_small", "chance": 0.25, "min_qty": 1, "max_qty": 1 }
+  ]
+}
+```
+
+Tables are matched in-order and every drop rolls using the single shared RNG to keep battle rewards reproducible.
 
 ---
 

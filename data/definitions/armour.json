@@ -126,5 +126,45 @@
     "value": 5,
     "tags": ["light_armour"],
     "hp_bonus": 0
+  },
+  "wolf_hide_cloak": {
+    "name": "Wolf Hide Cloak",
+    "slot": "body",
+    "defense": 3,
+    "value": 60,
+    "tags": ["light_armour"],
+    "hp_bonus": 4
+  },
+  "wolf_pelt_cap": {
+    "name": "Wolf Pelt Cap",
+    "slot": "head",
+    "defense": 1,
+    "value": 35,
+    "tags": ["light_armour"],
+    "hp_bonus": 1
+  },
+  "bandit_leathers": {
+    "name": "Bandit Leathers",
+    "slot": "body",
+    "defense": 5,
+    "value": 70,
+    "tags": ["medium_armour"],
+    "hp_bonus": 3
+  },
+  "bandit_bracers": {
+    "name": "Bandit Bracers",
+    "slot": "hands",
+    "defense": 2,
+    "value": 35,
+    "tags": ["medium_armour"],
+    "hp_bonus": 1
+  },
+  "bandit_boots": {
+    "name": "Bandit Boots",
+    "slot": "boots",
+    "defense": 2,
+    "value": 35,
+    "tags": ["medium_armour"],
+    "hp_bonus": 1
   }
 }

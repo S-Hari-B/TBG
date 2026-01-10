@@ -188,6 +188,7 @@ class StoryService:
             if effect_type == "set_class":
                 class_id = self._require_str(effect.data.get("class_id"), "set_class.class_id")
                 class_def = self._classes_repo.get(class_id)
+                starting_level = self._classes_repo.get_starting_level(class_id)
                 player = create_player_from_class_id(
                     class_id=class_id,
                     name=state.player_name,
@@ -197,6 +198,8 @@ class StoryService:
                     rng=state.rng,
                 )
                 state.player = player
+                state.member_levels[player.id] = starting_level
+                state.member_exp[player.id] = 0
                 self._inventory_service.initialize_player_loadout(state, player.id, class_def)
                 emitted.append(PlayerClassSetEvent(class_id=class_id, player_id=player.id))
             elif effect_type == "start_battle":
@@ -210,6 +213,8 @@ class StoryService:
                     try:
                         member_def = self._party_members_repo.get(member_id)
                         self._inventory_service.initialize_party_member_loadout(state, member_id, member_def)
+                        state.member_levels[member_id] = member_def.starting_level
+                        state.member_exp[member_id] = 0
                     except KeyError:
                         pass
                 emitted.append(PartyMemberJoinedEvent(member_id=member_id))

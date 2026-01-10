@@ -70,6 +70,42 @@
     "base_power": 3,
     "effect_type": "damage",
     "gold_value": 32
+  },
+  "skill_piercing_thrust": {
+    "name": "Piercing Thrust",
+    "description": "Drive your spear through a foe's defenses.",
+    "tags": ["skill", "spear"],
+    "required_weapon_tags": ["spear"],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 3,
+    "base_power": 6,
+    "effect_type": "damage",
+    "gold_value": 30
+  },
+  "skill_sweeping_polearm": {
+    "name": "Sweeping Polearm",
+    "description": "Sweep a spear across multiple foes.",
+    "tags": ["skill", "spear"],
+    "required_weapon_tags": ["spear"],
+    "target_mode": "multi_enemy",
+    "max_targets": 2,
+    "mp_cost": 5,
+    "base_power": 4,
+    "effect_type": "damage",
+    "gold_value": 38
+  },
+  "skill_impale": {
+    "name": "Impale",
+    "description": "A powerful thrust that can topple a foe.",
+    "tags": ["skill", "spear", "elite"],
+    "required_weapon_tags": ["spear"],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 7,
+    "base_power": 9,
+    "effect_type": "damage",
+    "gold_value": 50
   }
 }
 
