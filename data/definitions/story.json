@@ -45,8 +45,7 @@
       "next": "forest_aftermath"
     },
     "forest_aftermath": {
-      "text": "The forest goes quiet again. Emma exhales. “Okay. Now we’re even.”\n\nYou continue toward the capital.",
-      "effects": [{ "type": "give_gold", "amount": 5 }, { "type": "give_exp", "amount": 10 }]
+      "text": "The forest goes quiet again. Emma exhales. “Okay. Now we’re even.”\n\nYou continue toward the capital."
     }
   }
   

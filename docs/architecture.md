@@ -9,6 +9,7 @@ Layers:
 * Renders text to the user
 * Reads and validates user input
 * Calls services to perform actions
+* Owns slot-based save file I/O through a tiny adapter (`SaveSlotStore`) that reads/writes `data/saves/slot_X.json`; serialization logic remains in the services layer
 * Never computes combat outcomes or modifies domain objects directly
 
 ## services (orchestration)
@@ -18,6 +19,7 @@ Layers:
 * Constructs domain entities using factories
 * Owns GameState (overall runtime state)
 * Returns structured results and events for presentation to render
+* Implements persistence orchestration (`SaveService`) to serialize/deserialize `GameState` + RNG snapshots, validate ids against current definitions, and guard against schema/version drift
 
 ## domain (game rules)
 

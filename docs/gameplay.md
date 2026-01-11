@@ -5,7 +5,7 @@ Main Menu
 
 New Game (enter seed or generate)
 
-Load Game (future)
+Load Game (resume from one of three managed slots)
 
 Options (future)
 
@@ -19,9 +19,17 @@ Party status (future to include party talk)
 
 Inventory / Equipment – opens the shared inventory where you can inspect party members, equip/unequip weapons and armour, and view remaining supplies. Accessible during camp interludes and future out-of-combat scenes.
 
-Save Game (future)
+Save Game – only available from camp interludes. Writes the current runtime state (story position, party, inventory, equipment, flags, and RNG state) to a chosen slot under `data/saves/slot_{1-3}.json`.
 
 Quit to main menu
+
+## Manual Save/Load
+
+* Saving is always player initiated and only surfaces inside the Camp Menu interlude that fires after `enter_game_menu` story effects. The CLI lists three numbered slots; picking one serializes the full `GameState` plus RNG state. Success prints `Saved to Slot X.` and the player remains in camp. Errors are reported and the menu remains open.
+* Loading is only exposed on the Main Menu before entering or resuming play. Selecting `Load Game` shows the same three slots with summaries (player name, node id, last-saved timestamp). Empty slots are marked `Empty`; corrupt slots display `Corrupt data`. Attempting to load an empty or corrupt slot keeps the player in the Main Menu.
+* Save files live under `data/saves/slot_1.json` through `slot_3.json`. The format is versioned (`"save_version": 1`). Any mismatch or missing fields results in `Load failed: <reason>` and the CLI returns to the Main Menu without altering state.
+* Saves include the RNG internal state, so any random draws performed after loading match what would have happened had the player never quit. Story flow resumes exactly where the camp interlude paused: if you saved mid-camp you load back into the Camp Menu before continuing; otherwise the story picks up at the stored node and pending narration.
+* Save files are portable and JSON-readable so players (and tests) can inspect them, but only validated ids defined in `data/definitions` are accepted during load. If definitions change incompatibly, the load is refused with `Save incompatible with current definitions`.
 
 Story flow
 The player navigates story nodes. Nodes display dialogue and provide choices. Nodes can trigger battles, rewards, party changes, or flag updates.

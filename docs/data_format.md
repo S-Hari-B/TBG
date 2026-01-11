@@ -425,6 +425,79 @@ Note:
 
 ---
 
+## Save Files (`data/saves/slot_X.json`)
+
+Manual saves are plain JSON written to `data/saves/slot_1.json` through `slot_3.json` and contain four top-level keys:
+
+* `save_version`: integer schema version (v1 = `1`). Loaders refuse mismatched versions.
+* `metadata`: presentation summary used when rendering the slot picker (player name, current node, mode, gold, ISO timestamp).
+* `rng`: deterministic RNG snapshot (`{"version": 3, "state": [...], "gauss": null}`).
+* `state`: serialized `GameState` (seed, mode, story node ids, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, and the player object).
+
+Example (trimmed):
+
+```json
+{
+  "save_version": 1,
+  "metadata": {
+    "player_name": "Hero",
+    "current_node_id": "post_ambush_menu",
+    "mode": "camp_menu",
+    "gold": 42,
+    "saved_at": "2026-01-10T12:00:00+00:00"
+  },
+  "rng": {
+    "version": 3,
+    "state": [seeded MT19937 integers...],
+    "gauss": null
+  },
+  "state": {
+    "seed": 123456,
+    "mode": "camp_menu",
+    "current_node_id": "post_ambush_menu",
+    "player_name": "Hero",
+    "gold": 42,
+    "exp": 18,
+    "flags": {"tutorial_complete": true},
+    "party_members": ["emma"],
+    "pending_story_node_id": "forest_aftermath",
+    "pending_narration": [{"node_id": "post_ambush_menu", "text": "..."}],
+    "inventory": {
+      "weapons": {"iron_sword": 1},
+      "armour": {"leather_vest": 1},
+      "items": {"potion_hp_small": 2}
+    },
+    "equipment": {
+      "player_x1": {
+        "weapon_slots": ["iron_sword", null],
+        "armour_slots": {"head": null, "body": "leather_vest", "hands": null, "boots": null}
+      }
+    },
+    "member_levels": {"player_x1": 2, "emma": 3},
+    "member_exp": {"player_x1": 15, "emma": 0},
+    "camp_message": "You take a moment to rest, patch gear, and talk before pressing on.",
+    "player": {
+      "id": "player_x1",
+      "name": "Hero",
+      "class_id": "warrior",
+      "stats": {
+        "max_hp": 40,
+        "hp": 35,
+        "max_mp": 6,
+        "mp": 6,
+        "attack": 8,
+        "defense": 4,
+        "speed": 4
+      }
+    }
+  }
+}
+```
+
+All ids inside `state` are validated against the current `data/definitions`. If any referenced weapon, armour, item, class, party member, or story node is missing, the load fails with `Save incompatible with current definitions`. Missing keys or malformed types also raise `SaveLoadError`. Because the RNG snapshot is restored verbatim, any random operation after loading produces the same outcome as it would have without saving.
+
+---
+
 ## Knowledge (Planned)
 
 Knowledge is a deterministic mechanic. The optional LLM is presentation-only.

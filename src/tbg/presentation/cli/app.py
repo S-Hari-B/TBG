@@ -29,6 +29,8 @@ from tbg.services import (
     GoldGainedEvent,
     PartyMemberJoinedEvent,
     PlayerClassSetEvent,
+    SaveLoadError,
+    SaveService,
     StoryNodeView,
     StoryService,
 )
@@ -68,8 +70,9 @@ from .render import (
     render_menu,
     render_story,
 )
+from .save_slots import SaveSlotStore, SlotMetadata
 
-MenuAction = Literal["new_game", "quit"]
+MenuAction = Literal["new_game", "load_game", "quit"]
 _MAX_RANDOM_SEED = 2**31 - 1
 _MENU_TALK_LINES = {
     "emma": [
@@ -79,9 +82,48 @@ _MENU_TALK_LINES = {
 }
 
 
+def _main_menu_options() -> List[tuple[str, MenuAction]]:
+    return [
+        ("New Game", "new_game"),
+        ("Load Game", "load_game"),
+        ("Quit", "quit"),
+    ]
+
+
+def _build_camp_menu_entries(state: GameState) -> List[tuple[str, str]]:
+    entries: List[tuple[str, str]] = [
+        ("Continue story", "continue"),
+        ("Inventory / Equipment", "inventory"),
+    ]
+    if state.party_members:
+        entries.append(("Party Talk", "talk"))
+    entries.append(("Save Game", "save"))
+    entries.append(("Quit to Main Menu", "quit"))
+    return entries
+
+
+def _format_slot_label(meta: SlotMetadata) -> str:
+    if not meta.exists:
+        return f"Slot {meta.slot}: Empty"
+    if meta.is_corrupt:
+        return f"Slot {meta.slot}: Corrupt data"
+    metadata = meta.metadata or {}
+    player_name = metadata.get("player_name", "Unknown")
+    node_id = metadata.get("current_node_id") or "Unknown"
+    mode = metadata.get("mode")
+    saved_at = metadata.get("saved_at")
+    summary = f"Slot {meta.slot}: {player_name} – {node_id}"
+    if isinstance(mode, str):
+        summary += f" [{mode}]"
+    if isinstance(saved_at, str):
+        summary += f" ({saved_at})"
+    return summary
+
+
 def main() -> None:
     """Start the interactive CLI session."""
-    story_service, battle_service, inventory_service = _build_services()
+    story_service, battle_service, inventory_service, save_service = _build_services()
+    slot_store = SaveSlotStore()
     print("=== Text Based Game (To be renamed) ===")
     running = True
     while running:
@@ -89,9 +131,22 @@ def main() -> None:
         if action == "quit":
             running = False
             continue
-        game_state = _start_new_game(story_service)
+        if action == "load_game":
+            game_state = _load_game_flow(save_service, slot_store)
+            if game_state is None:
+                continue
+            from_load = True
+        else:
+            game_state = _start_new_game(story_service)
+            from_load = False
         keep_playing = _run_story_loop(
-            story_service, battle_service, inventory_service, game_state
+            story_service,
+            battle_service,
+            inventory_service,
+            game_state,
+            save_service,
+            slot_store,
+            from_load=from_load,
         )
         if not keep_playing:
             running = False
@@ -102,17 +157,21 @@ def _main_menu_loop() -> MenuAction:
     while True:
         print()
         print("Main Menu")
-        print("1. New Game")
-        print("2. Quit")
+        options = _main_menu_options()
+        for index, (label, _) in enumerate(options, start=1):
+            print(f"{index}. {label}")
         choice = input("Select an option: ").strip()
-        if choice == "1":
-            return "new_game"
-        if choice == "2":
-            return "quit"
-        print("Invalid selection. Please enter 1 or 2.")
+        try:
+            selection = int(choice) - 1
+        except ValueError:
+            print("Invalid selection. Please enter a number.")
+            continue
+        if 0 <= selection < len(options):
+            return options[selection][1]
+        print(f"Invalid selection. Please enter 1 to {len(options)}.")
 
 
-def _build_services() -> tuple[StoryService, BattleService, InventoryService]:
+def _build_services() -> tuple[StoryService, BattleService, InventoryService, SaveService]:
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
     story_repo = StoryRepository()
@@ -146,7 +205,15 @@ def _build_services() -> tuple[StoryService, BattleService, InventoryService]:
         items_repo=items_repo,
         loot_tables_repo=loot_repo,
     )
-    return story_service, battle_service, inventory_service
+    save_service = SaveService(
+        story_repo=story_repo,
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        items_repo=items_repo,
+        party_members_repo=party_repo,
+    )
+    return story_service, battle_service, inventory_service, save_service
 
 
 def _start_new_game(story_service: StoryService) -> GameState:
@@ -155,6 +222,34 @@ def _start_new_game(story_service: StoryService) -> GameState:
     state = story_service.start_new_game(seed=seed, player_name=player_name)
     print(f"Game started with seed: {seed}")
     return state
+
+
+def _load_game_flow(save_service: SaveService, slot_store: SaveSlotStore) -> GameState | None:
+    while True:
+        selection = _prompt_slot_choice(slot_store, title="Load Game")
+        if selection is None:
+            return None
+        if not selection.exists:
+            print("Slot is empty.")
+            continue
+        if selection.is_corrupt:
+            print("Slot data is corrupt. Overwrite it from the Camp Menu.")
+            continue
+        try:
+            payload = slot_store.read_slot(selection.slot)
+        except FileNotFoundError:
+            print("Slot is empty.")
+            continue
+        except ValueError as exc:
+            print(f"Load failed: {exc}")
+            return None
+        try:
+            state = save_service.deserialize(payload)
+        except SaveLoadError as exc:
+            print(f"Load failed: {exc}")
+            return None
+        print(f"Loaded Slot {selection.slot}.")
+        return state
 
 
 def _prompt_seed() -> int:
@@ -181,9 +276,38 @@ def _run_story_loop(
     battle_service: BattleService,
     inventory_service: InventoryService,
     state: GameState,
+    save_service: SaveService,
+    slot_store: SaveSlotStore,
+    *,
+    from_load: bool,
 ) -> bool:
     """Run the minimal story loop for the tutorial slice."""
-    print("\nBeginning tutorial slice...\n")
+    if from_load:
+        print("\nResuming saved game...\n")
+        if state.mode == "camp_menu":
+            follow_up = _run_post_battle_interlude(
+                state.camp_message or "",
+                story_service,
+                inventory_service,
+                state,
+                save_service,
+                slot_store,
+            )
+            if follow_up is None:
+                return False
+            if not _handle_story_events(
+                follow_up,
+                battle_service,
+                story_service,
+                inventory_service,
+                state,
+                save_service,
+                slot_store,
+                print_header=bool(follow_up),
+            ):
+                return False
+    else:
+        print("\nBeginning tutorial slice...\n")
     while True:
         node_view = story_service.get_current_node_view(state)
         _render_node_view(node_view)
@@ -198,6 +322,8 @@ def _run_story_loop(
             story_service,
             inventory_service,
             state,
+            save_service,
+            slot_store,
         ):
             return False
 
@@ -226,6 +352,8 @@ def _process_story_events(
     story_service: StoryService,
     inventory_service: InventoryService,
     state: GameState,
+    save_service: SaveService,
+    slot_store: SaveSlotStore,
 ) -> bool:
     return _handle_story_events(
         result.events,
@@ -233,6 +361,8 @@ def _process_story_events(
         story_service,
         inventory_service,
         state,
+        save_service,
+        slot_store,
         print_header=True,
     )
 
@@ -243,6 +373,8 @@ def _handle_story_events(
     story_service: StoryService,
     inventory_service: InventoryService,
     state: GameState,
+    save_service: SaveService,
+    slot_store: SaveSlotStore,
     *,
     print_header: bool,
 ) -> bool:
@@ -259,11 +391,13 @@ def _handle_story_events(
                 story_service, state, rendered_story_this_batch
             )
             print(f"- Battle initiated against '{event.enemy_id}'.")
+            state.mode = "battle"
             battle_state, start_events = battle_service.start_battle(event.enemy_id, state)
             _render_battle_events(start_events)
             if not _run_battle_loop(battle_service, battle_state, state):
                 print("You fall in battle. Game Over.\n")
                 return False
+            state.mode = "story"
             post_events = story_service.resume_pending_flow(state)
             if not _handle_story_events(
                 post_events,
@@ -271,6 +405,8 @@ def _handle_story_events(
                 story_service,
                 inventory_service,
                 state,
+                save_service,
+                slot_store,
                 print_header=bool(post_events),
             ):
                 return False
@@ -294,7 +430,12 @@ def _handle_story_events(
                 story_service, state, rendered_story_this_batch
             )
             follow_up = _run_post_battle_interlude(
-                event.message, story_service, inventory_service, state
+                event.message,
+                story_service,
+                inventory_service,
+                state,
+                save_service,
+                slot_store,
             )
             if follow_up is None:
                 return False
@@ -304,6 +445,8 @@ def _handle_story_events(
                 story_service,
                 inventory_service,
                 state,
+                save_service,
+                slot_store,
                 print_header=bool(follow_up),
             ):
                 return False
@@ -319,31 +462,21 @@ def _run_post_battle_interlude(
     story_service: StoryService,
     inventory_service: InventoryService,
     state: GameState,
+    save_service: SaveService,
+    slot_store: SaveSlotStore,
 ) -> List[object] | None:
     render_heading("Camp Interlude")
     if message:
         print(message)
+    state.mode = "camp_menu"
     while True:
-        options: List[str] = ["Continue story", "Inventory / Equipment"]
-        actions: List[str] = ["continue", "inventory"]
-        if state.party_members:
-            options.append("Party Talk")
-            actions.append("talk")
-        options.append("Quit to Main Menu")
-        actions.append("quit")
-        render_menu("Camp Menu", options)
-        choice = input("Select an option: ").strip()
-        try:
-            index = int(choice) - 1
-        except ValueError:
-            print("Invalid selection.")
-            continue
-        if not 0 <= index < len(actions):
-            print("Invalid selection.")
-            continue
-        action = actions[index]
+        menu_entries = _build_camp_menu_entries(state)
+        render_menu("Camp Menu", [label for label, _ in menu_entries])
+        index = _prompt_menu_index(len(menu_entries))
+        action = menu_entries[index][1]
         if action == "continue":
-            state.mode = "game_menu"
+            state.mode = "story"
+            state.camp_message = None
             return story_service.resume_pending_flow(state)
         if action == "inventory":
             _run_inventory_flow(inventory_service, state)
@@ -351,7 +484,34 @@ def _run_post_battle_interlude(
         if action == "talk":
             _handle_menu_party_talk(state)
             continue
+        if action == "save":
+            _handle_save_request(state, save_service, slot_store)
+            continue
         return None
+
+
+def _handle_save_request(state: GameState, save_service: SaveService, slot_store: SaveSlotStore) -> None:
+    selection = _prompt_slot_choice(slot_store, title="Save Game")
+    if selection is None:
+        return
+    try:
+        payload = save_service.serialize(state)
+        slot_store.write_slot(selection.slot, payload)
+    except OSError as exc:
+        print(f"Save failed: {exc}")
+        return
+    print(f"Saved to Slot {selection.slot}.")
+
+
+def _prompt_slot_choice(slot_store: SaveSlotStore, *, title: str) -> SlotMetadata | None:
+    entries = slot_store.list_slots()
+    options = [_format_slot_label(entry) for entry in entries]
+    options.append("Back")
+    render_menu(title, options)
+    choice = _prompt_menu_index(len(options))
+    if choice == len(entries):
+        return None
+    return entries[choice]
 
 
 def _handle_menu_party_talk(state: GameState) -> None:

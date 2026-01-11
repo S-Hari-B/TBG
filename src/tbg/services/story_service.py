@@ -106,7 +106,7 @@ class StoryService:
         state = GameState(
             seed=seed,
             rng=rng,
-            mode="game_menu",
+            mode="story",
             current_node_id="class_select",
         )
         state.player_name = player_name or self._default_player_name
@@ -150,6 +150,8 @@ class StoryService:
 
     def _enter_node(self, state: GameState, node_id: str, events: List[StoryEvent]) -> None:
         """Move state to the given node, applying auto-advance rules."""
+        state.mode = "story"
+        state.camp_message = None
         state.current_node_id = node_id
         state.pending_narration = []
         state.pending_story_node_id = None
@@ -228,7 +230,8 @@ class StoryService:
                 emitted.append(ExpGainedEvent(amount=amount, total_exp=state.exp))
             elif effect_type == "enter_game_menu":
                 message = self._require_optional_str(effect.data.get("message"), "enter_game_menu.message") or ""
-                state.mode = "game_menu"
+                state.mode = "camp_menu"
+                state.camp_message = message
                 emitted.append(GameMenuEnteredEvent(message=message))
                 halt_flow = True
             else:

@@ -30,5 +30,6 @@ class GameState:
     equipment: Dict[str, MemberEquipment] = field(default_factory=dict)
     member_levels: Dict[str, int] = field(default_factory=dict)
     member_exp: Dict[str, int] = field(default_factory=dict)
+    camp_message: str | None = None
 
 
