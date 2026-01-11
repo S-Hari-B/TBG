@@ -35,7 +35,8 @@ Layers:
 * JSON loaders and repositories
 * Validates and returns definitions
 * No combat rules, no printing
-* Includes the area map repository (`AreasRepository`) which enforces unique ids, valid travel connections, and entry-story references back into `story.json`
+* Includes the area map repository (`AreasRepository`) which enforces unique ids, valid travel connections, and entry-story references back into the story definitions
+* `StoryRepository` reads `story/index.json`, loads the referenced chapter files in order, merges every node, and rejects duplicate ids or broken `next`/choice references
 
 ## core (shared utilities)
 

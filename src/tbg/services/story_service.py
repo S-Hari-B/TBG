@@ -107,10 +107,10 @@ class StoryService:
             seed=seed,
             rng=rng,
             mode="story",
-            current_node_id="class_select",
+            current_node_id="intro_decree",
         )
         state.player_name = player_name or self._default_player_name
-        self._enter_node(state, "class_select", [])
+        self._enter_node(state, "intro_decree", [])
         return state
 
     def get_current_node_view(self, state: GameState) -> StoryNodeView:
@@ -240,6 +240,12 @@ class StoryService:
                 state.camp_message = message
                 emitted.append(GameMenuEnteredEvent(message=message))
                 halt_flow = True
+            elif effect_type == "set_flag":
+                flag_id = self._require_str(effect.data.get("flag_id"), "set_flag.flag_id")
+                value = effect.data.get("value", True)
+                if not isinstance(value, bool):
+                    raise ValueError("set_flag.value must be a boolean.")
+                state.flags[flag_id] = value
             else:
                 # Unknown effects are ignored for now to keep the interpreter forward compatible.
                 continue

@@ -59,10 +59,12 @@ def _make_battle_service() -> BattleService:
 
 def test_story_repository_loads_nodes() -> None:
     repo = StoryRepository()
-    node = repo.get("class_select")
+    class_node = repo.get("class_select")
+    intro_node = repo.get("intro_decree")
 
-    assert node.text
-    assert len(node.choices) == 4
+    assert class_node.text
+    assert len(class_node.choices) == 4
+    assert intro_node.next_node_id == "intro_departure"
 
 
 def test_story_flow_advances_and_applies_effects() -> None:
@@ -71,6 +73,11 @@ def test_story_flow_advances_and_applies_effects() -> None:
     view = service.get_current_node_view(state)
 
     assert view.node_id == "class_select"
+    assert [segment[0] for segment in view.segments] == [
+        "intro_decree",
+        "intro_departure",
+        "class_select",
+    ]
 
     first_result = service.choose(state, 0)
     assert state.player is not None
@@ -155,3 +162,8 @@ def test_post_ambush_interlude_triggers_game_menu() -> None:
     assert state.current_node_id == "forest_aftermath"
 
 
+def test_intro_flags_are_set() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=77, player_name="Hero")
+    assert state.flags.get("flag_decree_received") is True
+    assert state.flags.get("flag_left_village") is True

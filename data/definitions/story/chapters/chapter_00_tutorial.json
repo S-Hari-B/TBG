@@ -1,0 +1,126 @@
+{
+  "intro_decree": {
+    "text": "A royal courier arrives before dawn, unfurling a decree stamped with the King's crest. Adventurers are summoned to the capital for a mission 'vital to the realm.' The promise of coin, reputation, and answers hums through the village square.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_decree_received", "value": true }
+    ],
+    "next": "intro_departure"
+  },
+  "intro_departure": {
+    "text": "You pack your gear and leave the village gate behind. Other hopefuls march along the road, answering the same call. The capital is days away, but every step feels like the start of something irreversible.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_left_village", "value": true }
+    ],
+    "next": "class_select"
+  },
+  "class_select": {
+    "text": "Choose your starting class.",
+    "choices": [
+      { "label": "Warrior", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "warrior" }] },
+      { "label": "Rogue", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "rogue" }] },
+      { "label": "Mage", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "mage" }] },
+      { "label": "Commoner", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "commoner" }] }
+    ]
+  },
+  "forest_intro": {
+    "text": "You leave your village behind and set out along the forest road toward the capital. Caravans, scouts, and eager mercenaries share the path -- more traffic than these woods have seen in years.",
+    "next": "forest_scream"
+  },
+  "forest_scream": {
+    "text": "A sudden scream cuts through the trees.",
+    "choices": [
+      { "label": "Investigate", "next": "emma_encounter" },
+      { "label": "Ignore it (not implemented)", "next": "forest_scream" }
+    ]
+  },
+  "emma_encounter": {
+    "text": "You find a young adventurer backed against a tree. Three goblin corpses lie nearby. One goblin remains, snarling.",
+    "effects": [{ "type": "start_battle", "enemy_id": "goblin_grunt" }],
+    "next": "emma_join"
+  },
+  "emma_join": {
+    "text": "After the fight, she steadies her breathing. \"I had them... until I didn't.\"\n\nShe introduces herself as Emma, also heading to the capital. Traveling together means more eyes on the road -- and fewer ways to die alone.",
+    "effects": [
+      { "type": "add_party_member", "member_id": "emma" },
+      { "type": "set_flag", "flag_id": "flag_met_emma", "value": true }
+    ],
+    "next": "forest_ambush"
+  },
+  "forest_ambush": {
+    "text": "Rustling. Three goblins step onto the path, fanning out with practiced cruelty.",
+    "effects": [{ "type": "start_battle", "enemy_id": "goblin_pack_3" }],
+    "next": "post_ambush_menu"
+  },
+  "post_ambush_menu": {
+    "text": "Emma leans against a tree, gulping air. \"We should regroup before another patrol shows up.\"",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "You take a moment to rest, patch gear, and talk before pressing on."
+      }
+    ],
+    "next": "forest_aftermath"
+  },
+  "forest_aftermath": {
+    "text": "The forest goes quiet again. Emma exhales. \"Okay. Now we're even. But the King's mission won't wait forever.\" The road to the capital remains long, and rumors say the deeper woods are restless.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "End of demo slice. Rest at camp, Save, or Travel deeper into the forest before continuing."
+      }
+    ],
+    "next": "demo_slice_complete"
+  },
+  "demo_slice_complete": {
+    "text": "The road ahead is closed in this vertical slice. Keep sparring with goblins, explore the deep forest clearing, or tackle the ambush again to refine your tactics."
+  },
+  "village_return_entry": {
+    "text": "Familiar roofs. Stares. The village elder's shutters quiver as you pass. News of the decree spreads faster than the wagons leaving town.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Villagers quietly track your every step. What will you do next?"
+      }
+    ]
+  },
+  "forest_deeper_entry": {
+    "text": "The trees crowd closer and even the eager caravans turn back. Emma rests a hand on her hilt. \"Wildlife's been stirred up. Stay sharp.\"",
+    "next": "forest_deeper_path"
+  },
+  "forest_deeper_path": {
+    "text": "Broken carts, discarded rope, and fresh claw marks line the narrow path. Something large has been herding travelers away from the road.",
+    "next": "forest_deeper_tracks"
+  },
+  "forest_deeper_tracks": {
+    "text": "Tufts of fur cling to a fallen log. Heavy hoofprints veer off the main trail while the road ahead twists between thick brush.",
+    "choices": [
+      { "label": "Follow the clawed tracks", "next": "forest_deeper_follow" },
+      { "label": "Avoid them and keep to the road", "next": "forest_deeper_road" }
+    ]
+  },
+  "forest_deeper_follow": {
+    "text": "You and Emma push through the brush, discovering a den torn open by something desperate and hungry. Yellow eyes blink inside.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "wolf" }
+    ],
+    "next": "forest_deeper_clearing"
+  },
+  "forest_deeper_road": {
+    "text": "You skirt the tracks, but a bandit scout drops from a branch ahead, spear ready. \"Capital tax collectors? Perfect.\"",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "bandit_scout" }
+    ],
+    "next": "forest_deeper_clearing"
+  },
+  "forest_deeper_clearing": {
+    "text": "A mossy clearing offers a rare patch of calm. Smoldering embers and abandoned packs suggest someone else camped here recently. Beyond the trees, the road slopes toward the King's highway.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_cleared_forest_path", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "You secure the clearing, tend to wounds, and plan the push toward the capital."
+      }
+    ],
+    "next": "demo_slice_complete"
+  }
+}

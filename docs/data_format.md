@@ -379,7 +379,7 @@ Repositories validate that:
 
 * Area ids are unique.
 * Connection targets reference existing areas.
-* `entry_story_node_id` values exist in `story.json`.
+* `entry_story_node_id` values exist in the story definitions (see below).
 
 At runtime the single `AreaService` loads these definitions, keeps `GameState.current_location_id` synchronized, and tracks `visited_locations` (ordered list) plus a `location_entry_seen` map used to guard entry hooks.
 
@@ -411,37 +411,58 @@ Tables are matched in-order and every drop rolls using the single shared RNG to 
 
 ---
 
-## Story (`story.json`)
+## Story Chapters (`story/index.json` + `story/chapters/*.json`)
 
-Story is a graph of nodes. Nodes can show text, offer choices, and apply effects.
+Story content now lives under `data/definitions/story/`. The structure is:
 
-Node fields (v1):
+```
+story/
+  index.json
+  chapters/
+    chapter_00_tutorial.json
+    ...
+```
 
-* id: string
-* speaker: optional string
-* text: string
-* choices: list[choice]
-* effects: list[effect] (applied on enter)
-* next: optional string (default next node)
+`index.json` contains an ordered `"chapters"` list. StoryRepository loads each chapter file in that order, merges every node into a single dictionary, and raises validation errors when a chapter is missing, a node id is duplicated, or any `next`/choice reference points to an unknown node.
 
-Choice fields:
+Each chapter file is a JSON object keyed by node id:
 
-* label: string
-* next: string
-* conditions: optional list (future)
-* effects: optional list[effect] (applied on choosing)
+```json
+{
+  "node_id": { "...": "..." },
+  "another_node": { "...": "..." }
+}
+```
 
-Effect types (v1):
+Node schema (per entry) matches the previous single-file layout:
 
-* set_flag { flag: string, value: bool }
-* give_item { item_id: string, quantity: int }
-* give_gold { amount: int }
-* start_battle { enemy_id: string | enemy_ids: list[string] }
-* add_party_member { member_id: string }
-* enter_game_menu { message?: string } – halts flow, pushes the player into the camp/game menu before continuing to the node’s `next`.
+* `id`: implied by the object key; must be globally unique across all chapters.
+* `text`: string (required)
+* `effects`: optional list[effect] applied immediately on enter
+* `choices`: optional list[choice]
+* `next`: optional string (default continuation when no choices are present)
+
+Choice schema:
+
+* `label`: string
+* `next`: string (required until branching rules exist)
+* `effects`: optional list[effect] run before jumping to `next`
+
+Effect types supported in v1:
+
+* `set_class { "class_id": string }`
+* `start_battle { "enemy_id": string }`
+* `add_party_member { "member_id": string }`
+* `give_gold { "amount": int }`
+* `give_exp { "amount": int }`
+* `enter_game_menu { "message"?: string }` – halts flow and pushes the player to Camp Menu before resuming at `next`
+* `set_flag { "flag_id": string, "value"?: bool }` – stores/overrides boolean flags in `GameState.flags`
+
+Because the repository enforces chapter order, story progression stays deterministic even as additional chapters ship later.
 
 Note:
 
+* Area `entry_story_node_id` fields reference node ids defined inside these chapter files.
 * The vertical slice intro story nodes should align with docs/v1_vertical_slice.md.
 
 ---

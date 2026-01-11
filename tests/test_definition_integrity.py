@@ -345,7 +345,7 @@ def _validate_story(
     class_ids: set[str],
     enemy_ids: set[str],
 ) -> set[str]:
-    data = _load_required_dict(definitions_dir, "story.json")
+    data = _load_story_chapters(definitions_dir)
     for node_id, payload in data.items():
         _require_str(node_id, "story node id")
         mapping = _require_mapping(payload, f"story node '{node_id}'")
@@ -418,6 +418,10 @@ def _validate_story_effects(
             assert (
                 next_node in story_nodes
             ), f"story node '{node_id}' goto references missing node '{next_node}'"
+        elif effect_type == "set_flag":
+            _require_str(effect_map.get("flag_id"), f"story node '{node_id}' set_flag.flag_id")
+            value = effect_map.get("value", True)
+            assert isinstance(value, bool), f"story node '{node_id}' set_flag.value must be boolean if provided"
         else:
             # Unknown effect types are allowed for forward compatibility, but must at least be strings.
             _require_str(effect_type, f"story node '{node_id}' effect type")
@@ -486,7 +490,7 @@ def _validate_areas(definitions_dir: Path, story_node_ids: set[str]) -> set[str]
         if entry_story is not None:
             entry_story_id = _require_str(entry_story, f"area '{area_id}' entry_story_node_id")
             assert entry_story_id in story_node_ids, (
-                f"area '{area_id}' entry_story_node_id '{entry_story_id}' not found in story.json"
+                f"area '{area_id}' entry_story_node_id '{entry_story_id}' not found in story definitions"
             )
     return set(staged.keys())
 
@@ -497,6 +501,31 @@ def _load_required_dict(definitions_dir: Path, filename: str) -> dict[str, Any]:
     data = load_json(path)
     assert isinstance(data, dict), f"{filename} must contain an object."
     return data
+
+
+def _load_story_chapters(definitions_dir: Path) -> dict[str, Any]:
+    story_dir = definitions_dir / "story"
+    index_path = story_dir / "index.json"
+    assert index_path.exists(), "story/index.json is missing."
+    index_data = load_json(index_path)
+    assert isinstance(index_data, dict), "story/index.json must contain an object."
+    chapters = index_data.get("chapters")
+    assert isinstance(chapters, list) and chapters, "story/index.json must define a non-empty 'chapters' list."
+    combined: dict[str, Any] = {}
+    chapters_dir = story_dir / "chapters"
+    for entry in chapters:
+        chapter_name = _require_str(entry, "story/index.json chapter entry")
+        chapter_path = chapters_dir / chapter_name
+        assert chapter_path.exists(), f"Story chapter '{chapter_name}' is missing."
+        chapter_data = load_json(chapter_path)
+        assert isinstance(chapter_data, dict), f"chapter '{chapter_name}' must contain an object."
+        for node_id, payload in chapter_data.items():
+            _require_str(node_id, "story node id")
+            assert (
+                node_id not in combined
+            ), f"Duplicate story node id '{node_id}' detected between chapters."
+            combined[node_id] = payload
+    return combined
 
 
 def _require_mapping(value: Any, context: str) -> dict[str, Any]:

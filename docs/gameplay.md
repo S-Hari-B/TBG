@@ -36,6 +36,19 @@ Setting `TBG_DEBUG=1` adds a small status line to Camp and Travel menus (`DEBUG:
 Story flow
 The player navigates story nodes. Nodes display dialogue and provide choices. Nodes can trigger battles, rewards, party changes, or flag updates.
 
+### Chapter 00 Tutorial beats
+
+1. `intro_decree` – the King’s summons arrives and sets `flag_decree_received`.
+2. `intro_departure` – the player commits to the road (`flag_left_village`).
+3. `class_select` → `forest_intro` → `forest_scream` – establishes the crowded path to the capital before the Emma rescue.
+4. `emma_encounter` → `emma_join` – first battle, Emma joins, and `flag_met_emma` flips on.
+5. `forest_ambush` → `post_ambush_menu` – second battle followed by the first big camp interlude.
+6. `forest_aftermath` – awards a small gold stipend and nudges players to Travel before resuming the main story.
+7. Optional Travel to `forest_deeper` triggers `forest_deeper_entry` → `forest_deeper_path` → `forest_deeper_tracks`, culminating in either a wolf den or bandit ambush fight and the `forest_deeper_clearing` camp (`flag_cleared_forest_path`).
+8. `demo_slice_complete` – reminds players they can keep replaying battles or exploring the deep-forest camp before the next chapter unlocks.
+
+These steps, plus the deterministic Travel system, give Chapter 00 enough structure to test future quest tracking without introducing new mechanics yet.
+
 Party
 
 Max party size is 4.

@@ -82,15 +82,38 @@ Story Flow
 
 Ordered sequence (Slice A):
 
-1. `class_select`
-2. `forest_intro`
-3. `forest_scream`
-4. `emma_encounter` → battle vs `goblin_grunt` (player only)
-5. `emma_join` → Emma formally joins the party
-6. `forest_ambush` → battle vs `goblin_pack_3` (player + Emma)
-7. `post_ambush_menu` → short rest/menu interlude (player can Party Talk before continuing)
-8. `forest_aftermath` → auto returns to camp so players can test Travel around `village_outskirts`
-9. `demo_slice_complete` → final “End of slice” narration after the player leaves camp
+1. `intro_decree` – the royal summons arrives and sets `flag_decree_received`.
+2. `intro_departure` – the hero commits to the road (`flag_left_village`).
+3. `class_select`
+4. `forest_intro`
+5. `forest_scream`
+6. `emma_encounter` → battle vs `goblin_grunt` (player only)
+7. `emma_join` → Emma formally joins the party (`flag_met_emma`)
+8. `forest_ambush` → battle vs `goblin_pack_3` (player + Emma)
+9. `post_ambush_menu` → short rest/menu interlude (player can Party Talk before continuing)
+10. `forest_aftermath` → awards a small gold stipend, re-enters camp, and nudges the player to Travel before advancing
+11. Optional `forest_deeper_entry` → `forest_deeper_path` → `forest_deeper_tracks` → (wolf or bandit battle) → `forest_deeper_clearing` (`flag_cleared_forest_path`)
+12. `demo_slice_complete` → final “End of slice” narration after the player leaves camp
+
+Node: intro_decree
+
+Purpose: establish the King’s request and the larger JRPG hook.
+
+Effects:
+
+* `set_flag`: `flag_decree_received`
+
+Next: intro_departure
+
+Node: intro_departure
+
+Text: The player prepares to leave as other volunteers march toward the capital.
+
+Effects:
+
+* `set_flag`: `flag_left_village`
+
+Next: class_select
 
 Node: class_select
 
@@ -195,19 +218,27 @@ Next: forest_aftermath
 
 Node: forest_aftermath
 
-Dialogue and short banter
+Dialogue and short banter about the King's timetable and the restless forest.
 
 Rewards:
 
-EXP
-
-Gold
+* Gold (small stipend)
 
 Effects:
 
-* `enter_game_menu` – immediately returns the player to the Camp Menu with explicit instructions to try the new Travel option before proceeding.
+* `enter_game_menu` – immediately returns the player to the Camp Menu with explicit instructions to try the Travel option (village ↔ deep forest) before proceeding.
 
 Next: demo_slice_complete
+
+Node: forest_deeper_entry / path / tracks (Travel-triggered optional sequence)
+
+* Entry text warns about dangerous wildlife and bandit activity.
+* `forest_deeper_tracks` presents a choice:
+  * Follow the clawed tracks → `forest_deeper_follow` → battle vs `wolf`.
+  * Avoid the tracks / stay on the road → `forest_deeper_road` → battle vs `bandit_scout`.
+* Both paths converge on `forest_deeper_clearing`, which sets `flag_cleared_forest_path`, triggers another Camp Menu interlude, and foreshadows Chapter 01 on the King's highway.
+
+Node: demo_slice_complete
 
 Node: demo_slice_complete
 
@@ -221,6 +252,6 @@ Enemy stats are hidden by default
 Battles now run directly inside the CLI with deterministic turn order and offer Basic Attack, Use Skill (weapon-tag gated), and Party Talk actions.
 Party Talk currently prints structured knowledge text directly (UI intel reveal remains future work and enemy HP stays `???`).
 Information is revealed only through Party Talk
-Additional enemies (wolves, boars, bandits, slimes, goblin archers) plus the spear weapon line exist in the data to support future encounters even though Slice A focuses on goblins.
+Additional enemies (wolves, bandits, slimes, goblin archers) plus the spear weapon line exist in the data to support future encounters even though Slice A focuses on goblins.
 
 This slice establishes party members as strategic assets, not just combat units
