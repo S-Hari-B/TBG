@@ -26,10 +26,20 @@ Secondary tags (e.g., `slash`, `blunt`, `fire`) can be combined with the primary
 | slime   | Slime creatures                        |
 | ooze    | Variant of slime enemies               |
 
+## Area / Location Tags
+
+| Tag       | Notes                                           |
+|-----------|-------------------------------------------------|
+| village   | Settled safe-ish hubs; used for shop/story gates|
+| outskirts | Transitional tiles around towns                 |
+| forest    | Wild encounters; intro slice uses this heavily  |
+| safe      | Marks areas that should not spawn encounters    |
+
 ## Usage Summary
 
 * `required_weapon_tags` in `skills.json` must match the tags supplied by equipped weapons/shields. The warrior starter kit exposes both `sword` and `shield`, while the mage’s staff exposes `staff`.
 * Knowledge entries reference enemy tags so Party Talk can return deterministic intel lines.
+* Area tags feed future Travel gating/balance logic; keep them lowercase and document any new tags added to `areas.json`.
 * Keep tags data-driven—introduce new tags by documenting them here first so all data files stay aligned.
 
 

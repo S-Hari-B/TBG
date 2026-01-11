@@ -8,6 +8,7 @@ from tbg.core.rng import RNG, RNGStatePayload
 from tbg.core.types import GameMode
 from tbg.data.repositories import (
     ArmourRepository,
+    AreasRepository,
     ClassesRepository,
     ItemsRepository,
     PartyMembersRepository,
@@ -18,6 +19,7 @@ from tbg.domain.entities import Player, Stats
 from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment, PartyInventory
 from tbg.domain.state import GameState
 from tbg.services.errors import SaveLoadError
+from tbg.services.area_service import DEFAULT_STARTING_AREA_ID
 
 
 SavePayload = Dict[str, Any]
@@ -38,6 +40,7 @@ class SaveService:
         armour_repo: ArmourRepository,
         items_repo: ItemsRepository,
         party_members_repo: PartyMembersRepository,
+        areas_repo: AreasRepository,
     ) -> None:
         self._story_repo = story_repo
         self._classes_repo = classes_repo
@@ -45,6 +48,7 @@ class SaveService:
         self._armour_repo = armour_repo
         self._items_repo = items_repo
         self._party_members_repo = party_members_repo
+        self._areas_repo = areas_repo
 
     def serialize(self, state: GameState) -> SavePayload:
         """Return a JSON-serializable payload for disk persistence."""
@@ -78,6 +82,14 @@ class SaveService:
         mode = self._require_mode(state_payload.get("mode"))
         current_node_id = self._require_str(state_payload.get("current_node_id"), "state.current_node_id")
         self._validate_story_node(current_node_id)
+        current_location_id_raw = state_payload.get("current_location_id")
+        if current_location_id_raw is None:
+            current_location_id = DEFAULT_STARTING_AREA_ID
+        else:
+            current_location_id = self._require_str(
+                current_location_id_raw, "state.current_location_id"
+            )
+        self._validate_area_id(current_location_id)
 
         state = GameState(seed=seed, rng=rng, mode=mode, current_node_id=current_node_id)
         state.player_name = self._require_str(state_payload.get("player_name"), "state.player_name")
@@ -95,6 +107,13 @@ class SaveService:
         state.member_levels = self._coerce_int_dict(state_payload.get("member_levels"), "state.member_levels")
         state.member_exp = self._coerce_int_dict(state_payload.get("member_exp"), "state.member_exp")
         state.camp_message = self._coerce_optional_str(state_payload.get("camp_message"), "state.camp_message")
+        state.current_location_id = current_location_id
+        state.visited_locations = self._coerce_visited_locations(
+            state_payload.get("visited_locations"), current_location_id
+        )
+        state.location_entry_seen = self._coerce_location_entry_flags(
+            state_payload.get("location_entry_seen"), current_location_id
+        )
 
         player_payload = state_payload.get("player")
         if player_payload is not None:
@@ -110,8 +129,10 @@ class SaveService:
         return {
             "player_name": state.player_name,
             "current_node_id": state.current_node_id,
+            "current_location_id": state.current_location_id,
             "mode": state.mode,
             "gold": state.gold,
+            "seed": state.seed,
             "saved_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -130,6 +151,7 @@ class SaveService:
             "seed": state.seed,
             "mode": state.mode,
             "current_node_id": state.current_node_id,
+            "current_location_id": state.current_location_id,
             "player_name": state.player_name,
             "gold": state.gold,
             "exp": state.exp,
@@ -147,6 +169,8 @@ class SaveService:
             "member_exp": dict(state.member_exp),
             "camp_message": state.camp_message,
             "player": self._serialize_player(state.player) if state.player else None,
+            "visited_locations": list(state.visited_locations),
+            "location_entry_seen": dict(state.location_entry_seen),
         }
 
     @staticmethod
@@ -230,6 +254,40 @@ class SaveService:
                 raise SaveLoadError(f"Save incompatible with current definitions: party member '{member_id}' missing.") from exc
             members.append(member_id)
         return members
+
+    def _coerce_visited_locations(self, value: Any, current_location_id: str) -> List[str]:
+        if value is None:
+            return [current_location_id]
+        if not isinstance(value, list):
+            raise SaveLoadError("state.visited_locations must be a list.")
+        visited: List[str] = []
+        for entry in value:
+            location_id = self._require_str(entry, "state.visited_locations[]")
+            self._validate_area_id(location_id)
+            if location_id not in visited:
+                visited.append(location_id)
+        if not visited:
+            visited.append(current_location_id)
+        if current_location_id not in visited:
+            visited.append(current_location_id)
+        return visited
+
+    def _coerce_location_entry_flags(
+        self, value: Any, current_location_id: str
+    ) -> Dict[str, bool]:
+        if value is None:
+            return {current_location_id: True}
+        mapping = self._require_dict(value, "state.location_entry_seen")
+        result: Dict[str, bool] = {}
+        for key, entry in mapping.items():
+            location_id = self._require_str(key, "state.location_entry_seen key")
+            self._validate_area_id(location_id)
+            if not isinstance(entry, bool):
+                raise SaveLoadError(f"state.location_entry_seen[{location_id}] must be a boolean.")
+            result[location_id] = entry
+        if current_location_id not in result:
+            result[current_location_id] = True
+        return result
 
     def _coerce_narration(self, value: Any) -> List[tuple[str, str]]:
         if not isinstance(value, list):
@@ -369,6 +427,14 @@ class SaveService:
         extra_equipment = equipment_keys - member_ids
         if extra_equipment:
             raise SaveLoadError(f"Equipment references unknown members: {sorted(extra_equipment)}.")
+
+    def _validate_area_id(self, area_id: str) -> None:
+        try:
+            self._areas_repo.get(area_id)
+        except KeyError as exc:
+            raise SaveLoadError(
+                f"Save incompatible with current definitions: area '{area_id}' missing."
+            ) from exc
 
     @staticmethod
     def _require_dict(value: Any, context: str) -> Dict[str, Any]:

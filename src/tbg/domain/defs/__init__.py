@@ -1,6 +1,7 @@
 """Domain definition exports."""
 
 from .armour_def import ArmourDef
+from .area_def import AreaConnectionDef, AreaDef
 from .class_def import ClassDef
 from .effect_def import EffectDef
 from .enemy_def import EnemyDef
@@ -14,6 +15,8 @@ from .weapon_def import WeaponDef
 
 __all__ = [
     "ArmourDef",
+    "AreaConnectionDef",
+    "AreaDef",
     "ClassDef",
     "EffectDef",
     "EnemyDef",

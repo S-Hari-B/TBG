@@ -27,6 +27,7 @@ def definitions_dir() -> Path:
         "abilities.json",
         "skills.json",
         "loot_tables.json",
+        "areas.json",
     ],
 )
 def test_definition_files_are_valid_json(definitions_dir: Path, filename: str) -> None:
@@ -49,8 +50,9 @@ def test_definition_integrity_and_references(definitions_dir: Path) -> None:
     classes = _validate_classes(definitions_dir, weapons, armour, items)
     enemies = _validate_enemies(definitions_dir, weapons, armour)
     _validate_loot_tables(definitions_dir, items)
-    _validate_story(definitions_dir, classes, enemies)
+    story_node_ids = _validate_story(definitions_dir, classes, enemies)
     _validate_abilities(definitions_dir)
+    _validate_areas(definitions_dir, story_node_ids)
     assert skills  # ensure skills file not empty
 
 
@@ -342,7 +344,7 @@ def _validate_story(
     definitions_dir: Path,
     class_ids: set[str],
     enemy_ids: set[str],
-) -> None:
+) -> set[str]:
     data = _load_required_dict(definitions_dir, "story.json")
     for node_id, payload in data.items():
         _require_str(node_id, "story node id")
@@ -373,6 +375,7 @@ def _validate_story(
                     )
         if "effects" in mapping:
             _validate_story_effects(mapping["effects"], node_id, class_ids, enemy_ids, data)
+    return set(data.keys())
 
 
 def _validate_story_effects(
@@ -451,6 +454,41 @@ def _validate_abilities(definitions_dir: Path) -> None:
         _require_str(effect.get("type"), f"ability '{ability_id}' effect.type")
         if "power" in effect:
             _require_number(effect["power"], f"ability '{ability_id}' effect.power")
+
+
+def _validate_areas(definitions_dir: Path, story_node_ids: set[str]) -> set[str]:
+    path = definitions_dir / "areas.json"
+    assert path.exists(), "areas.json is missing."
+    data = load_json(path)
+    assert isinstance(data, dict), "areas.json must contain an object."
+    entries = data.get("areas")
+    assert isinstance(entries, list), "areas.json.areas must be a list."
+    staged: dict[str, dict[str, object]] = {}
+    for entry in entries:
+        mapping = _require_mapping(entry, "area entry")
+        area_id = _require_str(mapping.get("id"), "area id")
+        assert area_id not in staged, f"Duplicate area id '{area_id}'."
+        staged[area_id] = mapping
+    for area_id, mapping in staged.items():
+        _require_str(mapping.get("name"), f"area '{area_id}' name")
+        _require_str(mapping.get("description"), f"area '{area_id}' description")
+        tags = _require_str_list(mapping.get("tags"), f"area '{area_id}' tags")
+        assert tags, f"area '{area_id}' must declare at least one tag."
+        assert all(tag == tag.lower() for tag in tags), f"area '{area_id}' tags must be lowercase."
+        connections = mapping.get("connections")
+        assert isinstance(connections, list), f"area '{area_id}' connections must be a list."
+        for index, connection in enumerate(connections):
+            conn_map = _require_mapping(connection, f"area '{area_id}' connections[{index}]")
+            to_id = _require_str(conn_map.get("to"), f"area '{area_id}' connections[{index}].to")
+            assert to_id in staged, f"area '{area_id}' references unknown destination '{to_id}'."
+            _require_str(conn_map.get("label"), f"area '{area_id}' connections[{index}].label")
+        entry_story = mapping.get("entry_story_node_id")
+        if entry_story is not None:
+            entry_story_id = _require_str(entry_story, f"area '{area_id}' entry_story_node_id")
+            assert entry_story_id in story_node_ids, (
+                f"area '{area_id}' entry_story_node_id '{entry_story_id}' not found in story.json"
+            )
+    return set(staged.keys())
 
 
 def _load_required_dict(definitions_dir: Path, filename: str) -> dict[str, Any]:

@@ -13,15 +13,13 @@ Quit
 
 Game Menu
 
-Continue story
-
-Party status (future to include party talk)
-
-Inventory / Equipment – opens the shared inventory where you can inspect party members, equip/unequip weapons and armour, and view remaining supplies. Accessible during camp interludes and future out-of-combat scenes.
-
-Save Game – only available from camp interludes. Writes the current runtime state (story position, party, inventory, equipment, flags, and RNG state) to a chosen slot under `data/saves/slot_{1-3}.json`.
-
-Quit to main menu
+- Continue story – resumes the pending story node that triggered the camp interlude. If no pending node exists (e.g. after exhausting the current slice) the option remains but prints a reminder to explore via Travel instead.
+- Travel – opens the area map defined in `data/definitions/areas.json`. The screen shows the current location’s name/description, lists every connected destination using the JSON `"label"` fields, and lets the player pick a destination. Travelling emits deterministic events (`Traveled from …`, `Arrived at …`) and renders a fresh “Location” block with the new area description. Areas can optionally declare `entry_story_node_id`; those nodes fire exactly once per save file when the player first enters that area and can show short flavour beats before returning to camp.
+- Location Debug (DEBUG) – only in debug builds (`TBG_DEBUG=1`). Prints ids, tags, and entry-story flags for the current area plus the full `visited_locations`/`location_entry_seen` maps. Does not mutate state.
+- Inventory / Equipment – opens the shared inventory where you can inspect party members, equip/unequip weapons and armour, and view remaining supplies. Accessible during camp interludes and future out-of-combat scenes.
+- Party Talk – appears whenever at least one companion has joined. Surfaces deterministic banter lines.
+- Save Game – only available from camp interludes. Writes the current runtime state (story position, party, inventory, equipment, flags, RNG state, and the new location trackers) to a chosen slot under `data/saves/slot_{1-3}.json`.
+- Quit to main menu
 
 ## Manual Save/Load
 
@@ -30,6 +28,10 @@ Quit to main menu
 * Save files live under `data/saves/slot_1.json` through `slot_3.json`. The format is versioned (`"save_version": 1`). Any mismatch or missing fields results in `Load failed: <reason>` and the CLI returns to the Main Menu without altering state.
 * Saves include the RNG internal state, so any random draws performed after loading match what would have happened had the player never quit. Story flow resumes exactly where the camp interlude paused: if you saved mid-camp you load back into the Camp Menu before continuing; otherwise the story picks up at the stored node and pending narration.
 * Save files are portable and JSON-readable so players (and tests) can inspect them, but only validated ids defined in `data/definitions` are accepted during load. If definitions change incompatibly, the load is refused with `Save incompatible with current definitions`.
+
+### Debug-mode UI helpers
+
+Setting `TBG_DEBUG=1` adds a small status line to Camp and Travel menus (`DEBUG: <context> seed=… node=… location=… mode=…`), exposes the Location Debug menu entry described above, and augments the Save/Load slot picker with the stored seed + current location id so testers can verify persistence quickly. Combat still hides HP in normal play; debug mode continues to show explicit HP readings next to the `???` placeholder for enemies.
 
 Story flow
 The player navigates story nodes. Nodes display dialogue and provide choices. Nodes can trigger battles, rewards, party changes, or flag updates.

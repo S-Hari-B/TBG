@@ -11,6 +11,7 @@ Layers:
 * Calls services to perform actions
 * Owns slot-based save file I/O through a tiny adapter (`SaveSlotStore`) that reads/writes `data/saves/slot_X.json`; serialization logic remains in the services layer
 * Never computes combat outcomes or modifies domain objects directly
+* Debug-only instrumentation (seed/node/location headers, Location Debug menu, extra load slot metadata) lives exclusively in this layer so lower layers stay pure
 
 ## services (orchestration)
 
@@ -20,6 +21,7 @@ Layers:
 * Owns GameState (overall runtime state)
 * Returns structured results and events for presentation to render
 * Implements persistence orchestration (`SaveService`) to serialize/deserialize `GameState` + RNG snapshots, validate ids against current definitions, and guard against schema/version drift
+* Maintains auxiliary services such as `AreaService`, which drives location state, travel events, and one-shot entry story hooks while keeping the CLI ignorant of map topology
 
 ## domain (game rules)
 
@@ -33,6 +35,7 @@ Layers:
 * JSON loaders and repositories
 * Validates and returns definitions
 * No combat rules, no printing
+* Includes the area map repository (`AreasRepository`) which enforces unique ids, valid travel connections, and entry-story references back into `story.json`
 
 ## core (shared utilities)
 

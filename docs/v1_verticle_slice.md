@@ -89,7 +89,8 @@ Ordered sequence (Slice A):
 5. `emma_join` → Emma formally joins the party
 6. `forest_ambush` → battle vs `goblin_pack_3` (player + Emma)
 7. `post_ambush_menu` → short rest/menu interlude (player can Party Talk before continuing)
-8. `forest_aftermath`
+8. `forest_aftermath` → auto returns to camp so players can test Travel around `village_outskirts`
+9. `demo_slice_complete` → final “End of slice” narration after the player leaves camp
 
 Node: class_select
 
@@ -202,7 +203,17 @@ EXP
 
 Gold
 
-Slice ends here
+Effects:
+
+* `enter_game_menu` – immediately returns the player to the Camp Menu with explicit instructions to try the new Travel option before proceeding.
+
+Next: demo_slice_complete
+
+Node: demo_slice_complete
+
+Purpose: Provide the final “End of demo slice” narration once the player chooses Continue from camp.
+
+Text reminds the player they have reached the current edge of content and that they can continue replaying encounters or travelling between `village_outskirts`, `village`, and `forest_deeper` for testing.
 
 Design Notes
 

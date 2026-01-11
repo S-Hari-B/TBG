@@ -7,6 +7,7 @@ from typing import List, Literal, Sequence
 
 from tbg.data.repositories import (
     ArmourRepository,
+    AreasRepository,
     ClassesRepository,
     EnemiesRepository,
     ItemsRepository,
@@ -22,17 +23,21 @@ from tbg.domain.inventory import ARMOUR_SLOTS
 from tbg.domain.defs import SkillDef
 from tbg.domain.state import GameState
 from tbg.services import (
+    AreaService,
     BattleRequestedEvent,
     ChoiceResult,
     ExpGainedEvent,
     GameMenuEnteredEvent,
     GoldGainedEvent,
+    LocationEnteredEvent,
+    LocationView,
     PartyMemberJoinedEvent,
     PlayerClassSetEvent,
     SaveLoadError,
     SaveService,
     StoryNodeView,
     StoryService,
+    TravelPerformedEvent,
 )
 from tbg.services.battle_service import (
     AttackResolvedEvent,
@@ -82,6 +87,18 @@ _MENU_TALK_LINES = {
 }
 
 
+def _debug_enabled() -> bool:
+    return bool(os.getenv("TBG_DEBUG"))
+
+
+def _print_debug_status(state: GameState, *, context: str) -> None:
+    if not _debug_enabled():
+        return
+    node_id = state.current_node_id or "unknown"
+    location_id = state.current_location_id or "unplaced"
+    print(f"DEBUG: {context} seed={state.seed} node={node_id} location={location_id} mode={state.mode}")
+
+
 def _main_menu_options() -> List[tuple[str, MenuAction]]:
     return [
         ("New Game", "new_game"),
@@ -93,8 +110,11 @@ def _main_menu_options() -> List[tuple[str, MenuAction]]:
 def _build_camp_menu_entries(state: GameState) -> List[tuple[str, str]]:
     entries: List[tuple[str, str]] = [
         ("Continue story", "continue"),
-        ("Inventory / Equipment", "inventory"),
+        ("Travel", "travel"),
     ]
+    if _debug_enabled():
+        entries.append(("Location Debug (DEBUG)", "location_debug"))
+    entries.append(("Inventory / Equipment", "inventory"))
     if state.party_members:
         entries.append(("Party Talk", "talk"))
     entries.append(("Save Game", "save"))
@@ -117,12 +137,22 @@ def _format_slot_label(meta: SlotMetadata) -> str:
         summary += f" [{mode}]"
     if isinstance(saved_at, str):
         summary += f" ({saved_at})"
+    if _debug_enabled():
+        seed = metadata.get("seed", "?")
+        location = metadata.get("current_location_id") or "Unknown"
+        summary += f" | seed={seed} location={location}"
     return summary
 
 
 def main() -> None:
     """Start the interactive CLI session."""
-    story_service, battle_service, inventory_service, save_service = _build_services()
+    (
+        story_service,
+        battle_service,
+        inventory_service,
+        save_service,
+        area_service,
+    ) = _build_services()
     slot_store = SaveSlotStore()
     print("=== Text Based Game (To be renamed) ===")
     running = True
@@ -137,7 +167,7 @@ def main() -> None:
                 continue
             from_load = True
         else:
-            game_state = _start_new_game(story_service)
+            game_state = _start_new_game(story_service, area_service)
             from_load = False
         keep_playing = _run_story_loop(
             story_service,
@@ -146,6 +176,7 @@ def main() -> None:
             game_state,
             save_service,
             slot_store,
+            area_service,
             from_load=from_load,
         )
         if not keep_playing:
@@ -171,7 +202,7 @@ def _main_menu_loop() -> MenuAction:
         print(f"Invalid selection. Please enter 1 to {len(options)}.")
 
 
-def _build_services() -> tuple[StoryService, BattleService, InventoryService, SaveService]:
+def _build_services() -> tuple[StoryService, BattleService, InventoryService, SaveService, AreaService]:
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
     story_repo = StoryRepository()
@@ -205,6 +236,8 @@ def _build_services() -> tuple[StoryService, BattleService, InventoryService, Sa
         items_repo=items_repo,
         loot_tables_repo=loot_repo,
     )
+    areas_repo = AreasRepository()
+    area_service = AreaService(areas_repo=areas_repo)
     save_service = SaveService(
         story_repo=story_repo,
         classes_repo=classes_repo,
@@ -212,14 +245,16 @@ def _build_services() -> tuple[StoryService, BattleService, InventoryService, Sa
         armour_repo=armour_repo,
         items_repo=items_repo,
         party_members_repo=party_repo,
+        areas_repo=areas_repo,
     )
-    return story_service, battle_service, inventory_service, save_service
+    return story_service, battle_service, inventory_service, save_service, area_service
 
 
-def _start_new_game(story_service: StoryService) -> GameState:
+def _start_new_game(story_service: StoryService, area_service: AreaService) -> GameState:
     seed = _prompt_seed()
     player_name = _prompt_player_name()
     state = story_service.start_new_game(seed=seed, player_name=player_name)
+    area_service.initialize_state(state)
     print(f"Game started with seed: {seed}")
     return state
 
@@ -278,6 +313,7 @@ def _run_story_loop(
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
+    area_service: AreaService,
     *,
     from_load: bool,
 ) -> bool:
@@ -292,6 +328,8 @@ def _run_story_loop(
                 state,
                 save_service,
                 slot_store,
+                battle_service,
+                area_service,
             )
             if follow_up is None:
                 return False
@@ -303,6 +341,7 @@ def _run_story_loop(
                 state,
                 save_service,
                 slot_store,
+                area_service,
                 print_header=bool(follow_up),
             ):
                 return False
@@ -324,6 +363,7 @@ def _run_story_loop(
             state,
             save_service,
             slot_store,
+            area_service,
         ):
             return False
 
@@ -354,6 +394,7 @@ def _process_story_events(
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
+    area_service: AreaService,
 ) -> bool:
     return _handle_story_events(
         result.events,
@@ -363,6 +404,7 @@ def _process_story_events(
         state,
         save_service,
         slot_store,
+        area_service,
         print_header=True,
     )
 
@@ -375,6 +417,7 @@ def _handle_story_events(
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
+    area_service: AreaService,
     *,
     print_header: bool,
 ) -> bool:
@@ -407,6 +450,7 @@ def _handle_story_events(
                 state,
                 save_service,
                 slot_store,
+                area_service,
                 print_header=bool(post_events),
             ):
                 return False
@@ -436,6 +480,8 @@ def _handle_story_events(
                 state,
                 save_service,
                 slot_store,
+                battle_service,
+                area_service,
             )
             if follow_up is None:
                 return False
@@ -447,6 +493,7 @@ def _handle_story_events(
                 state,
                 save_service,
                 slot_store,
+                area_service,
                 print_header=bool(follow_up),
             ):
                 return False
@@ -464,6 +511,8 @@ def _run_post_battle_interlude(
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
+    battle_service: BattleService,
+    area_service: AreaService,
 ) -> List[object] | None:
     render_heading("Camp Interlude")
     if message:
@@ -471,13 +520,25 @@ def _run_post_battle_interlude(
     state.mode = "camp_menu"
     while True:
         menu_entries = _build_camp_menu_entries(state)
+        _print_debug_status(state, context="camp")
         render_menu("Camp Menu", [label for label, _ in menu_entries])
         index = _prompt_menu_index(len(menu_entries))
         action = menu_entries[index][1]
         if action == "continue":
+            if not state.pending_story_node_id:
+                print("No pending story nodes. Explore via Travel or Save your progress.")
+                continue
             state.mode = "story"
             state.camp_message = None
             return story_service.resume_pending_flow(state)
+        if action == "travel":
+            travel_follow_up = _handle_travel_menu(area_service, story_service, state)
+            if travel_follow_up is not None:
+                return travel_follow_up
+            continue
+        if action == "location_debug":
+            _render_location_debug_snapshot(area_service, state)
+            continue
         if action == "inventory":
             _run_inventory_flow(inventory_service, state)
             continue
@@ -490,6 +551,87 @@ def _run_post_battle_interlude(
         return None
 
 
+def _handle_travel_menu(
+    area_service: AreaService, story_service: StoryService, state: GameState
+) -> List[object] | None:
+    while True:
+        location_view = area_service.get_current_location_view(state)
+        _render_travel_context(location_view, state)
+        connections = list(location_view.connections)
+        if not connections:
+            print("No destinations are available from here yet.")
+            return None
+        options = [conn.label for conn in connections]
+        options.append("Back")
+        render_menu("Travel Destinations", options)
+        choice = _prompt_menu_index(len(options))
+        if choice == len(connections):
+            return None
+        destination = connections[choice]
+        try:
+            result = area_service.travel_to(state, destination.destination_id)
+        except ValueError as exc:
+            print(f"Cannot travel: {exc}")
+            continue
+        _render_travel_events(result.events)
+        if result.entry_story_node_id:
+            return story_service.play_node(state, result.entry_story_node_id)
+        return None
+
+
+def _render_travel_context(location_view: LocationView, state: GameState) -> None:
+    render_heading("Travel")
+    print(f"Current Location: {location_view.name}")
+    print(location_view.description)
+    if _debug_enabled():
+        tags = ", ".join(location_view.tags)
+        entry_info = location_view.entry_story_node_id or "None"
+        print(f"[DEBUG] id={location_view.id} tags=[{tags}] entry_story={entry_info} entry_seen={location_view.entry_seen}")
+    _print_debug_status(state, context="travel")
+
+
+def _render_travel_events(events: List[object]) -> None:
+    if not events:
+        return
+    render_events_header()
+    for event in events:
+        if isinstance(event, TravelPerformedEvent):
+            print(
+                f"- Traveled from {event.from_location_name} to {event.to_location_name}."
+            )
+        elif isinstance(event, LocationEnteredEvent):
+            _render_location_arrival(event.location)
+
+
+def _render_location_arrival(location_view: LocationView) -> None:
+    render_heading(f"Location: {location_view.name}")
+    print(location_view.description)
+    if _debug_enabled():
+        tags = ", ".join(location_view.tags)
+        entry_story = location_view.entry_story_node_id or "None"
+        print(f"[DEBUG] id={location_view.id} tags=[{tags}] entry_story={entry_story} entry_seen={location_view.entry_seen}")
+
+
+def _render_location_debug_snapshot(area_service: AreaService, state: GameState) -> None:
+    debug_view = area_service.build_debug_view(state)
+    render_heading("DEBUG: Location State")
+    location = debug_view.location
+    print(f"Current: {location.name} ({location.id})")
+    print(f"Tags: {', '.join(location.tags)}")
+    print(
+        f"Entry story: {location.entry_story_node_id or 'None'} | entry_seen={location.entry_seen}"
+    )
+    if location.connections:
+        print("Connections:")
+        for conn in location.connections:
+            print(f"  -> {conn.label} ({conn.destination_id})")
+    else:
+        print("Connections: (none)")
+    visited = ", ".join(debug_view.visited_locations) if debug_view.visited_locations else "(none)"
+    print(f"Visited order: {visited}")
+    print("Entry flags:")
+    for area_id, seen in debug_view.entry_seen_flags:
+        print(f"  {area_id}: {seen}")
 def _handle_save_request(state: GameState, save_service: SaveService, slot_store: SaveSlotStore) -> None:
     selection = _prompt_slot_choice(slot_store, title="Save Game")
     if selection is None:
@@ -832,7 +974,7 @@ def _run_battle_loop(battle_service: BattleService, battle_state: BattleState, s
 
 
 def _render_battle_view(view: BattleView, *, show_banner: bool) -> None:
-    debug_enabled = bool(os.getenv("TBG_DEBUG"))
+    debug_enabled = _debug_enabled()
     if show_banner:
         render_heading(f"Battle {view.battle_id}")
     else:

@@ -364,6 +364,27 @@ Party members define recruitable allies such as Emma. Fields mirror the class de
 
 ---
 
+## Areas (`areas.json`)
+
+`areas.json` drives the overworld “Travel” interface. The file stores an object with a single `"areas"` array. Each entry declares:
+
+* `id`: string — lowercase unique id (e.g. `village_outskirts`)
+* `name`: string
+* `description`: string
+* `tags`: list[string] — lowercase tags such as `village`, `outskirts`, `forest`, `safe`. These tags allow future encounter gating/balance rules.
+* `connections`: list of `{ "to": "<area_id>", "label": "<menu label>" }`. Connections are directional; add reciprocal entries explicitly.
+* `entry_story_node_id`: optional string referencing a node in `story.json`. If present, that node auto-plays exactly once the first time the player arrives at the area.
+
+Repositories validate that:
+
+* Area ids are unique.
+* Connection targets reference existing areas.
+* `entry_story_node_id` values exist in `story.json`.
+
+At runtime the single `AreaService` loads these definitions, keeps `GameState.current_location_id` synchronized, and tracks `visited_locations` (ordered list) plus a `location_entry_seen` map used to guard entry hooks.
+
+---
+
 ## Loot Tables (`loot_tables.json`)
 
 Loot tables are stored as a list. Each entry contains:
@@ -430,9 +451,9 @@ Note:
 Manual saves are plain JSON written to `data/saves/slot_1.json` through `slot_3.json` and contain four top-level keys:
 
 * `save_version`: integer schema version (v1 = `1`). Loaders refuse mismatched versions.
-* `metadata`: presentation summary used when rendering the slot picker (player name, current node, mode, gold, ISO timestamp).
+* `metadata`: presentation summary used when rendering the slot picker (player name, current node id, current location id, mode, gold, seed, ISO timestamp).
 * `rng`: deterministic RNG snapshot (`{"version": 3, "state": [...], "gauss": null}`).
-* `state`: serialized `GameState` (seed, mode, story node ids, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, and the player object).
+* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, and the player object).
 
 Example (trimmed):
 
@@ -442,8 +463,10 @@ Example (trimmed):
   "metadata": {
     "player_name": "Hero",
     "current_node_id": "post_ambush_menu",
+    "current_location_id": "village_outskirts",
     "mode": "camp_menu",
     "gold": 42,
+    "seed": 123456,
     "saved_at": "2026-01-10T12:00:00+00:00"
   },
   "rng": {
@@ -455,6 +478,7 @@ Example (trimmed):
     "seed": 123456,
     "mode": "camp_menu",
     "current_node_id": "post_ambush_menu",
+    "current_location_id": "village_outskirts",
     "player_name": "Hero",
     "gold": 42,
     "exp": 18,
@@ -476,6 +500,8 @@ Example (trimmed):
     "member_levels": {"player_x1": 2, "emma": 3},
     "member_exp": {"player_x1": 15, "emma": 0},
     "camp_message": "You take a moment to rest, patch gear, and talk before pressing on.",
+    "visited_locations": ["village_outskirts"],
+    "location_entry_seen": {"village_outskirts": true},
     "player": {
       "id": "player_x1",
       "name": "Hero",

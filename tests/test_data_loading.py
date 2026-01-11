@@ -6,6 +6,7 @@ import pytest
 from tbg.data.errors import DataReferenceError, DataValidationError
 from tbg.data.repositories import (
     ArmourRepository,
+    AreasRepository,
     ClassesRepository,
     ItemsRepository,
     WeaponsRepository,
@@ -143,6 +144,36 @@ def test_classes_repo_reference_validation_fails_when_weapon_missing(tmp_path: P
 
     with pytest.raises(DataReferenceError):
         classes_repo.all()
+
+
+def test_areas_repo_rejects_invalid_connection(tmp_path: Path) -> None:
+    definitions_dir = _make_definitions_dir(tmp_path)
+    _write_json(
+        definitions_dir / "areas.json",
+        {
+            "areas": [
+                {
+                    "id": "alpha",
+                    "name": "Alpha",
+                    "description": "Start",
+                    "tags": ["start"],
+                    "connections": [{"to": "missing", "label": "Go nowhere"}],
+                    "entry_story_node_id": None,
+                },
+                {
+                    "id": "beta",
+                    "name": "Beta",
+                    "description": "Next",
+                    "tags": ["next"],
+                    "connections": [],
+                    "entry_story_node_id": None,
+                },
+            ]
+        },
+    )
+    repo = AreasRepository(base_path=definitions_dir)
+    with pytest.raises(DataReferenceError):
+        repo.all()
 
 
 def _write_json(path: Path, data: dict) -> None:

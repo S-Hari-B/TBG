@@ -8,8 +8,10 @@ from tbg.services.inventory_service import InventoryService
 from tbg.services.save_service import SaveService
 from tbg.services.story_service import StoryService
 from tbg.services.errors import SaveLoadError
+from tbg.services.area_service import AreaService
 from tbg.data.repositories import (
     ArmourRepository,
+    AreasRepository,
     ClassesRepository,
     EnemiesRepository,
     ItemsRepository,
@@ -22,7 +24,7 @@ from tbg.data.repositories import (
 )
 
 
-def _build_test_services() -> tuple[StoryService, BattleService, InventoryService, SaveService, dict]:
+def _build_test_services() -> tuple[StoryService, BattleService, InventoryService, SaveService, AreaService, dict]:
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
     story_repo = StoryRepository()
@@ -56,6 +58,8 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         items_repo=items_repo,
         loot_tables_repo=loot_repo,
     )
+    areas_repo = AreasRepository()
+    area_service = AreaService(areas_repo=areas_repo)
     save_service = SaveService(
         story_repo=story_repo,
         classes_repo=classes_repo,
@@ -63,6 +67,7 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         armour_repo=armour_repo,
         items_repo=items_repo,
         party_members_repo=party_repo,
+        areas_repo=areas_repo,
     )
     repos = {
         "weapons": weapons_repo,
@@ -70,12 +75,20 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         "items": items_repo,
         "party": party_repo,
     }
-    return story_service, battle_service, inventory_service, save_service, repos
+    return story_service, battle_service, inventory_service, save_service, area_service, repos
 
 
 def test_save_round_trip_preserves_state() -> None:
-    story_service, battle_service, inventory_service, save_service, repos = _build_test_services()
+    (
+        story_service,
+        battle_service,
+        inventory_service,
+        save_service,
+        area_service,
+        repos,
+    ) = _build_test_services()
     state = story_service.start_new_game(seed=123, player_name="Tester")
+    area_service.initialize_state(state)
     story_service.choose(state, 0)  # select first class
     state.gold = 77
     state.exp = 42
@@ -114,11 +127,22 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.pending_narration == state.pending_narration
     assert restored.pending_story_node_id == state.pending_story_node_id
     assert restored.camp_message == state.camp_message
+    assert restored.current_location_id == state.current_location_id
+    assert restored.visited_locations == state.visited_locations
+    assert restored.location_entry_seen == state.location_entry_seen
 
 
 def test_rng_determinism_survives_save_round_trip() -> None:
-    story_service, battle_service, inventory_service, save_service, _ = _build_test_services()
+    (
+        story_service,
+        battle_service,
+        inventory_service,
+        save_service,
+        area_service,
+        _,
+    ) = _build_test_services()
     state = story_service.start_new_game(seed=999, player_name="Hero")
+    area_service.initialize_state(state)
     story_service.choose(state, 0)
     state.rng.randint(1, 100)  # advance RNG before saving
     payload = save_service.serialize(state)
@@ -145,8 +169,9 @@ def test_rng_determinism_survives_save_round_trip() -> None:
 
 
 def test_deserialize_rejects_unsupported_version() -> None:
-    story_service, battle_service, inventory_service, save_service, _ = _build_test_services()
+    story_service, _, _, save_service, area_service, _ = _build_test_services()
     state = story_service.start_new_game(seed=1, player_name="Hero")
+    area_service.initialize_state(state)
     payload = save_service.serialize(state)
     payload["save_version"] = 99
     with pytest.raises(SaveLoadError):
@@ -154,8 +179,9 @@ def test_deserialize_rejects_unsupported_version() -> None:
 
 
 def test_deserialize_rejects_missing_required_fields() -> None:
-    story_service, battle_service, inventory_service, save_service, _ = _build_test_services()
+    story_service, _, _, save_service, area_service, _ = _build_test_services()
     state = story_service.start_new_game(seed=1, player_name="Hero")
+    area_service.initialize_state(state)
     payload = save_service.serialize(state)
     payload["state"].pop("current_node_id")
     with pytest.raises(SaveLoadError):
@@ -163,8 +189,9 @@ def test_deserialize_rejects_missing_required_fields() -> None:
 
 
 def test_deserialize_rejects_unknown_ids() -> None:
-    story_service, battle_service, inventory_service, save_service, _ = _build_test_services()
+    story_service, _, _, save_service, area_service, _ = _build_test_services()
     state = story_service.start_new_game(seed=1, player_name="Hero")
+    area_service.initialize_state(state)
     payload = save_service.serialize(state)
     payload["state"]["inventory"]["weapons"]["unknown_weapon"] = 1
     with pytest.raises(SaveLoadError):

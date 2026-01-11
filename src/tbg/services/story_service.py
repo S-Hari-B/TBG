@@ -182,6 +182,12 @@ class StoryService:
         self._enter_node(state, next_node_id, events)
         return events
 
+    def play_node(self, state: GameState, node_id: str) -> List[StoryEvent]:
+        """Force-enter a node (used for optional entry hooks)."""
+        events: List[StoryEvent] = []
+        self._enter_node(state, node_id, events)
+        return events
+
     def _apply_effects(self, effects: Sequence[StoryEffectDef], state: GameState) -> tuple[List[StoryEvent], bool]:
         emitted: List[StoryEvent] = []
         halt_flow = False

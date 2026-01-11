@@ -31,5 +31,8 @@ class GameState:
     member_levels: Dict[str, int] = field(default_factory=dict)
     member_exp: Dict[str, int] = field(default_factory=dict)
     camp_message: str | None = None
+    current_location_id: str = ""
+    visited_locations: List[str] = field(default_factory=list)
+    location_entry_seen: Dict[str, bool] = field(default_factory=dict)
 
 

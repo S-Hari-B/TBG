@@ -12,6 +12,13 @@ from .story_service import (
     StoryNodeView,
     StoryService,
 )
+from .area_service import (
+    AreaService,
+    LocationEnteredEvent,
+    LocationView,
+    TravelPerformedEvent,
+    TravelResult,
+)
 from .battle_service import BattleService
 from .save_service import SaveService
 
@@ -27,6 +34,11 @@ __all__ = [
     "PlayerClassSetEvent",
     "StoryNodeView",
     "StoryService",
+    "AreaService",
+    "LocationEnteredEvent",
+    "LocationView",
+    "TravelPerformedEvent",
+    "TravelResult",
     "BattleService",
     "SaveService",
 ]
