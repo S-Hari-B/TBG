@@ -174,6 +174,12 @@ class StoryService:
 
     def resume_pending_flow(self, state: GameState) -> List[StoryEvent]:
         """Resume story flow after any blocking effect."""
+        if (
+            state.story_checkpoint_node_id
+            and state.story_checkpoint_thread_id in (None, "main_story")
+            and not state.pending_story_node_id
+        ):
+            self.rewind_to_checkpoint(state)
         if not state.pending_story_node_id:
             return []
         next_node_id = state.pending_story_node_id
@@ -212,6 +218,7 @@ class StoryService:
                 emitted.append(PlayerClassSetEvent(class_id=class_id, player_id=player.id))
             elif effect_type == "start_battle":
                 enemy_id = self._require_str(effect.data.get("enemy_id"), "start_battle.enemy_id")
+                self._record_battle_checkpoint(state)
                 emitted.append(BattleRequestedEvent(enemy_id=enemy_id))
                 halt_flow = True
             elif effect_type == "add_party_member":
@@ -250,6 +257,30 @@ class StoryService:
                 # Unknown effects are ignored for now to keep the interpreter forward compatible.
                 continue
         return emitted, halt_flow
+
+    def clear_checkpoint(self, state: GameState, thread_id: str = "main_story") -> None:
+        """Clear any stored story checkpoint after a successful battle."""
+        if state.story_checkpoint_thread_id and state.story_checkpoint_thread_id != thread_id:
+            return
+        state.story_checkpoint_node_id = None
+        state.story_checkpoint_location_id = None
+        state.story_checkpoint_thread_id = None
+
+    def rewind_to_checkpoint(self, state: GameState, thread_id: str = "main_story") -> bool:
+        """Prepare the state to resume from the last checkpoint after defeat."""
+        if not state.story_checkpoint_node_id:
+            return False
+        if state.story_checkpoint_thread_id and state.story_checkpoint_thread_id != thread_id:
+            return False
+        state.pending_story_node_id = state.story_checkpoint_node_id
+        state.pending_narration = []
+        state.current_node_id = state.story_checkpoint_node_id
+        return True
+
+    def _record_battle_checkpoint(self, state: GameState, thread_id: str = "main_story") -> None:
+        state.story_checkpoint_node_id = state.current_node_id
+        state.story_checkpoint_location_id = state.current_location_id
+        state.story_checkpoint_thread_id = thread_id
 
     @staticmethod
     def _require_str(value: object, context: str) -> str:

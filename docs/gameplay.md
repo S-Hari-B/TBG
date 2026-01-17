@@ -14,7 +14,7 @@ Quit
 Game Menu
 
 - Continue story – resumes the pending story node that triggered the camp interlude. If no pending node exists (e.g. after exhausting the current slice) the option remains but prints a reminder to explore via Travel instead.
-- Travel – opens the area map defined in `data/definitions/areas.json`. The screen shows the current location’s name/description, lists every connected destination using the JSON `"label"` fields, and lets the player pick a destination. Travelling emits deterministic events (`Traveled from …`, `Arrived at …`) and renders a fresh “Location” block with the new area description. Areas can optionally declare `entry_story_node_id`; those nodes fire exactly once per save file when the player first enters that area and can show short flavour beats before returning to camp.
+- Travel – opens the area map defined in `data/definitions/areas.json`. The screen shows the current location’s name/description, lists every connected destination using the JSON `"label"` fields, and lets the player pick a destination. Travelling emits deterministic events (`Traveled from …`, `Arrived at …`) and renders a fresh “Location” block with the new area description. Areas can optionally declare `entry_story_node_id`; those nodes fire exactly once per save file when the player first enters that area and can show short flavour beats before returning to camp. When a required battle checkpoint is active, any connection flagged as `progresses_story: true` is temporarily locked with the message “You can’t push onward yet…” until the battle is cleared, but backtracking routes remain available.
 - Location Debug (DEBUG) – only in debug builds (`TBG_DEBUG=1`). Prints ids, tags, and entry-story flags for the current area plus the full `visited_locations`/`location_entry_seen` maps. Does not mutate state.
 - Inventory / Equipment – opens the shared inventory where you can inspect party members, equip/unequip weapons and armour, and view remaining supplies. Accessible during camp interludes and future out-of-combat scenes.
 - Party Talk – appears whenever at least one companion has joined. Surfaces deterministic banter lines.
@@ -28,6 +28,13 @@ Game Menu
 * Save files live under `data/saves/slot_1.json` through `slot_3.json`. The format is versioned (`"save_version": 1`). Any mismatch or missing fields results in `Load failed: <reason>` and the CLI returns to the Main Menu without altering state.
 * Saves include the RNG internal state, so any random draws performed after loading match what would have happened had the player never quit. Story flow resumes exactly where the camp interlude paused: if you saved mid-camp you load back into the Camp Menu before continuing; otherwise the story picks up at the stored node and pending narration.
 * Save files are portable and JSON-readable so players (and tests) can inspect them, but only validated ids defined in `data/definitions` are accepted during load. If definitions change incompatibly, the load is refused with `Save incompatible with current definitions`.
+
+### Recovery & Defeat Rules
+
+* After every victorious battle the entire party’s MP is restored to full before any follow-up story or camp logic occurs. (HP remains unchanged unless specified elsewhere.)
+* Whenever a player-controlled character levels up (including multiple levels in one reward step) their HP and MP snap to their current max values immediately after the level-up calculation, guaranteeing they’re ready for the next encounter.
+* If the hero (player-controlled combatant) is reduced to 0 HP at any point in battle, the encounter ends instantly in defeat even if allies remain standing—no extra turns are played out after the hero falls.
+* When the party is defeated, no one dies permanently: `flag_last_battle_defeat` is set to `true`, everyone’s HP and MP are fully restored, and the CLI drops straight back into Camp Menu with the message “You barely make it back to camp…”. The story rewinds to the last checkpointed node (the moment that triggered the battle) so selecting “Continue story” replays the failed encounter rather than skipping ahead. Checkpoints are tagged by thread (`main_story` today), so future quest checkpoints can coexist without fighting over Camp Continue. No gold/EXP penalties are applied in this placeholder implementation.
 
 ### Debug-mode UI helpers
 

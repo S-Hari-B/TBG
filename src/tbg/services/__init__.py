@@ -1,6 +1,6 @@
 """Service layer exports."""
 
-from .errors import FactoryError, SaveLoadError
+from .errors import FactoryError, SaveLoadError, TravelBlockedError
 from .story_service import (
     BattleRequestedEvent,
     ChoiceResult,
@@ -25,6 +25,7 @@ from .save_service import SaveService
 __all__ = [
     "FactoryError",
     "SaveLoadError",
+    "TravelBlockedError",
     "BattleRequestedEvent",
     "ChoiceResult",
     "ExpGainedEvent",

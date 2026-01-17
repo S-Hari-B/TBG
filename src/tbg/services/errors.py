@@ -9,5 +9,9 @@ class SaveLoadError(Exception):
     """Raised when save or load operations fail."""
 
 
+class TravelBlockedError(Exception):
+    """Raised when travel is blocked by story progression locks."""
+
+
 
 

@@ -372,7 +372,7 @@ Party members define recruitable allies such as Emma. Fields mirror the class de
 * `name`: string
 * `description`: string
 * `tags`: list[string] — lowercase tags such as `village`, `outskirts`, `forest`, `safe`. These tags allow future encounter gating/balance rules.
-* `connections`: list of `{ "to": "<area_id>", "label": "<menu label>" }`. Connections are directional; add reciprocal entries explicitly.
+* `connections`: list of `{ "to": "<area_id>", "label": "<menu label>", "progresses_story": bool }`. `progresses_story` is optional and defaults to `false`. Connections are directional; add reciprocal entries explicitly.
 * `entry_story_node_id`: optional string referencing a node in `story.json`. If present, that node auto-plays exactly once the first time the player arrives at the area.
 
 Repositories validate that:
@@ -474,7 +474,7 @@ Manual saves are plain JSON written to `data/saves/slot_1.json` through `slot_3.
 * `save_version`: integer schema version (v1 = `1`). Loaders refuse mismatched versions.
 * `metadata`: presentation summary used when rendering the slot picker (player name, current node id, current location id, mode, gold, seed, ISO timestamp).
 * `rng`: deterministic RNG snapshot (`{"version": 3, "state": [...], "gauss": null}`).
-* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, and the player object).
+* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, checkpoint metadata, and the player object).
 
 Example (trimmed):
 
@@ -503,7 +503,7 @@ Example (trimmed):
     "player_name": "Hero",
     "gold": 42,
     "exp": 18,
-    "flags": {"tutorial_complete": true},
+    "flags": {"tutorial_complete": true, "flag_last_battle_defeat": false},
     "party_members": ["emma"],
     "pending_story_node_id": "forest_aftermath",
     "pending_narration": [{"node_id": "post_ambush_menu", "text": "..."}],
@@ -523,6 +523,9 @@ Example (trimmed):
     "camp_message": "You take a moment to rest, patch gear, and talk before pressing on.",
     "visited_locations": ["village_outskirts"],
     "location_entry_seen": {"village_outskirts": true},
+    "story_checkpoint_node_id": "forest_ambush",
+    "story_checkpoint_location_id": "village_outskirts",
+    "story_checkpoint_thread_id": "main_story",
     "player": {
       "id": "player_x1",
       "name": "Hero",
@@ -542,6 +545,12 @@ Example (trimmed):
 ```
 
 All ids inside `state` are validated against the current `data/definitions`. If any referenced weapon, armour, item, class, party member, or story node is missing, the load fails with `Save incompatible with current definitions`. Missing keys or malformed types also raise `SaveLoadError`. Because the RNG snapshot is restored verbatim, any random operation after loading produces the same outcome as it would have without saving.
+
+Additional state fields:
+
+* `story_checkpoint_node_id`: string | null — the most recent story node that should be replayed if the player was defeated. When non-null, Camp Menu’s “Continue story” rewinds to that node instead of skipping ahead.
+* `story_checkpoint_location_id`: string | null — the area id the player must return to before replaying the checkpoint encounter. Continue auto-warps to this location when needed.
+* `story_checkpoint_thread_id`: string | null — identifier describing which checkpoint thread is active (`"main_story"` today; quests can introduce additional threads later). Thread ids keep different checkpoint categories from interfering with one another.
 
 ---
 

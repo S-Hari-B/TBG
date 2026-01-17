@@ -7,7 +7,7 @@
       "tags": ["village", "outskirts"],
       "connections": [
         { "to": "village", "label": "Return to the village" },
-        { "to": "forest_deeper", "label": "Head deeper into the forest" }
+        { "to": "forest_deeper", "label": "Head deeper into the forest", "progresses_story": true }
       ],
       "entry_story_node_id": null
     },

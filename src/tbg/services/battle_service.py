@@ -192,7 +192,8 @@ class BattleService:
             allies.append(self._party_member_to_combatant(member_id, state))
 
         battle_id = make_instance_id("battle", state.rng)
-        battle_state = BattleState(battle_id=battle_id, allies=allies, enemies=enemies)
+        player_id = state.player.id if state.player else None
+        battle_state = BattleState(battle_id=battle_id, allies=allies, enemies=enemies, player_id=player_id)
         self._rebuild_turn_queue(battle_state)
         if battle_state.turn_queue:
             battle_state.current_actor_id = battle_state.turn_queue[0]
@@ -229,6 +230,11 @@ class BattleService:
         ]
         if not target.is_alive:
             events.append(CombatantDefeatedEvent(combatant_id=target.instance_id, combatant_name=target.display_name))
+
+        player_defeat_event = self._check_player_defeat(battle_state)
+        if player_defeat_event:
+            events.append(player_defeat_event)
+            return events
 
         maybe_resolved = self._update_victory(battle_state)
         if maybe_resolved:
@@ -285,6 +291,10 @@ class BattleService:
                     events.append(
                         CombatantDefeatedEvent(combatant_id=target.instance_id, combatant_name=target.display_name)
                     )
+                player_defeat_event = self._check_player_defeat(battle_state)
+                if player_defeat_event:
+                    events.append(player_defeat_event)
+                    return events
         elif skill.effect_type == "guard":
             attacker.guard_reduction = skill.base_power
             events.append(
@@ -323,23 +333,36 @@ class BattleService:
         return events
 
     def run_ally_ai_turn(self, battle_state: BattleState, actor_id: str, rng: RNG) -> List[BattleEvent]:
+        del rng  # ally AI is deterministic
         actor = self._get_combatant(battle_state, actor_id)
         living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
         if not living_enemies:
             return []
 
         available_skills = self.get_available_skills(battle_state, actor_id)
-        firebolt_skill = next((skill for skill in available_skills if skill.id == "skill_firebolt"), None)
-        if (
-            firebolt_skill
-            and actor.stats.mp >= firebolt_skill.mp_cost
-            and rng.randint(0, 1) == 0
-        ):
-            target = living_enemies[rng.randint(0, len(living_enemies) - 1)]
-            return self.use_skill(battle_state, actor_id, firebolt_skill.id, [target.instance_id])
+        for skill in available_skills:
+            if actor.stats.mp < skill.mp_cost:
+                continue
+            target_ids = self._select_ai_skill_targets(skill, actor, living_enemies)
+            if target_ids is None:
+                continue
+            return self.use_skill(battle_state, actor_id, skill.id, target_ids)
 
-        target = living_enemies[rng.randint(0, len(living_enemies) - 1)]
+        target = living_enemies[0]
         return self.basic_attack(battle_state, actor_id, target.instance_id)
+
+    def _select_ai_skill_targets(
+        self, skill: SkillDef, actor: Combatant, living_enemies: List[Combatant]
+    ) -> List[str] | None:
+        if skill.target_mode == "self":
+            return []
+        if not living_enemies:
+            return None
+        if skill.target_mode == "single_enemy":
+            return [living_enemies[0].instance_id]
+        if skill.target_mode == "multi_enemy":
+            return [enemy.instance_id for enemy in living_enemies[: skill.max_targets]]
+        return None
 
     # -----------------------
     # Helpers
@@ -443,6 +466,20 @@ class BattleService:
             result = self._update_victory(battle_state)
             return [result] if result else []
         return []
+
+    def _check_player_defeat(self, battle_state: BattleState) -> BattleResolvedEvent | None:
+        player_id = battle_state.player_id
+        if not player_id:
+            return None
+        for combatant in battle_state.allies:
+            if combatant.instance_id == player_id:
+                if combatant.is_alive:
+                    return None
+                battle_state.is_over = True
+                battle_state.victor = "enemies"
+                battle_state.current_actor_id = None
+                return BattleResolvedEvent(victor="enemies")
+        return None
 
     def _build_party_talk_text(
         self,
@@ -657,6 +694,8 @@ class BattleService:
                         reward_events.extend(self._award_exp(state, member_id, share))
 
         reward_events.extend(self._roll_loot(defeated, state))
+        self.restore_party_resources(state, restore_hp=False, restore_mp=True)
+        state.flags["flag_last_battle_defeat"] = False
         if len(reward_events) == 1:
             return []
         return reward_events
@@ -695,6 +734,8 @@ class BattleService:
         )
         for level in leveled:
             events.append(BattleLevelUpEvent(member_id=member_id, member_name=member_name, new_level=level))
+        if leveled:
+            self._restore_member_resources(state, member_id, restore_hp=True, restore_mp=True)
         return events
 
     @staticmethod
@@ -754,5 +795,24 @@ class BattleService:
             return member.name
         except KeyError:
             return member_id
+
+    def restore_party_resources(self, state: GameState, *, restore_hp: bool, restore_mp: bool) -> None:
+        """Reset current resources for the player (and future party hooks) after battles."""
+        for member_id in self._active_party_ids(state):
+            self._restore_member_resources(state, member_id, restore_hp=restore_hp, restore_mp=restore_mp)
+
+    def _restore_member_resources(
+        self,
+        state: GameState,
+        member_id: str,
+        *,
+        restore_hp: bool,
+        restore_mp: bool,
+    ) -> None:
+        if state.player and member_id == state.player.id:
+            if restore_hp:
+                state.player.stats.hp = state.player.stats.max_hp
+            if restore_mp:
+                state.player.stats.mp = state.player.stats.max_mp
 
 

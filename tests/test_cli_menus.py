@@ -1,7 +1,11 @@
 from tbg.core.rng import RNG
 from tbg.domain.state import GameState
 from tbg.presentation.cli import app
-from tbg.presentation.cli.app import _build_camp_menu_entries, _main_menu_options
+from tbg.presentation.cli.app import (
+    _build_camp_menu_entries,
+    _main_menu_options,
+    _warp_to_checkpoint_location,
+)
 from tbg.services.area_service import AreaService
 from tbg.data.repositories import AreasRepository
 from tbg.services.story_service import GameMenuEnteredEvent
@@ -81,3 +85,30 @@ def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> Non
 
     assert result is True
     assert captured["area_service"] is area_service
+
+
+def test_warp_to_checkpoint_location_emits_message(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("TBG_DEBUG", "1")
+    area_service = AreaService(AreasRepository())
+    state = _camp_state()
+    area_service.initialize_state(state)
+    area_service.force_set_location(state, "village")
+    state.story_checkpoint_location_id = "village_outskirts"
+
+    did_warp = _warp_to_checkpoint_location(area_service, state)
+
+    assert did_warp is True
+    assert state.current_location_id == "village_outskirts"
+    out = capsys.readouterr().out
+    assert "checkpoint rewind" in out
+    assert "DEBUG: checkpoint warp from=village to=village_outskirts" in out
+
+
+def test_warp_to_checkpoint_skips_when_already_at_location(capsys) -> None:
+    area_service = AreaService(AreasRepository())
+    state = _camp_state()
+    area_service.initialize_state(state)
+    state.story_checkpoint_location_id = state.current_location_id
+
+    assert _warp_to_checkpoint_location(area_service, state) is False
+    assert capsys.readouterr().out == ""

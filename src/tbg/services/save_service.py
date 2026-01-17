@@ -107,6 +107,19 @@ class SaveService:
         state.member_levels = self._coerce_int_dict(state_payload.get("member_levels"), "state.member_levels")
         state.member_exp = self._coerce_int_dict(state_payload.get("member_exp"), "state.member_exp")
         state.camp_message = self._coerce_optional_str(state_payload.get("camp_message"), "state.camp_message")
+        state.story_checkpoint_node_id = self._coerce_optional_str(
+            state_payload.get("story_checkpoint_node_id"), "state.story_checkpoint_node_id"
+        )
+        state.story_checkpoint_location_id = self._coerce_optional_str(
+            state_payload.get("story_checkpoint_location_id"), "state.story_checkpoint_location_id"
+        )
+        checkpoint_thread = state_payload.get("story_checkpoint_thread_id")
+        if checkpoint_thread is None:
+            state.story_checkpoint_thread_id = "main_story" if state.story_checkpoint_node_id else None
+        else:
+            state.story_checkpoint_thread_id = self._coerce_optional_str(
+                checkpoint_thread, "state.story_checkpoint_thread_id"
+            )
         state.current_location_id = current_location_id
         state.visited_locations = self._coerce_visited_locations(
             state_payload.get("visited_locations"), current_location_id
@@ -171,6 +184,9 @@ class SaveService:
             "player": self._serialize_player(state.player) if state.player else None,
             "visited_locations": list(state.visited_locations),
             "location_entry_seen": dict(state.location_entry_seen),
+            "story_checkpoint_node_id": state.story_checkpoint_node_id,
+            "story_checkpoint_location_id": state.story_checkpoint_location_id,
+            "story_checkpoint_thread_id": state.story_checkpoint_thread_id,
         }
 
     @staticmethod

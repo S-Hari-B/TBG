@@ -14,9 +14,7 @@ from tbg.data.repositories import (
 )
 from tbg.services.story_service import (
     BattleRequestedEvent,
-    ExpGainedEvent,
     GameMenuEnteredEvent,
-    GoldGainedEvent,
     PartyMemberJoinedEvent,
     PlayerClassSetEvent,
     StoryService,
@@ -156,10 +154,90 @@ def test_post_ambush_interlude_triggers_game_menu() -> None:
     assert state.current_node_id == "post_ambush_menu"
     assert state.pending_story_node_id == "forest_aftermath"
 
-    # Continue story after menu interlude
+    # Continue story after menu interlude (forest aftermath triggers another camp)
     post_menu_events = story_service.resume_pending_flow(state)
-    assert any(isinstance(evt, GoldGainedEvent) for evt in post_menu_events)
+    assert any(isinstance(evt, GameMenuEnteredEvent) for evt in post_menu_events)
     assert state.current_node_id == "forest_aftermath"
+    assert state.pending_story_node_id == "demo_slice_complete"
+
+
+def test_rewind_to_checkpoint_retries_failed_battle() -> None:
+    story_service = _make_story_service()
+    state = story_service.start_new_game(seed=303, player_name="Hero")
+
+    story_service.choose(state, 0)  # class selection
+    story_service.choose(state, 0)  # investigate scream, triggers first battle
+    resume_events = story_service.resume_pending_flow(state)  # Emma joins and next battle queued
+    assert any(isinstance(evt, BattleRequestedEvent) for evt in resume_events)
+    assert state.story_checkpoint_node_id == "forest_ambush"
+
+    assert story_service.rewind_to_checkpoint(state) is True
+    assert state.pending_story_node_id == "forest_ambush"
+
+    retry_events = story_service.resume_pending_flow(state)
+    assert any(isinstance(evt, BattleRequestedEvent) for evt in retry_events)
+
+    story_service.clear_checkpoint(state)
+    assert state.story_checkpoint_node_id is None
+
+
+def test_resume_pending_flow_honors_checkpoint_even_without_pending() -> None:
+    story_service = _make_story_service()
+    state = story_service.start_new_game(seed=404, player_name="Hero")
+
+    story_service.choose(state, 0)
+    story_service.choose(state, 0)
+    story_service.resume_pending_flow(state)  # finish first battle
+    story_service.resume_pending_flow(state)  # hit ambush checkpoint
+    assert state.story_checkpoint_node_id == "forest_ambush"
+
+    state.pending_story_node_id = None
+    state.pending_narration = []
+
+    replay_events = story_service.resume_pending_flow(state)
+    assert any(isinstance(evt, BattleRequestedEvent) for evt in replay_events)
+
+
+def test_checkpoint_records_location() -> None:
+    story_service = _make_story_service()
+    state = story_service.start_new_game(seed=515, player_name="Hero")
+
+    story_service.choose(state, 0)
+    story_service.choose(state, 0)
+    first_resume = story_service.resume_pending_flow(state)
+    events = story_service.resume_pending_flow(state)
+
+    assert any(isinstance(evt, BattleRequestedEvent) for evt in first_resume + events)
+    assert state.story_checkpoint_node_id == "forest_ambush"
+    assert state.story_checkpoint_location_id == state.current_location_id
+    assert state.story_checkpoint_thread_id == "main_story"
+
+
+def test_checkpoint_clear_only_when_thread_matches() -> None:
+    story_service = _make_story_service()
+    state = story_service.start_new_game(seed=616, player_name="Hero")
+    story_service.choose(state, 0)
+    story_service.choose(state, 0)
+    story_service.resume_pending_flow(state)
+    story_service.resume_pending_flow(state)
+
+    state.story_checkpoint_thread_id = "quest_bandits"
+    story_service.clear_checkpoint(state, thread_id="main_story")
+    assert state.story_checkpoint_node_id is not None
+
+    story_service.clear_checkpoint(state, thread_id="quest_bandits")
+    assert state.story_checkpoint_node_id is None
+
+
+def test_rewind_only_when_thread_matches() -> None:
+    story_service = _make_story_service()
+    state = story_service.start_new_game(seed=717, player_name="Hero")
+    state.story_checkpoint_node_id = "dummy"
+    state.story_checkpoint_location_id = "village_outskirts"
+    state.story_checkpoint_thread_id = "quest_thread"
+
+    assert story_service.rewind_to_checkpoint(state, thread_id="main_story") is False
+    assert story_service.rewind_to_checkpoint(state, thread_id="quest_thread") is True
 
 
 def test_intro_flags_are_set() -> None:

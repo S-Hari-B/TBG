@@ -62,7 +62,14 @@ class AreasRepository(RepositoryBase[AreaDef]):
                     conn_map.get("label"),
                     f"area '{area_id}' connections[{index}].label",
                 )
-                connections.append(AreaConnectionDef(to_id=to_id, label=label))
+                progresses_story = conn_map.get("progresses_story", False)
+                if not isinstance(progresses_story, bool):
+                    raise DataValidationError(
+                        f"area '{area_id}' connections[{index}].progresses_story must be a boolean if provided."
+                    )
+                connections.append(
+                    AreaConnectionDef(to_id=to_id, label=label, progresses_story=progresses_story)
+                )
             entry_story_node_id = area_map.get("entry_story_node_id")
             if entry_story_node_id is not None:
                 entry_story_node_id = self._require_str(

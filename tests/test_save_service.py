@@ -9,6 +9,7 @@ from tbg.services.save_service import SaveService
 from tbg.services.story_service import StoryService
 from tbg.services.errors import SaveLoadError
 from tbg.services.area_service import AreaService
+from tbg.services.errors import TravelBlockedError
 from tbg.data.repositories import (
     ArmourRepository,
     AreasRepository,
@@ -89,6 +90,7 @@ def test_save_round_trip_preserves_state() -> None:
     ) = _build_test_services()
     state = story_service.start_new_game(seed=123, player_name="Tester")
     area_service.initialize_state(state)
+    area_service.initialize_state(state)
     story_service.choose(state, 0)  # select first class
     state.gold = 77
     state.exp = 42
@@ -112,6 +114,9 @@ def test_save_round_trip_preserves_state() -> None:
     state.equipment[state.player.id] = member_equipment
     state.camp_message = "Rest up."
     state.mode = "camp_menu"
+    state.story_checkpoint_node_id = "forest_ambush"
+    state.story_checkpoint_location_id = "village_outskirts"
+    state.story_checkpoint_thread_id = "main_story"
 
     payload = save_service.serialize(state)
     restored = save_service.deserialize(payload)
@@ -130,6 +135,9 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.current_location_id == state.current_location_id
     assert restored.visited_locations == state.visited_locations
     assert restored.location_entry_seen == state.location_entry_seen
+    assert restored.story_checkpoint_node_id == state.story_checkpoint_node_id
+    assert restored.story_checkpoint_location_id == state.story_checkpoint_location_id
+    assert restored.story_checkpoint_thread_id == state.story_checkpoint_thread_id
 
 
 def test_rng_determinism_survives_save_round_trip() -> None:
@@ -142,6 +150,7 @@ def test_rng_determinism_survives_save_round_trip() -> None:
         _,
     ) = _build_test_services()
     state = story_service.start_new_game(seed=999, player_name="Hero")
+    area_service.initialize_state(state)
     area_service.initialize_state(state)
     story_service.choose(state, 0)
     state.rng.randint(1, 100)  # advance RNG before saving
@@ -172,6 +181,7 @@ def test_deserialize_rejects_unsupported_version() -> None:
     story_service, _, _, save_service, area_service, _ = _build_test_services()
     state = story_service.start_new_game(seed=1, player_name="Hero")
     area_service.initialize_state(state)
+    area_service.initialize_state(state)
     payload = save_service.serialize(state)
     payload["save_version"] = 99
     with pytest.raises(SaveLoadError):
@@ -181,6 +191,7 @@ def test_deserialize_rejects_unsupported_version() -> None:
 def test_deserialize_rejects_missing_required_fields() -> None:
     story_service, _, _, save_service, area_service, _ = _build_test_services()
     state = story_service.start_new_game(seed=1, player_name="Hero")
+    area_service.initialize_state(state)
     area_service.initialize_state(state)
     payload = save_service.serialize(state)
     payload["state"].pop("current_node_id")
@@ -192,8 +203,36 @@ def test_deserialize_rejects_unknown_ids() -> None:
     story_service, _, _, save_service, area_service, _ = _build_test_services()
     state = story_service.start_new_game(seed=1, player_name="Hero")
     area_service.initialize_state(state)
+    area_service.initialize_state(state)
     payload = save_service.serialize(state)
     payload["state"]["inventory"]["weapons"]["unknown_weapon"] = 1
     with pytest.raises(SaveLoadError):
         save_service.deserialize(payload)
+
+
+def test_checkpoint_blocks_story_progress_travel_after_load() -> None:
+    (
+        story_service,
+        _,
+        _,
+        save_service,
+        area_service,
+        _,
+    ) = _build_test_services()
+    state = story_service.start_new_game(seed=555, player_name="Hero")
+    area_service.initialize_state(state)
+    state.story_checkpoint_node_id = "forest_ambush"
+    state.story_checkpoint_location_id = "village_outskirts"
+    state.story_checkpoint_thread_id = "main_story"
+
+    payload = save_service.serialize(state)
+    restored = save_service.deserialize(payload)
+
+    with pytest.raises(TravelBlockedError):
+        area_service.travel_to(restored, "forest_deeper")
+
+    restored.story_checkpoint_node_id = None
+    restored.story_checkpoint_location_id = None
+    restored.story_checkpoint_thread_id = None
+    area_service.travel_to(restored, "forest_deeper")
 

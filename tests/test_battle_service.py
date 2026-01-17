@@ -17,6 +17,7 @@ from tbg.data.repositories import (
 from tbg.domain.state import GameState
 from tbg.services.battle_service import (
     AttackResolvedEvent,
+    BattleResolvedEvent,
     BattleService,
     GuardAppliedEvent,
     LootAcquiredEvent,
@@ -198,6 +199,76 @@ def test_enemy_ai_target_selection_deterministic_for_seed() -> None:
     target_b = next(evt.target_id for evt in events_b if isinstance(evt, AttackResolvedEvent))
 
     assert target_a == target_b
+
+
+def test_player_ko_immediately_ends_battle() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_pack_3", state)
+    player = next(ally for ally in battle_state.allies if ally.instance_id == state.player.id)
+    enemy = battle_state.enemies[0]
+    enemy.stats.attack = 999
+
+    events = service.basic_attack(battle_state, enemy.instance_id, player.instance_id)
+
+    assert battle_state.is_over is True
+    assert battle_state.victor == "enemies"
+    assert any(isinstance(evt, BattleResolvedEvent) for evt in events)
+
+
+def test_apply_victory_rewards_restores_player_mp_and_clears_defeat_flag() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    for enemy in battle_state.enemies:
+        enemy.stats.hp = 0
+    assert state.player is not None
+    state.player.stats.mp = 0
+
+    service.apply_victory_rewards(battle_state, state)
+
+    assert state.player.stats.mp == state.player.stats.max_mp
+    assert state.flags["flag_last_battle_defeat"] is False
+
+
+def test_level_up_restores_player_hp_and_mp() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    assert state.player is not None
+    player_id = state.player.id
+    state.player.stats.hp = 1
+    state.player.stats.mp = 0
+
+    service._award_exp(state, player_id, 20)
+
+    assert state.player.stats.hp == state.player.stats.max_hp
+    assert state.player.stats.mp == state.player.stats.max_mp
+
+
+def test_party_ai_prefers_skill_when_available() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_pack_3", state)
+    emma = next(ally for ally in battle_state.allies if ally.instance_id == "party_emma")
+    battle_state.current_actor_id = emma.instance_id
+    emma.stats.mp = emma.stats.max_mp
+
+    events = service.run_ally_ai_turn(battle_state, emma.instance_id, state.rng)
+
+    assert any(isinstance(evt, SkillUsedEvent) for evt in events)
+
+
+def test_party_ai_falls_back_to_basic_attack_with_insufficient_mp() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_pack_3", state)
+    emma = next(ally for ally in battle_state.allies if ally.instance_id == "party_emma")
+    battle_state.current_actor_id = emma.instance_id
+    emma.stats.mp = 0
+
+    events = service.run_ally_ai_turn(battle_state, emma.instance_id, state.rng)
+
+    assert any(isinstance(evt, AttackResolvedEvent) for evt in events)
 
 
 def test_apply_victory_rewards_grants_gold_exp_and_loot() -> None:

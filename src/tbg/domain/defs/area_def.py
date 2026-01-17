@@ -11,6 +11,7 @@ class AreaConnectionDef:
 
     to_id: str
     label: str
+    progresses_story: bool = False
 
 
 @dataclass(slots=True)

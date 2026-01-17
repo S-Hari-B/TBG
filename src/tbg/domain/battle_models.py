@@ -38,6 +38,7 @@ class BattleState:
     current_actor_id: str | None = None
     is_over: bool = False
     victor: Side | None = None
+    player_id: str | None = None
 
 
 @dataclass(slots=True)

@@ -37,8 +37,10 @@ from tbg.services import (
     SaveService,
     StoryNodeView,
     StoryService,
+    TravelBlockedError,
     TravelPerformedEvent,
 )
+from tbg.services.area_service import TRAVEL_BLOCKED_MESSAGE
 from tbg.services.battle_service import (
     AttackResolvedEvent,
     BattleEvent,
@@ -85,6 +87,7 @@ _MENU_TALK_LINES = {
         "If more goblins show up, we strike first this time.",
     ]
 }
+_DEFEAT_CAMP_MESSAGE = "You barely make it back to camp, bruised but alive."
 
 
 def _debug_enabled() -> bool:
@@ -96,7 +99,13 @@ def _print_debug_status(state: GameState, *, context: str) -> None:
         return
     node_id = state.current_node_id or "unknown"
     location_id = state.current_location_id or "unplaced"
-    print(f"DEBUG: {context} seed={state.seed} node={node_id} location={location_id} mode={state.mode}")
+    checkpoint_thread = state.story_checkpoint_thread_id or "none"
+    checkpoint_node = state.story_checkpoint_node_id or "none"
+    checkpoint_loc = state.story_checkpoint_location_id or "none"
+    print(
+        f"DEBUG: {context} seed={state.seed} node={node_id} location={location_id} mode={state.mode} "
+        f"checkpoint_thread={checkpoint_thread} checkpoint_node={checkpoint_node} checkpoint_loc={checkpoint_loc}"
+    )
 
 
 def _main_menu_options() -> List[tuple[str, MenuAction]]:
@@ -142,6 +151,27 @@ def _format_slot_label(meta: SlotMetadata) -> str:
         location = metadata.get("current_location_id") or "Unknown"
         summary += f" | seed={seed} location={location}"
     return summary
+
+
+def _warp_to_checkpoint_location(area_service: AreaService, state: GameState) -> bool:
+    checkpoint_location_id = state.story_checkpoint_location_id
+    if not checkpoint_location_id:
+        return False
+    if state.current_location_id == checkpoint_location_id:
+        return False
+    previous_location = state.current_location_id or "unknown"
+    area_service.force_set_location(state, checkpoint_location_id)
+    if state.current_location_id != checkpoint_location_id:
+        raise RuntimeError(
+            f"Checkpoint warp failed: expected location '{checkpoint_location_id}' but found '{state.current_location_id}'."
+        )
+    pretty_name = checkpoint_location_id.replace("_", " ").title()
+    print(f"- Returned to {pretty_name} (checkpoint rewind).")
+    if _debug_enabled():
+        print(
+            f"DEBUG: checkpoint warp from={previous_location} to={checkpoint_location_id}"
+        )
+    return True
 
 
 def main() -> None:
@@ -438,8 +468,18 @@ def _handle_story_events(
             battle_state, start_events = battle_service.start_battle(event.enemy_id, state)
             _render_battle_events(start_events)
             if not _run_battle_loop(battle_service, battle_state, state):
-                print("You fall in battle. Game Over.\n")
-                return False
+                if not _handle_defeat_flow(
+                    battle_service,
+                    story_service,
+                    inventory_service,
+                    state,
+                    save_service,
+                    slot_store,
+                    area_service,
+                ):
+                    return False
+                continue
+            story_service.clear_checkpoint(state)
             state.mode = "story"
             post_events = story_service.resume_pending_flow(state)
             if not _handle_story_events(
@@ -525,12 +565,15 @@ def _run_post_battle_interlude(
         index = _prompt_menu_index(len(menu_entries))
         action = menu_entries[index][1]
         if action == "continue":
-            if not state.pending_story_node_id:
+            if state.story_checkpoint_thread_id in (None, "main_story"):
+                _warp_to_checkpoint_location(area_service, state)
+            resumed_events = story_service.resume_pending_flow(state)
+            if not resumed_events:
                 print("No pending story nodes. Explore via Travel or Save your progress.")
                 continue
             state.mode = "story"
             state.camp_message = None
-            return story_service.resume_pending_flow(state)
+            return resumed_events
         if action == "travel":
             travel_follow_up = _handle_travel_menu(area_service, story_service, state)
             if travel_follow_up is not None:
@@ -551,6 +594,48 @@ def _run_post_battle_interlude(
         return None
 
 
+def _handle_defeat_flow(
+    battle_service: BattleService,
+    story_service: StoryService,
+    inventory_service: InventoryService,
+    state: GameState,
+    save_service: SaveService,
+    slot_store: SaveSlotStore,
+    area_service: AreaService,
+) -> bool:
+    story_service.rewind_to_checkpoint(state)
+    battle_service.restore_party_resources(state, restore_hp=True, restore_mp=True)
+    state.flags["flag_last_battle_defeat"] = True
+    message = _DEFEAT_CAMP_MESSAGE
+    state.mode = "camp_menu"
+    state.camp_message = message
+    follow_up = _run_post_battle_interlude(
+        message,
+        story_service,
+        inventory_service,
+        state,
+        save_service,
+        slot_store,
+        battle_service,
+        area_service,
+    )
+    if follow_up is None:
+        return False
+    if not follow_up:
+        return True
+    return _handle_story_events(
+        follow_up,
+        battle_service,
+        story_service,
+        inventory_service,
+        state,
+        save_service,
+        slot_store,
+        area_service,
+        print_header=bool(follow_up),
+    )
+
+
 def _handle_travel_menu(
     area_service: AreaService, story_service: StoryService, state: GameState
 ) -> List[object] | None:
@@ -568,8 +653,14 @@ def _handle_travel_menu(
         if choice == len(connections):
             return None
         destination = connections[choice]
+        if state.story_checkpoint_node_id and destination.progresses_story:
+            print(TRAVEL_BLOCKED_MESSAGE)
+            continue
         try:
             result = area_service.travel_to(state, destination.destination_id)
+        except TravelBlockedError as exc:
+            print(str(exc))
+            continue
         except ValueError as exc:
             print(f"Cannot travel: {exc}")
             continue

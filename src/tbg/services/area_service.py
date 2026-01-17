@@ -7,8 +7,10 @@ from typing import List, Tuple
 from tbg.data.repositories import AreasRepository
 from tbg.domain.defs import AreaDef
 from tbg.domain.state import GameState
+from tbg.services.errors import TravelBlockedError
 
 DEFAULT_STARTING_AREA_ID = "village_outskirts"
+TRAVEL_BLOCKED_MESSAGE = "You can't push onward yet. Something unresolved still blocks your path."
 
 
 @dataclass(slots=True)
@@ -17,6 +19,7 @@ class TravelOptionView:
 
     destination_id: str
     label: str
+    progresses_story: bool
 
 
 @dataclass(slots=True)
@@ -111,21 +114,29 @@ class AreaService:
         destination_id = destination_id.strip()
         if not destination_id:
             raise ValueError("Destination id must not be empty.")
-        connection_targets = {conn.to_id for conn in current_area.connections}
-        if destination_id not in connection_targets:
+        connection_lookup = {conn.to_id: conn for conn in current_area.connections}
+        connection = connection_lookup.get(destination_id)
+        if connection is None:
             raise ValueError(f"Destination '{destination_id}' is not reachable from '{current_id}'.")
+        checkpoint_thread = state.story_checkpoint_thread_id or "main_story"
+        checkpoint_active = bool(state.story_checkpoint_node_id and checkpoint_thread == "main_story")
+        if checkpoint_active and connection.progresses_story:
+            raise TravelBlockedError(TRAVEL_BLOCKED_MESSAGE)
         destination_def = self._areas_repo.get(destination_id)
         state.current_location_id = destination_def.id
         if destination_def.id not in state.visited_locations:
             state.visited_locations.append(destination_def.id)
-        entry_seen = state.location_entry_seen.get(destination_def.id)
-        if entry_seen is None:
-            entry_seen = destination_def.entry_story_node_id is None
-            state.location_entry_seen[destination_def.id] = entry_seen
         entry_story_node_id = None
-        if destination_def.entry_story_node_id and not entry_seen:
-            entry_story_node_id = destination_def.entry_story_node_id
-            state.location_entry_seen[destination_def.id] = True
+        checkpoint_thread = state.story_checkpoint_thread_id or "main_story"
+        checkpoint_active = bool(state.story_checkpoint_node_id and checkpoint_thread == "main_story")
+        if not checkpoint_active:
+            entry_seen = state.location_entry_seen.get(destination_def.id)
+            if entry_seen is None:
+                entry_seen = destination_def.entry_story_node_id is None
+                state.location_entry_seen[destination_def.id] = entry_seen
+            if destination_def.entry_story_node_id and not entry_seen:
+                entry_story_node_id = destination_def.entry_story_node_id
+                state.location_entry_seen[destination_def.id] = True
 
         location_view = self._build_location_view(destination_def, state)
         events: List[TravelEvent] = [
@@ -143,6 +154,13 @@ class AreaService:
             entry_story_node_id=entry_story_node_id,
         )
 
+    def force_set_location(self, state: GameState, location_id: str) -> None:
+        """Teleport the party without triggering story hooks or travel events."""
+        location_def = self._areas_repo.get(location_id)
+        state.current_location_id = location_def.id
+        if location_def.id not in state.visited_locations:
+            state.visited_locations.append(location_def.id)
+
     def _ensure_current_location_id(self, state: GameState) -> str:
         if not state.current_location_id:
             self.initialize_state(state)
@@ -155,7 +173,11 @@ class AreaService:
             description=area_def.description,
             tags=area_def.tags,
             connections=tuple(
-                TravelOptionView(destination_id=conn.to_id, label=conn.label)
+                TravelOptionView(
+                    destination_id=conn.to_id,
+                    label=conn.label,
+                    progresses_story=conn.progresses_story,
+                )
                 for conn in area_def.connections
             ),
             entry_story_node_id=area_def.entry_story_node_id,
