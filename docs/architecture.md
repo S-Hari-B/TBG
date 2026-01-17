@@ -12,6 +12,7 @@ Layers:
 * Owns slot-based save file I/O through a tiny adapter (`SaveSlotStore`) that reads/writes `data/saves/slot_X.json`; serialization logic remains in the services layer
 * Never computes combat outcomes or modifies domain objects directly
 * Debug-only instrumentation (seed/node/location headers, Location Debug menu, extra load slot metadata) lives exclusively in this layer so lower layers stay pure
+* Owns the boxed battle renderer: 60-character ASCII panels for turn headers, battlefield snapshots, per-turn results, and player-only menus. Services only expose structured `BattleView` snapshots/events, keeping layout concerns isolated to the CLI.
 
 ## services (orchestration)
 

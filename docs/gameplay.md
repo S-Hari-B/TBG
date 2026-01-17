@@ -134,6 +134,14 @@ Flee (A chance to flee battle. If success, no rewards gained but retreats back t
 
 Identical enemies in the same encounter are suffixed deterministically (“Goblin Grunt (1)”, “Goblin Grunt (2)”, …) so the CLI, events, and target prompts always stay in sync.
 
+### Battle CLI presentation
+
+* Battles now render inside a fixed-width (60 character) ASCII layout. Each actor turn begins with a `====` separator and a boxed `TURN` header so long encounters are easy to scan.
+* A boxed battlefield view shows ALLIES vs ENEMIES in two columns. The currently acting unit is marked with `>` and allies always list both HP and MP (even when downed). Enemy HP remains hidden as `???` in normal play, while `TBG_DEBUG=1` keeps the `??? [current/max]` suffix that already existed.
+* The state panel prints once at battle start and once at the beginning of every player-controlled turn; invalid menu input and retries never trigger a full re-render.
+* Player menus (Actions, Skills, Target selection, Party Talk) use boxed panels with numbered entries. Enemy/ally AI turns never show menus.
+* Every actor turn finishes with exactly one boxed RESULTS panel summarising all resolved events for that turn (multi-hit skills print multiple bullet lines). Invalid actions such as insufficient MP are summarised inside the same panel before re-prompting the relevant menu.
+
 Winning and losing
 Victory
 

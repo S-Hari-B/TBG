@@ -1,7 +1,5 @@
 """Console-driven UI loops for TBG."""
 from __future__ import annotations
-
-import os
 import secrets
 from typing import List, Literal, Sequence
 
@@ -71,6 +69,7 @@ from tbg.services.inventory_service import (
     WeaponSlotView,
 )
 from .render import (
+    debug_enabled,
     render_choices,
     render_events_header,
     render_heading,
@@ -88,10 +87,105 @@ _MENU_TALK_LINES = {
     ]
 }
 _DEFEAT_CAMP_MESSAGE = "You barely make it back to camp, bruised but alive."
+_BATTLE_UI_WIDTH = 60
+_BATTLE_STATE_LEFT_COL = 27
+_BATTLE_STATE_RIGHT_COL = _BATTLE_UI_WIDTH - 3 - _BATTLE_STATE_LEFT_COL
+_TURN_SEPARATOR = "=" * _BATTLE_UI_WIDTH
+
+
+def _battle_box_border(char: str = "-") -> str:
+    fill = char * (_BATTLE_UI_WIDTH - 2)
+    return f"+{fill}+"
+
+
+def _battle_box_line(text: str) -> str:
+    content = text[: _BATTLE_UI_WIDTH - 4]
+    return f"| {content.ljust(_BATTLE_UI_WIDTH - 4)} |"
+
+
+def _render_boxed_panel(title: str, lines: Sequence[str]) -> None:
+    print(_battle_box_border("-"))
+    print(_battle_box_line(title.upper()))
+    for line in lines or [""]:
+        print(_battle_box_line(line))
+    print(_battle_box_border("-"))
+
+
+def _render_turn_separator() -> None:
+    print(f"\n{_TURN_SEPARATOR}")
+
+
+def _render_turn_header(actor_name: str | None) -> None:
+    label = actor_name or "Unknown"
+    _render_boxed_panel("TURN", [f"{label}"])
+
+
+def _truncate_cell(text: str, width: int) -> str:
+    if len(text) <= width:
+        return text.ljust(width)
+    if width <= 3:
+        return text[:width]
+    return f"{text[: width - 3]}...".ljust(width)
+
+
+def _render_state_row(left: str, right: str) -> None:
+    left_display = f" {left}" if left else ""
+    right_display = f" {right}" if right else ""
+    left_cell = _truncate_cell(left_display, _BATTLE_STATE_LEFT_COL)
+    right_cell = _truncate_cell(right_display, _BATTLE_STATE_RIGHT_COL)
+    print(f"|{left_cell}|{right_cell}|")
+
+
+def _state_row_border() -> str:
+    left = "-" * _BATTLE_STATE_LEFT_COL
+    right = "-" * _BATTLE_STATE_RIGHT_COL
+    return f"+{left}+{right}+"
+
+
+def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, active_id: str | None) -> None:
+    debug_enabled = _debug_enabled()
+    allies_lines: List[str] = []
+    for ally in view.allies:
+        marker = ">" if ally.instance_id == active_id else " "
+        combatant = _find_combatant(battle_state, ally.instance_id)
+        mp_text = "--/--"
+        if combatant is not None:
+            mp_text = f"{combatant.stats.mp}/{combatant.stats.max_mp}"
+        hp_display = ally.hp_display if ally.is_alive else "DOWN"
+        allies_lines.append(f"{marker} {ally.name}  HP {hp_display} MP {mp_text}")
+    enemies_lines: List[str] = []
+    for enemy in view.enemies:
+        marker = ">" if enemy.instance_id == active_id else " "
+        status = _format_enemy_hp_display(enemy, debug_enabled=debug_enabled)
+        name_segment = f"{marker} {enemy.name}"
+        gap = " "
+        available_width = _BATTLE_STATE_RIGHT_COL - 1  # account for leading space applied later
+        name_width = available_width - len(status) - len(gap)
+        if name_width < 0:
+            name_width = 0
+        if name_width > 0:
+            trimmed_name = _truncate_cell(name_segment, name_width).rstrip()
+        else:
+            trimmed_name = ""
+        spacer = gap if trimmed_name else ""
+        enemies_lines.append(f"{trimmed_name}{spacer}{status}")
+    rows = max(len(allies_lines), len(enemies_lines))
+    print(_state_row_border())
+    _render_state_row("ALLIES", "ENEMIES")
+    for index in range(rows):
+        left = allies_lines[index] if index < len(allies_lines) else ""
+        right = enemies_lines[index] if index < len(enemies_lines) else ""
+        _render_state_row(left, right)
+    print(_state_row_border())
+
+
+def _render_results_panel(lines: Sequence[str]) -> None:
+    panel_lines = lines or ["- Nothing happens."]
+    _render_boxed_panel("Results", panel_lines)
 
 
 def _debug_enabled() -> bool:
-    return bool(os.getenv("TBG_DEBUG"))
+    return debug_enabled()
 
 
 def _print_debug_status(state: GameState, *, context: str) -> None:
@@ -1025,62 +1119,109 @@ def _render_inventory_events(events: List[InventoryEvent]) -> None:
             print(f"- {event.message}")
 def _run_battle_loop(battle_service: BattleService, battle_state: BattleState, state: GameState) -> bool:
     """Run the deterministic battle loop until victory or defeat."""
-    first_snapshot = True
+    render_heading(f"Battle {battle_state.battle_id}")
+    state_panel_printed = False
     while not battle_state.is_over:
         view = battle_service.get_battle_view(battle_state)
-        _render_battle_view(view, show_banner=first_snapshot)
-        first_snapshot = False
         actor = _find_combatant(battle_state, view.current_actor_id)
         if actor is None:
             break
-        if actor.side == "allies":
-            if actor.instance_id == state.player.id:
-                available_skills = battle_service.get_available_skills(battle_state, actor.instance_id)
-                action = _prompt_battle_action(
-                    can_talk=bool(state.party_members), can_use_skill=bool(available_skills)
-                )
-                if action == "attack":
-                    target = _prompt_battle_target(battle_state)
-                    events = battle_service.basic_attack(battle_state, actor.instance_id, target.instance_id)
-                elif action == "skill":
-                    events = _handle_player_skill_choice(
-                        battle_service, battle_state, actor.instance_id, available_skills
-                    )
-                    if any(isinstance(evt, SkillFailedEvent) for evt in events):
-                        _render_battle_events(events)
-                        continue
-                else:
-                    speaker_member_id = _prompt_party_member_choice(state)
-                    speaker_combatant_id = f"party_{speaker_member_id}"
-                    events = battle_service.party_talk(battle_state, speaker_combatant_id, state.rng)
-            else:
-                events = battle_service.run_ally_ai_turn(battle_state, actor.instance_id, state.rng)
+        _render_turn_separator()
+        _render_turn_header(actor.display_name)
+        should_show_state_panel = False
+        if not state_panel_printed:
+            should_show_state_panel = True
+            state_panel_printed = True
+        elif state.player and actor.instance_id == state.player.id:
+            should_show_state_panel = True
+        if should_show_state_panel:
+            _render_battle_state_panel(view, battle_state, active_id=actor.instance_id)
+        if actor.side == "allies" and state.player and actor.instance_id == state.player.id:
+            turn_lines = _run_player_turn(battle_service, battle_state, state, actor.instance_id)
+        elif actor.side == "allies":
+            events = battle_service.run_ally_ai_turn(battle_state, actor.instance_id, state.rng)
+            turn_lines = _summarize_battle_events(events)
         else:
             events = battle_service.run_enemy_turn(battle_state, state.rng)
-        _render_battle_events(events)
+            turn_lines = _summarize_battle_events(events)
+        _render_results_panel(turn_lines)
     if battle_state.victor == "allies":
         reward_events = battle_service.apply_victory_rewards(battle_state, state)
         _render_battle_events(reward_events)
     return battle_state.victor == "allies"
 
 
-def _render_battle_view(view: BattleView, *, show_banner: bool) -> None:
-    debug_enabled = _debug_enabled()
-    if show_banner:
-        render_heading(f"Battle {view.battle_id}")
-    else:
-        actor_name = _lookup_combatant_name(view, view.current_actor_id)
-        render_heading(f"Turn: {actor_name or 'Battle Continues'}")
-    print("Allies:")
-    for ally in view.allies:
-        status = "DOWN" if not ally.is_alive else ally.hp_display
-        marker = "*" if ally.instance_id == view.current_actor_id else " "
-        print(f"{marker} {ally.name:<12} HP {status}")
-    print("Enemies:")
-    for enemy in view.enemies:
-        marker = "*" if enemy.instance_id == view.current_actor_id else " "
-        status = _format_enemy_hp_display(enemy, debug_enabled=debug_enabled)
-        print(f"{marker} {enemy.name:<12} HP {status}")
+def _run_player_turn(
+    battle_service: BattleService, battle_state: BattleState, state: GameState, actor_id: str
+) -> List[str]:
+    """Handle the player-controlled turn, ensuring the panel only renders once."""
+    turn_lines: List[str] = []
+    while True:
+        available_skills = battle_service.get_available_skills(battle_state, actor_id)
+        action = _prompt_battle_action(
+            can_talk=bool(state.party_members), can_use_skill=bool(available_skills)
+        )
+        if action == "attack":
+            target = _prompt_battle_target(battle_state)
+            events = battle_service.basic_attack(battle_state, actor_id, target.instance_id)
+            turn_lines.extend(_summarize_battle_events(events))
+            return turn_lines
+        if action == "skill":
+            skill = _prompt_skill_choice(available_skills)
+            target_ids = _prompt_skill_targets(skill, battle_state)
+            events = battle_service.use_skill(battle_state, actor_id, skill.id, target_ids)
+            failure_event = next((evt for evt in events if isinstance(evt, SkillFailedEvent)), None)
+            if failure_event:
+                reason = _format_skill_failure_reason(failure_event.reason)
+                turn_lines.append(f"- Cannot use {skill.name} ({reason}).")
+                continue
+            turn_lines.extend(_summarize_battle_events(events))
+            return turn_lines
+        speaker_member_id = _prompt_party_member_choice(state, boxed=True)
+        speaker_combatant_id = f"party_{speaker_member_id}"
+        events = battle_service.party_talk(battle_state, speaker_combatant_id, state.rng)
+        turn_lines.extend(_summarize_battle_events(events))
+        return turn_lines
+
+
+def _format_skill_failure_reason(reason: str) -> str:
+    if reason == "insufficient_mp":
+        return "insufficient MP"
+    return reason.replace("_", " ")
+
+
+def _summarize_battle_events(events: List[BattleEvent]) -> List[str]:
+    lines: List[str] = []
+    for event in events:
+        if isinstance(event, BattleStartedEvent):
+            lines.append(f"- Battle started against {', '.join(event.enemy_names)}.")
+        elif isinstance(event, AttackResolvedEvent):
+            lines.append(f"- {event.attacker_name} hits {event.target_name} for {event.damage} damage.")
+        elif isinstance(event, CombatantDefeatedEvent):
+            lines.append(f"- {event.combatant_name} is defeated.")
+        elif isinstance(event, PartyTalkEvent):
+            lines.append(f"- {event.text}")
+        elif isinstance(event, SkillUsedEvent):
+            lines.append(
+                f"- {event.attacker_name} uses {event.skill_name} on {event.target_name} for {event.damage} damage."
+            )
+        elif isinstance(event, GuardAppliedEvent):
+            lines.append(f"- {event.combatant_name} braces, reducing the next hit by {event.amount}.")
+        elif isinstance(event, SkillFailedEvent):
+            lines.append(f"- {event.combatant_name} cannot use that skill ({event.reason}).")
+        elif isinstance(event, BattleResolvedEvent):
+            lines.append(f"- Battle resolved. Victor: {event.victor.title()}")
+        elif isinstance(event, BattleGoldRewardEvent):
+            lines.append(f"- Gained {event.amount} gold (Total: {event.total_gold}).")
+        elif isinstance(event, BattleExpRewardEvent):
+            lines.append(f"- {event.member_name} gains {event.amount} EXP (Level {event.new_level}).")
+        elif isinstance(event, BattleLevelUpEvent):
+            lines.append(f"- {event.member_name} reached Level {event.new_level}!")
+        elif isinstance(event, LootAcquiredEvent):
+            lines.append(f"- Loot: {event.item_name} x{event.quantity}")
+        else:
+            lines.append(f"- {event}")
+    return lines
 
 
 def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool) -> str:
@@ -1090,7 +1231,8 @@ def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool) -> str:
     if can_talk:
         options.append(("talk", "Party Talk"))
     while True:
-        render_menu("Actions", [label for _, label in options])
+        lines = [f"{idx + 1:>2}) {label}" for idx, (_, label) in enumerate(options)]
+        _render_boxed_panel("Actions", lines)
         choice = input("Choose action: ").strip()
         try:
             index = int(choice) - 1
@@ -1102,27 +1244,17 @@ def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool) -> str:
         print("Invalid selection.")
 
 
-def _handle_player_skill_choice(
-    battle_service: BattleService,
-    battle_state: BattleState,
-    actor_id: str,
-    skills: List[SkillDef],
-) -> List[BattleEvent]:
-    skill = _prompt_skill_choice(skills)
-    target_ids = _prompt_skill_targets(skill, battle_state)
-    return battle_service.use_skill(battle_state, actor_id, skill.id, target_ids)
-
-
 def _prompt_skill_choice(skills: List[SkillDef]) -> SkillDef:
     while True:
-        render_heading("Skills")
+        lines = []
         for idx, skill in enumerate(skills, start=1):
             target_desc = {
                 "single_enemy": "Single Enemy",
                 "multi_enemy": f"Up to {skill.max_targets} Enemies",
                 "self": "Self",
             }[skill.target_mode]
-            print(f"{idx}. {skill.name} (MP {skill.mp_cost}, {target_desc}) - {skill.description}")
+            lines.append(f"{idx:>2}) {skill.name} (MP {skill.mp_cost}, {target_desc})")
+        _render_boxed_panel("Skills", lines)
         choice = input("Select skill: ").strip()
         try:
             index = int(choice) - 1
@@ -1149,10 +1281,9 @@ def _prompt_skill_targets(skill: SkillDef, battle_state: BattleState) -> List[st
 def _prompt_multi_enemy_targets(battle_state: BattleState, max_targets: int) -> List[str]:
     living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
     while True:
-        render_heading("Select Targets")
-        for idx, enemy in enumerate(living_enemies, start=1):
-            print(f"{idx}. {enemy.display_name}")
-        raw = input(f"Choose up to {max_targets} targets: ").strip()
+        lines = [f"{idx + 1:>2}) {enemy.display_name}" for idx, enemy in enumerate(living_enemies)]
+        _render_boxed_panel("Select Targets", lines)
+        raw = input(f"Choose up to {max_targets} targets (comma separated): ").strip()
         parts = [part.strip() for part in raw.split(",") if part.strip()]
         try:
             indices = [int(part) - 1 for part in parts]
@@ -1178,9 +1309,8 @@ def _prompt_battle_target(battle_state: BattleState, exclude_ids: Sequence[str] 
     exclude_set = set(exclude_ids or [])
     living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive and enemy.instance_id not in exclude_set]
     while True:
-        render_heading("Choose Target")
-        for idx, enemy in enumerate(living_enemies, start=1):
-            print(f"{idx}. {enemy.display_name}")
+        lines = [f"{idx + 1:>2}) {enemy.display_name}" for idx, enemy in enumerate(living_enemies)]
+        _render_boxed_panel("Target", lines)
         raw = input("Target #: ").strip()
         try:
             index = int(raw) - 1
@@ -1192,11 +1322,15 @@ def _prompt_battle_target(battle_state: BattleState, exclude_ids: Sequence[str] 
         print("Invalid target.")
 
 
-def _prompt_party_member_choice(state: GameState, prompt_title: str = "Party Talk") -> str:
+def _prompt_party_member_choice(state: GameState, prompt_title: str = "Party Talk", *, boxed: bool = False) -> str:
     while True:
-        render_heading(prompt_title)
-        for idx, member_id in enumerate(state.party_members, start=1):
-            print(f"{idx}. {member_id.title()}")
+        if boxed:
+            lines = [f"{idx + 1:>2}) {member_id.title()}" for idx, member_id in enumerate(state.party_members)]
+            _render_boxed_panel(prompt_title, lines)
+        else:
+            render_heading(prompt_title)
+            for idx, member_id in enumerate(state.party_members, start=1):
+                print(f"{idx}. {member_id.title()}")
         raw = input("Speaker #: ").strip()
         try:
             index = int(raw) - 1
@@ -1264,16 +1398,6 @@ def _format_enemy_hp_display(enemy: BattleCombatantView, *, debug_enabled: bool)
     if not debug_enabled:
         return enemy.hp_display
     return f"{enemy.hp_display} [{enemy.current_hp}/{enemy.max_hp}]"
-
-
-def _lookup_combatant_name(view: BattleView, combatant_id: str | None) -> str | None:
-    if combatant_id is None:
-        return None
-    for roster in (view.allies, view.enemies):
-        for combatant in roster:
-            if combatant.instance_id == combatant_id:
-                return combatant.name
-    return None
 
 
 def _render_story_if_needed(

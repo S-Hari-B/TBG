@@ -55,6 +55,13 @@ Status legend:
 * Added `loot_tables.json`, goblin horn drops, optional potion rewards, a spear weapon line, new spear skills, and five additional enemies (wolf, boar, bandit scout, spore slime, goblin archer) for future encounters.
 * Battle UI improvements: identical enemies gain numbered suffixes, debug HP is shown beside the `???` placeholder instead of event spam, and reward blocks render under a dedicated heading.
 
+## DONE: Ticket-014 – Battle CLI Layout & Readability Pass
+
+* Battle turns now render inside 60-character ASCII panels: `====` separators, boxed TURN headers, and a dual-column ALLIES vs ENEMIES snapshot that marks the active combatant and always shows ally MP.
+* Player-only menus (Actions, Skills, Target, Party Talk) share the same boxed treatment, while invalid input retries no longer reprint the battlefield state.
+* Each actor turn concludes with a single boxed RESULTS panel so multi-hit skills, failures, and AI actions stay grouped; debug HP visibility remains gated behind `TBG_DEBUG`.
+* Added CLI-focused tests covering state panel cadence, results panel counts, menu gating, numbering consistency, and debug output.
+
 ---
 
 ## NEXT: Ticket-005.1 – UI Intel Reveal + Knowledge Tracking

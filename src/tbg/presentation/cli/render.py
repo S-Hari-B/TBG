@@ -4,7 +4,10 @@ from __future__ import annotations
 import os
 from typing import Iterable, Sequence
 
-DEBUG_ENABLED = bool(os.getenv("TBG_DEBUG"))
+
+def debug_enabled() -> bool:
+    """Return True only when TBG_DEBUG is explicitly set to '1'."""
+    return os.getenv("TBG_DEBUG") == "1"
 
 
 def render_heading(title: str) -> None:
@@ -18,7 +21,7 @@ def render_story(segments: Sequence[tuple[str, str]]) -> None:
         return
     render_heading("Story")
     for idx, (node_id, text) in enumerate(segments):
-        if DEBUG_ENABLED:
+        if debug_enabled():
             print(f"[{node_id}]")
         print(text)
         if idx < len(segments) - 1:
