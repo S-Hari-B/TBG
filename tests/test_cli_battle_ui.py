@@ -164,6 +164,22 @@ def test_state_panel_printed_once_per_player_turn(monkeypatch, capsys) -> None:
     assert out.count("| ALLIES") == 1
 
 
+def test_turn_header_not_duplicated_on_invalid_input(monkeypatch, capsys) -> None:
+    """Verify that turn header and state panel don't reprint when invalid action is entered."""
+    state, battle_state = _build_state_and_battle(enemy_hp=6)
+    service = _FakeBattleService()
+    _set_inputs(monkeypatch, ["x", "y", "1", "1"])
+
+    assert app._run_battle_loop(service, battle_state, state) is True
+    out = capsys.readouterr().out
+    # Only one state panel despite two invalid inputs
+    assert out.count("| ALLIES") == 1
+    # Only one turn header for the player
+    assert out.count("| TURN") == 1
+    # Action menu appears multiple times due to retries
+    assert out.count("| ACTIONS") >= 2
+
+
 def test_results_panel_once_per_actor_turn(monkeypatch, capsys) -> None:
     state, battle_state = _build_state_and_battle(enemy_hp=10)
     service = _FakeBattleService()

@@ -21,6 +21,7 @@ from .area_service import (
 )
 from .battle_service import BattleService
 from .save_service import SaveService
+from .controllers import BattleController, BattleAction, BattleActionType
 
 __all__ = [
     "FactoryError",
@@ -42,6 +43,9 @@ __all__ = [
     "TravelResult",
     "BattleService",
     "SaveService",
+    "BattleController",
+    "BattleAction",
+    "BattleActionType",
 ]
 
 

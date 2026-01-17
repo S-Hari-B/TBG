@@ -22,6 +22,8 @@ from tbg.domain.defs import SkillDef
 from tbg.domain.state import GameState
 from tbg.services import (
     AreaService,
+    BattleAction,
+    BattleController,
     BattleRequestedEvent,
     ChoiceResult,
     ExpGainedEvent,
@@ -1119,68 +1121,86 @@ def _render_inventory_events(events: List[InventoryEvent]) -> None:
             print(f"- {event.message}")
 def _run_battle_loop(battle_service: BattleService, battle_state: BattleState, state: GameState) -> bool:
     """Run the deterministic battle loop until victory or defeat."""
+    controller = BattleController(battle_service)
     render_heading(f"Battle {battle_state.battle_id}")
-    state_panel_printed = False
+    is_first_turn = True
+
     while not battle_state.is_over:
-        view = battle_service.get_battle_view(battle_state)
-        actor = _find_combatant(battle_state, view.current_actor_id)
+        view = controller.get_battle_view(battle_state)
+        actor_id = battle_state.current_actor_id
+        if not actor_id:
+            break
+
+        # Always print turn separator and header
+        _render_turn_separator()
+        actor = _find_combatant(battle_state, actor_id)
         if actor is None:
             break
-        _render_turn_separator()
         _render_turn_header(actor.display_name)
-        should_show_state_panel = False
-        if not state_panel_printed:
-            should_show_state_panel = True
-            state_panel_printed = True
-        elif state.player and actor.instance_id == state.player.id:
-            should_show_state_panel = True
-        if should_show_state_panel:
-            _render_battle_state_panel(view, battle_state, active_id=actor.instance_id)
-        if actor.side == "allies" and state.player and actor.instance_id == state.player.id:
-            turn_lines = _run_player_turn(battle_service, battle_state, state, actor.instance_id)
-        elif actor.side == "allies":
-            events = battle_service.run_ally_ai_turn(battle_state, actor.instance_id, state.rng)
-            turn_lines = _summarize_battle_events(events)
+
+        # Render state panel only at decision points
+        if controller.should_render_state_panel(battle_state, state, is_first_turn=is_first_turn):
+            _render_battle_state_panel(view, battle_state, active_id=actor_id)
+
+        is_first_turn = False
+
+        # Execute the appropriate turn type
+        if controller.is_player_controlled_turn(battle_state, state):
+            turn_lines = _run_player_turn(controller, battle_state, state, actor_id)
+        elif controller.is_ally_ai_turn(battle_state, state):
+            events = controller.run_ally_ai_turn(battle_state, state.rng)
+            turn_lines = _format_battle_event_lines(events)
         else:
-            events = battle_service.run_enemy_turn(battle_state, state.rng)
-            turn_lines = _summarize_battle_events(events)
+            events = controller.run_enemy_turn(battle_state, state.rng)
+            turn_lines = _format_battle_event_lines(events)
+
         _render_results_panel(turn_lines)
+
     if battle_state.victor == "allies":
-        reward_events = battle_service.apply_victory_rewards(battle_state, state)
+        reward_events = controller.apply_victory_rewards(battle_state, state)
         _render_battle_events(reward_events)
+
     return battle_state.victor == "allies"
 
 
 def _run_player_turn(
-    battle_service: BattleService, battle_state: BattleState, state: GameState, actor_id: str
+    controller: BattleController, battle_state: BattleState, state: GameState, actor_id: str
 ) -> List[str]:
-    """Handle the player-controlled turn, ensuring the panel only renders once."""
+    """Handle the player-controlled turn. Only re-renders action menu on invalid input, not the state panel."""
     turn_lines: List[str] = []
+    actions = controller.get_available_actions(battle_state, state)
+
     while True:
-        available_skills = battle_service.get_available_skills(battle_state, actor_id)
-        action = _prompt_battle_action(
-            can_talk=bool(state.party_members), can_use_skill=bool(available_skills)
+        action_type = _prompt_battle_action(
+            can_talk=actions["can_talk"], can_use_skill=actions["can_use_skill"]
         )
-        if action == "attack":
+
+        if action_type == "attack":
             target = _prompt_battle_target(battle_state)
-            events = battle_service.basic_attack(battle_state, actor_id, target.instance_id)
-            turn_lines.extend(_summarize_battle_events(events))
+            action = BattleAction(action_type="attack", target_id=target.instance_id)
+            events = controller.apply_player_action(battle_state, state, action)
+            turn_lines.extend(_format_battle_event_lines(events))
             return turn_lines
-        if action == "skill":
-            skill = _prompt_skill_choice(available_skills)
+
+        if action_type == "skill":
+            skill = _prompt_skill_choice(actions["available_skills"])
             target_ids = _prompt_skill_targets(skill, battle_state)
-            events = battle_service.use_skill(battle_state, actor_id, skill.id, target_ids)
+            action = BattleAction(action_type="skill", skill_id=skill.id, target_ids=target_ids)
+            events = controller.apply_player_action(battle_state, state, action)
             failure_event = next((evt for evt in events if isinstance(evt, SkillFailedEvent)), None)
             if failure_event:
                 reason = _format_skill_failure_reason(failure_event.reason)
                 turn_lines.append(f"- Cannot use {skill.name} ({reason}).")
                 continue
-            turn_lines.extend(_summarize_battle_events(events))
+            turn_lines.extend(_format_battle_event_lines(events))
             return turn_lines
+
+        # Talk action
         speaker_member_id = _prompt_party_member_choice(state, boxed=True)
         speaker_combatant_id = f"party_{speaker_member_id}"
-        events = battle_service.party_talk(battle_state, speaker_combatant_id, state.rng)
-        turn_lines.extend(_summarize_battle_events(events))
+        action = BattleAction(action_type="talk", speaker_id=speaker_combatant_id)
+        events = controller.apply_player_action(battle_state, state, action)
+        turn_lines.extend(_format_battle_event_lines(events))
         return turn_lines
 
 
@@ -1190,7 +1210,8 @@ def _format_skill_failure_reason(reason: str) -> str:
     return reason.replace("_", " ")
 
 
-def _summarize_battle_events(events: List[BattleEvent]) -> List[str]:
+def _format_battle_event_lines(events: List[BattleEvent]) -> List[str]:
+    """Canonical battle event formatter. All battle event rendering must use this function."""
     lines: List[str] = []
     for event in events:
         if isinstance(event, BattleStartedEvent):
@@ -1219,6 +1240,8 @@ def _summarize_battle_events(events: List[BattleEvent]) -> List[str]:
             lines.append(f"- {event.member_name} reached Level {event.new_level}!")
         elif isinstance(event, LootAcquiredEvent):
             lines.append(f"- Loot: {event.item_name} x{event.quantity}")
+        elif isinstance(event, BattleRewardsHeaderEvent):
+            pass
         else:
             lines.append(f"- {event}")
     return lines
@@ -1343,6 +1366,7 @@ def _prompt_party_member_choice(state: GameState, prompt_title: str = "Party Tal
 
 
 def _render_battle_events(events: List[BattleEvent]) -> None:
+    """Render battle events with appropriate headers. Uses canonical event formatter."""
     if not events:
         return
     standard_header_printed = False
@@ -1355,32 +1379,10 @@ def _render_battle_events(events: List[BattleEvent]) -> None:
         if not in_rewards_block and not standard_header_printed:
             render_events_header()
             standard_header_printed = True
-        if isinstance(event, BattleStartedEvent):
-            print(f"- Battle started against {', '.join(event.enemy_names)}.")
-        elif isinstance(event, AttackResolvedEvent):
-            print(f"- {event.attacker_name} hits {event.target_name} for {event.damage} damage.")
-        elif isinstance(event, CombatantDefeatedEvent):
-            print(f"- {event.combatant_name} is defeated.")
-        elif isinstance(event, PartyTalkEvent):
-            print(f"- {event.text}")
-        elif isinstance(event, SkillUsedEvent):
-            print(f"- {event.attacker_name} uses {event.skill_name} on {event.target_name} for {event.damage} damage.")
-        elif isinstance(event, GuardAppliedEvent):
-            print(f"- {event.combatant_name} braces, reducing the next hit by {event.amount}.")
-        elif isinstance(event, SkillFailedEvent):
-            print(f"- {event.combatant_name} cannot use that skill ({event.reason}).")
-        elif isinstance(event, BattleResolvedEvent):
-            print(f"- Battle resolved. Victor: {event.victor.title()}")
-        elif isinstance(event, BattleGoldRewardEvent):
-            print(f"- Gained {event.amount} gold (Total: {event.total_gold}).")
-        elif isinstance(event, BattleExpRewardEvent):
-            print(f"- {event.member_name} gains {event.amount} EXP (Level {event.new_level}).")
-        elif isinstance(event, BattleLevelUpEvent):
-            print(f"- {event.member_name} reached Level {event.new_level}!")
-        elif isinstance(event, LootAcquiredEvent):
-            print(f"- Loot: {event.item_name} x{event.quantity}")
-        else:
-            print(f"- {event}")
+        # Use canonical formatter for consistency
+        formatted = _format_battle_event_lines([event])
+        for line in formatted:
+            print(line)
 
 
 def _find_combatant(battle_state: BattleState, combatant_id: str | None) -> Combatant | None:

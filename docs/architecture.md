@@ -8,11 +8,12 @@ Layers:
 
 * Renders text to the user
 * Reads and validates user input
-* Calls services to perform actions
+* Calls services **or controllers** to perform actions
 * Owns slot-based save file I/O through a tiny adapter (`SaveSlotStore`) that reads/writes `data/saves/slot_X.json`; serialization logic remains in the services layer
 * Never computes combat outcomes or modifies domain objects directly
 * Debug-only instrumentation (seed/node/location headers, Location Debug menu, extra load slot metadata) lives exclusively in this layer so lower layers stay pure
 * Owns the boxed battle renderer: 60-character ASCII panels for turn headers, battlefield snapshots, per-turn results, and player-only menus. Services only expose structured `BattleView` snapshots/events, keeping layout concerns isolated to the CLI.
+* **Battle rendering is tied to decision points, not input loops**: The state panel renders once per player turn, regardless of invalid input retries. See `battle_controller.md`.
 
 ## services (orchestration)
 
@@ -23,6 +24,7 @@ Layers:
 * Returns structured results and events for presentation to render
 * Implements persistence orchestration (`SaveService`) to serialize/deserialize `GameState` + RNG snapshots, validate ids against current definitions, and guard against schema/version drift
 * Maintains auxiliary services such as `AreaService`, which drives location state, travel events, and one-shot entry story hooks while keeping the CLI ignorant of map topology
+* **Controllers**: UI-agnostic orchestration layer (e.g., `BattleController`) that wraps services and exposes structured state + actions. Controllers do NOT print, format, or prompt—they only progress state and return events. See `battle_controller.md` for details.
 
 ## domain (game rules)
 
