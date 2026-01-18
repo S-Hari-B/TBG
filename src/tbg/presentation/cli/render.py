@@ -75,12 +75,15 @@ def render_story(segments: Sequence[tuple[str, str]]) -> None:
     """Render story narration segments with optional node ids."""
     if not segments:
         return
+    trimmed = [(node_id, text) for node_id, text in segments if text.strip()]
+    if not trimmed:
+        return
     render_heading("Story")
-    for idx, (node_id, text) in enumerate(segments):
+    for idx, (node_id, text) in enumerate(trimmed):
         if debug_enabled():
             print(f"[{node_id}]")
         print(text)
-        if idx < len(segments) - 1:
+        if idx < len(trimmed) - 1:
             print("\n---")
 
 

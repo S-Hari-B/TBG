@@ -52,5 +52,6 @@ class BattleCombatantView:
     is_alive: bool
     current_hp: int
     max_hp: int
+    defense: int
 
 

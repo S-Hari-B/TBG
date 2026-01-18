@@ -242,13 +242,15 @@ def test_post_ambush_interlude_triggers_game_menu() -> None:
     
     # Choose companion (Emma, index 1)
     result = story_service.choose(state, 1)
-    # The battle happens, so we need to resume twice: once for battle, once for post-battle
-    story_service.resume_pending_flow(state)  # party battle happens
+    # The battle happens, so we need to resume multiple times
+    story_service.resume_pending_flow(state)  # party battle setup
+    story_service.resume_pending_flow(state)  # battle happens
     story_service.resume_pending_flow(state)  # after party battle (victory assumed)
+    story_service.resume_pending_flow(state)  # knowledge intro
     story_service.resume_pending_flow(state)  # advance to proto-quest
     
-    # Should reach proto-quest offer node
-    assert state.current_node_id == "protoquest_offer"
+    # Should reach proto-quest offer node (router will then branch to party variant)
+    assert state.current_node_id in ["protoquest_offer", "protoquest_offer_party"]
 
 
 def test_rewind_to_checkpoint_retries_failed_battle() -> None:
@@ -429,7 +431,7 @@ def test_threshold_inn_router_text_prints_once() -> None:
         service.resume_pending_flow(state)
     segments = [text for _, text in service.get_current_node_view(state).segments]
     text_lines = [segment for segment in segments if segment.strip()]
-    matches = [segment for segment in text_lines if "Threshold Inn hums behind you" in segment]
+    matches = [segment for segment in text_lines if "Threshold Inn stands solid behind you" in segment]
     assert len(matches) == 1
 
 

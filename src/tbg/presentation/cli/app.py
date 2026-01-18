@@ -1,7 +1,7 @@
 """Console-driven UI loops for TBG."""
 from __future__ import annotations
 import secrets
-from typing import List, Literal, Sequence
+from typing import Callable, List, Literal, Sequence
 
 from tbg.data.repositories import (
     ArmourRepository,
@@ -85,6 +85,7 @@ from .render import (
     render_heading,
     render_menu,
     render_story,
+    wrap_text_for_box,
 )
 from .save_slots import SaveSlotStore, SlotMetadata
 
@@ -116,17 +117,23 @@ def _battle_box_line(text: str) -> str:
 
 def _render_boxed_panel(title: str, lines: Sequence[str]) -> None:
     """Render a boxed panel with word-wrapped content."""
-    from tbg.presentation.cli.render import wrap_text_for_box
-    
     print(_battle_box_border("-"))
     print(_battle_box_line(title.upper()))
     
     # Word-wrap each line to fit within the box
     box_inner_width = _BATTLE_UI_WIDTH - 4
     for line in lines or [""]:
-        wrapped_lines = wrap_text_for_box(line, box_inner_width, indent_continuation=True)
-        for wrapped in wrapped_lines:
-            print(_battle_box_line(wrapped))
+        if line.startswith("  "):
+            content = line[2:]
+            wrapped_lines = wrap_text_for_box(
+                content, box_inner_width - 2, indent_continuation=False
+            )
+            for wrapped in wrapped_lines:
+                print(_battle_box_line(f"  {wrapped}"))
+        else:
+            wrapped_lines = wrap_text_for_box(line, box_inner_width, indent_continuation=True)
+            for wrapped in wrapped_lines:
+                print(_battle_box_line(wrapped))
     
     print(_battle_box_border("-"))
 
@@ -148,14 +155,20 @@ def _truncate_cell(text: str, width: int) -> str:
     return f"{text[: width - 3]}...".ljust(width)
 
 
-def _truncate_enemy_name(name_segment: str, width: int, *, raw_name: str) -> str:
+def _truncate_enemy_name(
+    name_segment: str,
+    width: int,
+    *,
+    raw_name: str,
+    prefix_len: int = 2,
+) -> str:
     if len(name_segment) <= width:
         return name_segment.ljust(width)
     if not (raw_name.endswith(")") and " (" in raw_name):
         return _truncate_cell(name_segment, width)
     suffix = raw_name[raw_name.rfind(" (") :]
     base_name = raw_name[: -len(suffix)]
-    prefix = name_segment[:2]
+    prefix = name_segment[:prefix_len]
     base_width = width - len(prefix) - len(suffix)
     if base_width <= 0:
         return _truncate_cell(name_segment, width)
@@ -180,17 +193,31 @@ def _state_row_border() -> str:
     return f"+{left}+{right}+"
 
 
+def _build_turn_order_map(battle_state: BattleState) -> dict[str, int]:
+    queue = list(battle_state.turn_queue)
+    if not queue:
+        return {}
+    current = battle_state.current_actor_id
+    if current in queue:
+        idx = queue.index(current)
+        queue = queue[idx:] + queue[:idx]
+    return {instance_id: idx + 1 for idx, instance_id in enumerate(queue)}
+
+
 def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, active_id: str | None) -> None:
     debug_enabled = _debug_enabled()
+    turn_order = _build_turn_order_map(battle_state) if debug_enabled else {}
     allies_lines: List[str] = []
     for ally in view.allies:
         marker = ">" if ally.instance_id == active_id else " "
+        order_value = turn_order.get(ally.instance_id)
+        order_prefix = f"{order_value:>2} " if order_value is not None else ""
         combatant = _find_combatant(battle_state, ally.instance_id)
         mp_text = "--/--"
         if combatant is not None:
             mp_text = f"{combatant.stats.mp}/{combatant.stats.max_mp}"
         hp_display = ally.hp_display if ally.is_alive else "DOWN"
-        allies_lines.append(f"{marker} {ally.name}  HP {hp_display} MP {mp_text}")
+        allies_lines.append(f"{marker} {order_prefix}{ally.name}  HP {hp_display} MP {mp_text}")
     enemies_lines: List[str] = []
     enemy_name_lookup = {
         combatant.instance_id: combatant.display_name
@@ -200,7 +227,10 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
         marker = ">" if enemy.instance_id == active_id else " "
         status = _format_enemy_hp_display(enemy, debug_enabled=debug_enabled)
         display_name = enemy_name_lookup.get(enemy.instance_id, enemy.name)
-        name_segment = f"{marker} {display_name}"
+        order_value = turn_order.get(enemy.instance_id)
+        order_prefix = f"{order_value:>2} " if order_value is not None else ""
+        prefix = f"{marker} {order_prefix}"
+        name_segment = f"{prefix}{display_name}"
         gap = " "
         available_width = _BATTLE_STATE_RIGHT_COL - 1  # account for leading space applied later
         name_width = available_width - len(status) - len(gap)
@@ -208,7 +238,7 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
             name_width = 0
         if name_width > 0:
             trimmed_name = _truncate_enemy_name(
-                name_segment, name_width, raw_name=display_name
+                name_segment, name_width, raw_name=display_name, prefix_len=len(prefix)
             ).rstrip()
         else:
             trimmed_name = ""
@@ -1556,7 +1586,8 @@ def _render_inventory_events(events: List[InventoryEvent]) -> None:
 def _run_battle_loop(battle_service: BattleService, battle_state: BattleState, state: GameState) -> bool:
     """Run the deterministic battle loop until victory or defeat."""
     controller = BattleController(battle_service)
-    render_heading(f"Battle {battle_state.battle_id}")
+    if _debug_enabled():
+        render_heading(f"Battle {battle_state.battle_id}")
     is_first_turn = True
 
     while not battle_state.is_over:
@@ -1610,15 +1641,29 @@ def _run_player_turn(
         )
 
         if action_type == "attack":
-            target = _prompt_battle_target(battle_state)
+            estimator = lambda enemy: controller.estimate_damage(
+                battle_state, actor_id, enemy.instance_id
+            )
+            target = _prompt_battle_target(
+                battle_state, damage_estimator=estimator, state=state, controller=controller
+            )
             action = BattleAction(action_type="attack", target_id=target.instance_id)
             events = controller.apply_player_action(battle_state, state, action)
             turn_lines.extend(_format_battle_event_lines(events))
             return turn_lines
 
         if action_type == "skill":
-            skill = _prompt_skill_choice(actions["available_skills"])
-            target_ids = _prompt_skill_targets(skill, battle_state)
+            skill = _prompt_skill_choice(
+                actions["available_skills"], battle_state, controller, actor_id, state
+            )
+            damage_estimator: Callable[[Combatant], int] | None = None
+            if skill.effect_type == "damage":
+                damage_estimator = lambda enemy: controller.estimate_damage(
+                    battle_state, actor_id, enemy.instance_id, bonus_power=skill.base_power
+                )
+            target_ids = _prompt_skill_targets(
+                skill, battle_state, damage_estimator=damage_estimator, state=state, controller=controller
+            )
             action = BattleAction(action_type="skill", skill_id=skill.id, target_ids=target_ids)
             events = controller.apply_player_action(battle_state, state, action)
             failure_event = next((evt for evt in events if isinstance(evt, SkillFailedEvent)), None)
@@ -1642,6 +1687,87 @@ def _format_skill_failure_reason(reason: str) -> str:
     if reason == "insufficient_mp":
         return "insufficient MP"
     return reason.replace("_", " ")
+
+
+def _format_damage_preview(value: int | None, *, suffix: str = "", base_power: int | None = None, is_known: bool = False) -> str:
+    """
+    Format damage preview based on debug mode and knowledge.
+    
+    Args:
+        value: Estimated damage (when known or debug)
+        suffix: Optional suffix like " each"
+        base_power: Skill base power (fallback for unknown enemies)
+        is_known: Whether party has knowledge of the enemy
+    
+    Returns:
+        Formatted preview string
+    """
+    if _debug_enabled():
+        if value is None:
+            return ""
+        return f"Projected: {value}{suffix}"
+    
+    if is_known and value is not None:
+        return f"Projected: {value}{suffix}"
+    
+    # Non-debug, no knowledge: show base power only
+    if base_power is not None:
+        return f"Power: {base_power}{suffix}"
+    
+    return ""
+
+
+def _build_skill_preview(
+    skill: SkillDef,
+    battle_state: BattleState,
+    controller: BattleController,
+    actor_id: str,
+    state: GameState,
+) -> str:
+    """Build preview string for a skill, respecting knowledge and debug modes."""
+    if skill.effect_type != "damage":
+        return ""
+    
+    suffix = " each" if skill.target_mode == "multi_enemy" else ""
+    
+    # Check if we can show projected values
+    can_project = _debug_enabled()
+    if not can_project:
+        # Check if party has knowledge of any living enemy
+        living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
+        if living_enemies:
+            # Check knowledge for the first enemy as representative
+            enemy = living_enemies[0]
+            can_project = controller.has_knowledge_of_enemy(state, enemy.tags)
+    
+    if not can_project:
+        # Show base power only
+        return _format_damage_preview(
+            None, suffix=suffix, base_power=skill.base_power, is_known=False
+        )
+    
+    # Can show projected damage
+    if skill.target_mode == "self":
+        estimate = controller.estimate_damage(
+            battle_state, actor_id, actor_id, bonus_power=skill.base_power
+        )
+        return _format_damage_preview(estimate, suffix="", base_power=skill.base_power, is_known=True)
+    
+    if skill.target_mode in {"single_enemy", "multi_enemy"}:
+        living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
+        if not living_enemies:
+            return ""
+        estimates = [
+            controller.estimate_damage(
+                battle_state, actor_id, enemy.instance_id, bonus_power=skill.base_power
+            )
+            for enemy in living_enemies
+        ]
+        if len(set(estimates)) == 1:
+            return _format_damage_preview(
+                estimates[0], suffix=suffix, base_power=skill.base_power, is_known=True
+            )
+    return ""
 
 
 def _format_battle_event_lines(events: List[BattleEvent]) -> List[str]:
@@ -1711,7 +1837,13 @@ def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool) -> str:
         print("Invalid selection.")
 
 
-def _prompt_skill_choice(skills: List[SkillDef]) -> SkillDef:
+def _prompt_skill_choice(
+    skills: List[SkillDef],
+    battle_state: BattleState,
+    controller: BattleController,
+    actor_id: str,
+    state: GameState,
+) -> SkillDef:
     while True:
         lines = []
         for idx, skill in enumerate(skills, start=1):
@@ -1720,7 +1852,19 @@ def _prompt_skill_choice(skills: List[SkillDef]) -> SkillDef:
                 "multi_enemy": f"Up to {skill.max_targets} Enemies",
                 "self": "Self",
             }[skill.target_mode]
-            lines.append(f"{idx:>2}) {skill.name} (MP {skill.mp_cost}, {target_desc})")
+            preview = _build_skill_preview(
+                skill, battle_state, controller, actor_id, state
+            )
+            line = f"{idx:>2}) {skill.name} (MP {skill.mp_cost}, {target_desc})"
+            if preview:
+                line = f"{line} - {preview}"
+            lines.append(line)
+            if skill.description:
+                desc_width = _BATTLE_UI_WIDTH - 6  # account for box padding and indent
+                desc_lines = wrap_text_for_box(
+                    skill.description, desc_width, indent_continuation=False
+                )
+                lines.extend([f"  {desc_line}" for desc_line in desc_lines])
         _render_boxed_panel("Skills", lines)
         choice = input("Select skill: ").strip()
         try:
@@ -1733,22 +1877,54 @@ def _prompt_skill_choice(skills: List[SkillDef]) -> SkillDef:
         print("Invalid selection.")
 
 
-def _prompt_skill_targets(skill: SkillDef, battle_state: BattleState) -> List[str]:
+def _prompt_skill_targets(
+    skill: SkillDef,
+    battle_state: BattleState,
+    *,
+    damage_estimator: Callable[[Combatant], int] | None = None,
+    state: GameState | None = None,
+    controller: BattleController | None = None,
+) -> List[str]:
     if skill.target_mode == "self":
         return []
     living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
     if not living_enemies:
         raise ValueError("No valid targets.")
     if skill.target_mode == "single_enemy":
-        target = _prompt_battle_target(battle_state)
+        target = _prompt_battle_target(
+            battle_state, damage_estimator=damage_estimator, state=state, controller=controller
+        )
         return [target.instance_id]
-    return _prompt_multi_enemy_targets(battle_state, skill.max_targets)
+    return _prompt_multi_enemy_targets(
+        battle_state, skill.max_targets, damage_estimator=damage_estimator,
+        state=state, controller=controller
+    )
 
 
-def _prompt_multi_enemy_targets(battle_state: BattleState, max_targets: int) -> List[str]:
+def _prompt_multi_enemy_targets(
+    battle_state: BattleState,
+    max_targets: int,
+    *,
+    damage_estimator: Callable[[Combatant], int] | None = None,
+    state: GameState | None = None,
+    controller: BattleController | None = None,
+) -> List[str]:
     living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
     while True:
-        lines = [f"{idx + 1:>2}) {enemy.display_name}" for idx, enemy in enumerate(living_enemies)]
+        lines = []
+        for idx, enemy in enumerate(living_enemies):
+            line = f"{idx + 1:>2}) {enemy.display_name}"
+            if damage_estimator:
+                estimate = damage_estimator(enemy)
+                # Determine if we can show projected damage
+                can_project = _debug_enabled()
+                if not can_project and state and controller:
+                    can_project = controller.has_knowledge_of_enemy(state, enemy.tags)
+                
+                if can_project:
+                    line = f"{line} - Projected: {estimate}"
+                # If not can_project, don't show preview for multi-target
+            lines.append(line)
         _render_boxed_panel("Select Targets", lines)
         raw = input(f"Choose up to {max_targets} targets (comma separated): ").strip()
         parts = [part.strip() for part in raw.split(",") if part.strip()]
@@ -1772,11 +1948,42 @@ def _prompt_multi_enemy_targets(battle_state: BattleState, max_targets: int) -> 
         return [living_enemies[index].instance_id for index in indices]
 
 
-def _prompt_battle_target(battle_state: BattleState, exclude_ids: Sequence[str] | None = None) -> Combatant:
+def _prompt_battle_target(
+    battle_state: BattleState,
+    exclude_ids: Sequence[str] | None = None,
+    *,
+    damage_estimator: Callable[[Combatant], int] | None = None,
+    state: GameState | None = None,
+    controller: BattleController | None = None,
+) -> Combatant:
+    """Prompt for a battle target with optional damage preview."""
     exclude_set = set(exclude_ids or [])
     living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive and enemy.instance_id not in exclude_set]
     while True:
-        lines = [f"{idx + 1:>2}) {enemy.display_name}" for idx, enemy in enumerate(living_enemies)]
+        lines = []
+        for idx, enemy in enumerate(living_enemies):
+            line = f"{idx + 1:>2}) {enemy.display_name}"
+            if damage_estimator:
+                estimate = damage_estimator(enemy)
+                # Determine if we can show projected damage
+                can_project = _debug_enabled()
+                if not can_project and state and controller:
+                    can_project = controller.has_knowledge_of_enemy(state, enemy.tags)
+                
+                if can_project:
+                    line = f"{line} - Projected: {estimate}"
+                # If not can_project, don't show any preview for basic attacks in target list
+            lines.append(line)
+        _render_boxed_panel("Target", lines)
+        raw = input("Target #: ").strip()
+        try:
+            index = int(raw) - 1
+        except ValueError:
+            print("Enter a number.")
+            continue
+        if 0 <= index < len(living_enemies):
+            return living_enemies[index]
+        print("Invalid target.")
         _render_boxed_panel("Target", lines)
         raw = input("Target #: ").strip()
         try:
@@ -1813,14 +2020,12 @@ def _render_battle_events(events: List[BattleEvent]) -> None:
     """Render battle events with appropriate headers. Uses canonical event formatter."""
     if not events:
         return
+    if any(isinstance(event, BattleRewardsHeaderEvent) for event in events):
+        _render_reward_panels(events)
+        return
     standard_header_printed = False
-    in_rewards_block = False
     for event in events:
-        if isinstance(event, BattleRewardsHeaderEvent):
-            render_heading("Battle Rewards")
-            in_rewards_block = True
-            continue
-        if not in_rewards_block and not standard_header_printed:
+        if not standard_header_printed:
             render_events_header()
             standard_header_printed = True
         # Use canonical formatter for consistency
@@ -1838,12 +2043,33 @@ def _find_combatant(battle_state: BattleState, combatant_id: str | None) -> Comb
     return None
 
 
+def _render_reward_panels(events: List[BattleEvent]) -> None:
+    gold_events = [evt for evt in events if isinstance(evt, BattleGoldRewardEvent)]
+    exp_events = [evt for evt in events if isinstance(evt, BattleExpRewardEvent)]
+    level_events = [evt for evt in events if isinstance(evt, BattleLevelUpEvent)]
+    loot_events = [evt for evt in events if isinstance(evt, LootAcquiredEvent)]
+
+    reward_lines = _format_battle_event_lines([*gold_events, *exp_events])
+    if reward_lines:
+        _render_boxed_panel("Rewards", reward_lines)
+
+    level_lines = _format_battle_event_lines(level_events)
+    if level_lines:
+        _render_boxed_panel("Level Ups", level_lines)
+
+    loot_lines = _format_battle_event_lines(loot_events)
+    if loot_lines:
+        _render_boxed_panel("Loot", loot_lines)
+
+
 def _format_enemy_hp_display(enemy: BattleCombatantView, *, debug_enabled: bool) -> str:
+    """Format enemy HP display with optional debug info (HP + DEF)."""
     if not enemy.is_alive:
         return "DOWN"
     if not debug_enabled:
         return enemy.hp_display
-    return f"{enemy.hp_display}[{enemy.current_hp}/{enemy.max_hp}]"
+    # Debug mode: show HP and defense (ultra-compact: [15/15|D2])
+    return f"{enemy.hp_display}[{enemy.current_hp}/{enemy.max_hp}|D{enemy.defense}]"
 
 
 def _render_story_if_needed(

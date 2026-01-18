@@ -526,6 +526,7 @@ class BattleService:
             is_alive=combatant.is_alive,
             current_hp=combatant.stats.hp,
             max_hp=combatant.stats.max_hp,
+            defense=combatant.stats.defense,
         )
 
     def _weapon_tags_for_ids(self, weapon_ids: Sequence[str]) -> Tuple[str, ...]:
@@ -612,6 +613,27 @@ class BattleService:
                 continue
             total += armour_def.defense
         return total if total > 0 else max(0, fallback)
+
+    @staticmethod
+    def estimate_damage(
+        attacker: Combatant, target: Combatant, *, bonus_power: int = 0, minimum: int = 1
+    ) -> int:
+        """Estimate damage without mutating combatants or guard values."""
+        base_damage = max(minimum, attacker.stats.attack + bonus_power - target.stats.defense)
+        return max(0, base_damage)
+
+    def estimate_damage_for_ids(
+        self,
+        battle_state: BattleState,
+        attacker_id: str,
+        target_id: str,
+        *,
+        bonus_power: int = 0,
+        minimum: int = 1,
+    ) -> int:
+        attacker = self._get_combatant(battle_state, attacker_id)
+        target = self._get_combatant(battle_state, target_id)
+        return self.estimate_damage(attacker, target, bonus_power=bonus_power, minimum=minimum)
 
     def _resolve_damage(self, attacker: Combatant, target: Combatant, *, bonus_power: int, minimum: int) -> int:
         base_damage = max(minimum, attacker.stats.attack + bonus_power - target.stats.defense)
@@ -885,6 +907,20 @@ class BattleService:
         """Reset current resources for the player (and future party hooks) after battles."""
         for member_id in self._active_party_ids(state):
             self._restore_member_resources(state, member_id, restore_hp=restore_hp, restore_mp=restore_mp)
+
+    def party_has_knowledge(self, state: GameState, enemy_tags: Tuple[str, ...]) -> bool:
+        """
+        Check if any member of the current party has knowledge entries matching the enemy tags.
+        
+        Returns True if at least one active party member knows about enemies with these tags.
+        """
+        enemy_tag_set = set(enemy_tags)
+        for member_id in self._active_party_ids(state):
+            entries = self._knowledge_repo.get_entries(member_id)
+            for entry in entries:
+                if set(entry.enemy_tags) & enemy_tag_set:
+                    return True
+        return False
 
     def _restore_member_resources(
         self,

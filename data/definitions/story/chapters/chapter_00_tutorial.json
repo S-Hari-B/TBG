@@ -11,7 +11,7 @@
     "next": "inn_arrival"
   },
   "inn_arrival": {
-    "text": "The Threshold Inn sits just past the dunes, solid wood and warm light. Inside, a handful of arrivals sit nursing drinks or staring at their hands. You're shown to a table.\n\nA middle-aged man in crisp robes approaches. His smile is professional, reassuring.\n\n\"Welcome. I'm Cerel, integration specialist. You probably have a lot of questions. Don't worry, that is normal. Unfortunately, I cannot answer them all but I can help you learn the basics on how to survive in this world.\"",
+    "text": "The Threshold Inn sits just past the dunes, solid wood and warm light. Inside, a handful of arrivals sit nursing drinks or staring at their hands. You're shown to a table.\n\nA middle-aged man in crisp robes approaches. His smile is professional, reassuring.\n\n\"Welcome. I'm Cerel, integration specialist. You probably have a lot of questions. That's normal. Unfortunately, I can't answer them all, but I can help you learn the basics of survival here.\"",
     "next": "inn_orientation_cerel"
   },
   "inn_orientation_cerel": {
@@ -19,7 +19,7 @@
     "next": "inn_orientation_dana"
   },
   "inn_orientation_dana": {
-    "text": "A scarred woman at the bar interjects, not looking up from her drink.\n\n\"Cerel makes it sound clean. It's not. Floors get harder. Monsters get meaner. Parties help, but they also slow you down—shared rewards, shared risk.\"\n\nShe finally glances your way. \"Name's Dana. Been here since the start. My advice? Pick your class carefully. It's not possible to change it later. And don't rush Floor One alone, if you plan on surviving, you should at least have a companion to help you.\"",
+    "text": "A scarred woman at the bar interjects, not looking up from her drink.\n\n\"Cerel makes it sound clean. It's not. Floors get harder. Monsters get meaner. Parties help, but they also slow you down—shared rewards, shared risk.\"\n\nShe finally glances your way. \"Name's Dana. Been here since the start. My advice? Pick your class carefully. You can't change it later. And don't rush Floor One alone—if you plan on surviving, bring at least one companion.\"",
     "next": "class_overview"
   },
   "class_overview": {
@@ -182,10 +182,33 @@
     "next": "protoquest_offer"
   },
   "protoquest_offer": {
-    "text": "Dana leans against the doorway. \"There's a rumor. Shoreline ruins, not far from here. Someone said they saw a supply cache—potions, maybe a weapon. Could be worth checking before you head to Floor One.\"\n\nYour companion glances at you. \"Optional. We don't need it, but free loot is free loot.\"\n\nCerel: \"Entirely your call. The Floor One gate is open when you're ready. No rush.\"\n\nDo you pursue the rumor?",
+    "text": "",
     "effects": [
-      { "type": "set_flag", "flag_id": "flag_protoquest_offered", "value": true }
-    ],
+      { "type": "set_flag", "flag_id": "flag_protoquest_offered", "value": true },
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "protoquest_offer_solo",
+        "next_on_false": "protoquest_offer_party"
+      }
+    ]
+  },
+  "protoquest_offer_solo": {
+    "text": "Dana leans against the doorway. \"There's a rumor. Shoreline ruins, not far from here. Someone said they saw a supply cache—potions, maybe a weapon. Could be worth checking before you head to Floor One.\"\n\nShe looks at you directly. \"Optional. But free loot is free loot.\"\n\nCerel: \"Entirely your call. The Floor One gate is open when you're ready. No rush.\"\n\nDo you pursue the rumor?",
+    "choices": [
+      {
+        "label": "Investigate the ruins (optional)",
+        "next": "protoquest_accept"
+      },
+      {
+        "label": "Head straight to Floor One",
+        "next": "protoquest_decline"
+      }
+    ]
+  },
+  "protoquest_offer_party": {
+    "text": "Dana leans against the doorway. \"There's a rumor. Shoreline ruins, not far from here. Someone said they saw a supply cache—potions, maybe a weapon. Could be worth checking before you head to Floor One.\"\n\nYour companion glances at you. \"Optional. We don't need it, but free loot is free loot.\"\n\nCerel: \"Entirely your call. The Floor One gate is open when you're ready. No rush.\"\n\nDo you pursue the rumor?",
     "choices": [
       {
         "label": "Investigate the ruins (optional)",
@@ -198,7 +221,7 @@
     ]
   },
   "protoquest_accept": {
-    "text": "\"Alright,\" you say. \"Let's check it out.\"\n\nDana nods. \"Smart. I'll mark it on your map. Don't take too long—ruins attract scavengers.\"",
+    "text": "\"Alright, I'll check it out,\" you say.\n\nDana nods. \"Smart. I'll mark it on your map. Don't take too long—ruins attract scavengers.\"",
     "effects": [
       { "type": "quest", "action": "accept", "quest_id": "dana_shoreline_rumor" },
       {
@@ -209,9 +232,31 @@
     "next": "floor1_open_handoff"
   },
   "protoquest_decline": {
-    "text": "\"We'll pass,\" you say. \"Let's keep moving.\"\n\nDana shrugs. \"Your call. Floor One's waiting.\"\n\n\"Fair. Let's go.\"",
+    "text": "",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_protoquest_declined", "value": true },
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "protoquest_decline_solo",
+        "next_on_false": "protoquest_decline_party"
+      }
+    ]
+  },
+  "protoquest_decline_solo": {
+    "text": "\"I'll pass,\" you say. \"Let's keep moving.\"\n\nDana shrugs. \"Your call. Floor One's waiting.\"",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Floor One gate is now accessible via Travel. Explore at your own pace."
+      }
+    ],
+    "next": "floor1_open_handoff"
+  },
+  "protoquest_decline_party": {
+    "text": "\"We'll pass,\" you say. \"Let's keep moving.\"\n\nDana shrugs. \"Your call. Floor One's waiting.\"\n\nYour companion nods. \"Fair. Let's go.\"",
+    "effects": [
       {
         "type": "enter_game_menu",
         "message": "Floor One gate is now accessible via Travel. Explore at your own pace."
@@ -220,7 +265,7 @@
     "next": "floor1_open_handoff"
   },
   "floor1_open_handoff": {
-    "text": "Cerel walks you to the edge of the settlement. Beyond, a shimmering threshold marks the boundary to Floor One.\n\n\"This is where I leave you,\" he says. \"Floor One is larger, more dangerous, and more rewarding. Towns exist, but they're farther apart. The guardian waits at the far end—defeat it, and Floor Two opens.\"\n\nYou adjust your gear. \"No turning back now. Let's see what this place has.\"",
+    "text": "Cerel walks you to the edge of the settlement. Beyond, a shimmering threshold marks the boundary to Floor One.\n\n\"This is where I leave you,\" he says. \"Floor One is larger, more dangerous, and more rewarding. Towns exist, but they're farther apart. The guardian waits at the far end—defeat it, and Floor Two opens.\"\n\nYou adjust your gear, ready to move forward.",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_story_floor1_gate_opened", "value": true },
       {
@@ -231,6 +276,22 @@
     "next": "threshold_inn_hub_router"
   },
   "protoquest_ruins_entry": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "protoquest_ruins_entry_solo",
+        "next_on_false": "protoquest_ruins_entry_party"
+      }
+    ]
+  },
+  "protoquest_ruins_entry_solo": {
+    "text": "The shoreline ruins are half-buried in sand, their stones worn by salt and time. You scan the area carefully.\n\nQuiet. Too quiet. You stay sharp.\n\nA shape moves in the shadows—another goblin scavenger, larger than the trial ones.",
+    "next": "protoquest_battle"
+  },
+  "protoquest_ruins_entry_party": {
     "text": "The shoreline ruins are half-buried in sand, their stones worn by salt and time. Your companion scans the area.\n\n\"Quiet. Too quiet. Stay sharp.\"\n\nA shape moves in the shadows—another goblin scavenger, larger than the trial ones.",
     "next": "protoquest_battle"
   },
@@ -242,6 +303,28 @@
     "next": "protoquest_complete"
   },
   "protoquest_complete": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "protoquest_complete_solo",
+        "next_on_false": "protoquest_complete_party"
+      }
+    ]
+  },
+  "protoquest_complete_solo": {
+    "text": "The scavenger falls. Behind it, a weathered chest. Inside: a small potion and a handful of gold.\n\nYou pocket the loot. Not bad.\n\nIf you want to report in, Dana is waiting at the inn.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Objective complete. Return to Dana at the Threshold Inn for your reward."
+      }
+    ],
+    "next": "floor1_open_handoff"
+  },
+  "protoquest_complete_party": {
     "text": "The scavenger falls. Behind it, a weathered chest. Inside: a small potion and a handful of gold.\n\nYou pocket the loot. \"Not bad. Let's head back.\"\n\nIf you want to report in, Dana is waiting at the inn.",
     "effects": [
       {
@@ -288,7 +371,7 @@
     ]
   },
   "threshold_inn_hub_basic": {
-    "text": "The Threshold Inn hums behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows outside.\n\nYou can ask around for work or step through when you're ready.",
+    "text": "The Threshold Inn stands solid behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows faintly in the distance.\n\nYou can ask around for work, or move forward when ready.",
     "choices": [
       {
         "label": "Ask Dana about work",
@@ -305,7 +388,7 @@
     ]
   },
   "threshold_inn_hub_wolf_ready": {
-    "text": "The Threshold Inn hums behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows outside.\n\nYou can ask around for work or step through when you're ready.",
+    "text": "The Threshold Inn stands solid behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows faintly in the distance.\n\nYou can ask around for work, or move forward when ready.",
     "choices": [
       {
         "label": "Ask Dana about work",
@@ -326,7 +409,7 @@
     ]
   },
   "threshold_inn_hub_rumor_ready": {
-    "text": "The Threshold Inn hums behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows outside.\n\nYou can ask around for work or step through when you're ready.",
+    "text": "The Threshold Inn stands solid behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows faintly in the distance.\n\nYou can ask around for work, or move forward when ready.",
     "choices": [
       {
         "label": "Ask Dana about work",
@@ -341,13 +424,13 @@
         "next": "floor1_gate_prompt"
       },
       {
-        "label": "Return to town menu",
+        "label": "Return to camp menu",
         "next": "threshold_inn_return"
       }
     ]
   },
   "threshold_inn_hub_both_ready": {
-    "text": "The Threshold Inn hums behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows outside.\n\nYou can ask around for work or step through when you're ready.",
+    "text": "The Threshold Inn stands solid behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows faintly in the distance.\n\nYou can ask around for work, or move forward when ready.",
     "choices": [
       {
         "label": "Ask Dana about work",
@@ -608,7 +691,7 @@
     ]
   },
   "cerel_kill_quest_offer": {
-    "text": "\"Kill counts matter down here,\" Cerel says. \"Clear out ten goblin grunts and five half-orcs. Bring me proof, and I'll pay. You'll learn their patterns along the way.\"\n\n\"Optional,\" he adds. \"But it will sharpen you.\"",
+    "text": "\"Kill counts matter down here,\" Cerel says. \"Clear out ten goblin grunts and five half-orcs. Bring me proof and I'll pay. You'll learn their patterns along the way.\"\n\nHe adds: \"It's optional. But it'll sharpen you.\"",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_sq_cerel_offered", "value": true }
     ],
@@ -748,7 +831,7 @@
     "next": "cave_guardian_foreshadow"
   },
   "cave_guardian_foreshadow": {
-    "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nA lock mechanism glows faintly, unresponsive. This is the guardian's chamber. Not yet.\n\nYou turn back, the warning etched into your memory.",
+    "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nA lock mechanism glows faintly, unresponsive. The guardian's chamber. Not yet.\n\nYou turn back, the warning etched into your memory.",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_story_guardian_foreshadowed", "value": true },
       {

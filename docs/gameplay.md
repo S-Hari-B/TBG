@@ -43,7 +43,17 @@ The game menu appears after `enter_game_menu` story effects. Non-hub areas show 
 
 ### Debug-mode UI helpers
 
-Setting `TBG_DEBUG=1` adds a small status line to Camp and Travel menus (`DEBUG: <context> seed=… node=… location=… mode=…`), exposes the Location Debug submenu described above (quest + conversation snapshots), and augments the Save/Load slot picker with the stored seed + current location id so testers can verify persistence quickly. Combat still hides HP in normal play; debug mode continues to show explicit HP readings next to the `???` placeholder for enemies.
+Setting `TBG_DEBUG=1` adds a small status line to Camp and Travel menus (`DEBUG: <context> seed=… node=… location=… mode=…`), exposes the Location Debug submenu described above (quest + conversation snapshots), and augments the Save/Load slot picker with the stored seed + current location id so testers can verify persistence quickly. Combat still hides HP in normal play; debug mode continues to show explicit HP readings next to the `???` placeholder for enemies, including defense values in an ultra-compact format (e.g., `???[22/22|D2]`). Debug mode also prints the battle ID heading (`=== Battle battle_XXXX ===`) at the start of encounters for reproducibility testing and shows turn-order numbers in the battle state panel.
+
+### Battle damage previews
+
+During battle, the UI provides damage previews to help players make informed decisions. The skill list now also shows each skill's description on a wrapped line under the entry for quick reference:
+
+- **Debug mode (`TBG_DEBUG=1`)**: Always shows exact projected damage based on attacker/target stats (e.g., "Projected: 6").
+- **Normal mode with knowledge**: If any party member has knowledge of the target enemy type (via the knowledge system), the UI shows the exact projected damage as in debug mode.
+- **Normal mode without knowledge**: For unknown enemies, the UI shows only the skill's base power value (e.g., "Power: 4") to avoid leaking hidden enemy defense stats. For basic attacks without knowledge, no preview is shown.
+
+Projected damage does not account for guard reduction, which is consumed on hit. Previews are purely informational and never affect battle outcomes or RNG consumption.
 
 Story flow
 The player navigates story nodes. Nodes display dialogue and provide choices. Nodes can trigger battles, rewards, party changes, or flag updates.
@@ -167,6 +177,8 @@ Identical enemies in the same encounter are suffixed deterministically (“Gobli
 * The state panel prints once at battle start and once at the beginning of every player-controlled turn; invalid menu input and retries never trigger a full re-render.
 * Player menus (Actions, Skills, Target selection, Party Talk) use boxed panels with numbered entries. Enemy/ally AI turns never show menus.
 * Every actor turn finishes with exactly one boxed RESULTS panel summarising all resolved events for that turn (multi-hit skills print multiple bullet lines). Invalid actions such as insufficient MP are summarised inside the same panel before re-prompting the relevant menu.
+* Target selection panels include deterministic damage previews. In debug (`TBG_DEBUG=1`), exact values show as `Projected: X`. In normal play, previews use a non-leaky baseline label (no numeric damage) unless future knowledge rules explicitly allow exact projections. Previews never use RNG and ignore guard reductions for now.
+* Post-battle rewards render in boxed panels: `REWARDS` (gold + EXP), `LEVEL UPS` (only when level-up events occur), and `LOOT` (aggregated item counts).
 * **Text wrapping**: Long lines in boxed panels (RESULTS, Party Talk knowledge entries, etc.) are word-wrapped at render time to fit within the 56-character inner width, with continuation lines indented for readability. This ensures full knowledge text displays correctly without breaking panel borders or truncating mid-word.
 
 Winning and losing

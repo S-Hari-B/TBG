@@ -14,6 +14,8 @@ from tbg.data.repositories import (
     SkillsRepository,
     WeaponsRepository,
 )
+from tbg.domain.battle_models import BattleState, Combatant
+from tbg.domain.entities.stats import Stats
 from tbg.domain.state import GameState
 from tbg.services.battle_service import (
     AttackResolvedEvent,
@@ -111,6 +113,57 @@ def test_basic_attack_reduces_hp_and_can_kill() -> None:
 
     assert target.stats.hp < starting_hp
     assert any(isinstance(evt, AttackResolvedEvent) for evt in events)
+
+
+def test_estimate_damage_matches_basic_attack_when_guard_zero() -> None:
+    service = _make_battle_service()
+    attacker_stats = Stats(max_hp=10, hp=10, max_mp=0, mp=0, attack=6, defense=1, speed=1)
+    target_stats = Stats(max_hp=12, hp=12, max_mp=0, mp=0, attack=3, defense=2, speed=1)
+    attacker = Combatant(
+        instance_id="attacker",
+        display_name="Attacker",
+        side="allies",
+        stats=attacker_stats,
+        guard_reduction=0,
+    )
+    target = Combatant(
+        instance_id="target",
+        display_name="Target",
+        side="enemies",
+        stats=target_stats,
+        guard_reduction=0,
+    )
+    estimate = service.estimate_damage(attacker, target)
+    battle_state = BattleState(battle_id="test", allies=[attacker], enemies=[target])
+    starting_hp = target.stats.hp
+    service.basic_attack(battle_state, attacker.instance_id, target.instance_id)
+    actual_damage = starting_hp - target.stats.hp
+    assert estimate == actual_damage
+
+
+def test_estimate_damage_does_not_mutate_target() -> None:
+    service = _make_battle_service()
+    attacker_stats = Stats(max_hp=10, hp=10, max_mp=0, mp=0, attack=6, defense=1, speed=1)
+    target_stats = Stats(max_hp=12, hp=12, max_mp=0, mp=0, attack=3, defense=2, speed=1)
+    attacker = Combatant(
+        instance_id="attacker",
+        display_name="Attacker",
+        side="allies",
+        stats=attacker_stats,
+        guard_reduction=0,
+    )
+    target = Combatant(
+        instance_id="target",
+        display_name="Target",
+        side="enemies",
+        stats=target_stats,
+        guard_reduction=5,
+    )
+    hp_before = target.stats.hp
+    guard_before = target.guard_reduction
+    _ = service.estimate_damage(attacker, target)
+    assert target.stats.hp == hp_before
+    assert target.guard_reduction == guard_before
 
 
 def test_battle_resolves_victory_when_all_enemies_dead() -> None:

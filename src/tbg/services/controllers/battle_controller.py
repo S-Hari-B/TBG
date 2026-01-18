@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Literal, Sequence
+from typing import List, Literal, Sequence, Tuple
 
 from tbg.core.rng import RNG
-from tbg.domain.battle_models import BattleState
+from tbg.domain.battle_models import BattleState, Combatant
 from tbg.domain.defs import SkillDef
 from tbg.domain.state import GameState
 from tbg.services.battle_service import BattleEvent, BattleService, BattleView
@@ -167,3 +167,25 @@ class BattleController:
     def apply_victory_rewards(self, battle_state: BattleState, state: GameState) -> List[BattleEvent]:
         """Apply victory rewards and return events."""
         return self._service.apply_victory_rewards(battle_state, state)
+
+    def has_knowledge_of_enemy(self, state: GameState, enemy_tags: Tuple[str, ...]) -> bool:
+        """
+        Check if any party member has knowledge of an enemy with the given tags.
+        
+        Returns True if at least one party member knows about enemies with these tags.
+        """
+        return self._service.party_has_knowledge(state, enemy_tags)
+
+    def estimate_damage(
+        self,
+        battle_state: BattleState,
+        attacker_id: str,
+        target_id: str,
+        *,
+        bonus_power: int = 0,
+        minimum: int = 1,
+    ) -> int:
+        """Estimate damage without mutating battle state."""
+        return self._service.estimate_damage_for_ids(
+            battle_state, attacker_id, target_id, bonus_power=bonus_power, minimum=minimum
+        )

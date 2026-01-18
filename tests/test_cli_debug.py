@@ -12,6 +12,7 @@ def test_format_enemy_hp_display_no_debug() -> None:
         is_alive=True,
         current_hp=10,
         max_hp=20,
+        defense=2,
     )
     assert _format_enemy_hp_display(enemy_view, debug_enabled=False) == "???"
 
@@ -25,8 +26,9 @@ def test_format_enemy_hp_display_debug_enabled() -> None:
         is_alive=True,
         current_hp=10,
         max_hp=20,
+        defense=2,
     )
-    assert _format_enemy_hp_display(enemy_view, debug_enabled=True) == "???[10/20]"
+    assert _format_enemy_hp_display(enemy_view, debug_enabled=True) == "???[10/20|D2]"
 
 
 def test_format_enemy_hp_display_dead() -> None:
@@ -38,6 +40,7 @@ def test_format_enemy_hp_display_dead() -> None:
         is_alive=False,
         current_hp=0,
         max_hp=20,
+        defense=2,
     )
     assert _format_enemy_hp_display(enemy_view, debug_enabled=True) == "DOWN"
 
@@ -69,4 +72,10 @@ def test_render_story_shows_node_ids_with_debug(monkeypatch, capsys) -> None:
     render_story([("intro_decree", "The decree arrives.")])
     out = capsys.readouterr().out
     assert "[intro_decree]" in out
+
+
+def test_render_story_suppresses_blank_blocks(capsys) -> None:
+    render_story([("router_node", "   ")])
+    out = capsys.readouterr().out
+    assert "=== Story ===" not in out
 
