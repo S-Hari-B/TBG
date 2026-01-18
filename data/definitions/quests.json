@@ -1,0 +1,94 @@
+{
+  "quests": {
+    "dana_shoreline_rumor": {
+      "quest_id": "dana_shoreline_rumor",
+      "name": "Dana's Shoreline Rumor",
+      "prereqs": {
+        "required_flags": ["flag_protoquest_offered"],
+        "forbidden_flags": ["flag_protoquest_declined", "flag_protoquest_completed"]
+      },
+      "objectives": [
+        {
+          "type": "kill_tag",
+          "tag": "goblin",
+          "quantity": 1,
+          "label": "Clear the shoreline ruins"
+        }
+      ],
+      "turn_in": { "node_id": "dana_protoquest_turn_in_check", "npc_id": "dana" },
+      "rewards": {
+        "gold": 10,
+        "party_exp": 0,
+        "items": [],
+        "set_flags": {
+          "flag_protoquest_completed": true,
+          "flag_protoquest_ready": false
+        }
+      },
+      "accept_flags": ["flag_protoquest_accepted"],
+      "complete_flags": ["flag_protoquest_ready"]
+    },
+    "dana_wolf_teeth": {
+      "quest_id": "dana_wolf_teeth",
+      "name": "Dana's Wolf Teeth",
+      "prereqs": {
+        "required_flags": ["flag_sq_dana_offered"],
+        "forbidden_flags": ["flag_sq_dana_completed"]
+      },
+      "objectives": [
+        {
+          "type": "collect_item",
+          "item_id": "wolf_tooth",
+          "quantity": 3,
+          "label": "Collect 3 wolf teeth"
+        }
+      ],
+      "turn_in": { "node_id": "dana_turn_in_check", "npc_id": "dana" },
+      "rewards": {
+        "gold": 18,
+        "party_exp": 6,
+        "items": [],
+        "set_flags": {
+          "flag_sq_dana_completed": true,
+          "flag_sq_dana_ready": false
+        }
+      },
+      "accept_flags": ["flag_sq_dana_accepted"],
+      "complete_flags": ["flag_sq_dana_ready"]
+    },
+    "cerel_kill_hunt": {
+      "quest_id": "cerel_kill_hunt",
+      "name": "Cerel's Hunt",
+      "prereqs": {
+        "required_flags": ["flag_sq_cerel_offered"],
+        "forbidden_flags": ["flag_sq_cerel_completed"]
+      },
+      "objectives": [
+        {
+          "type": "kill_tag",
+          "tag": "goblin",
+          "quantity": 10,
+          "label": "Defeat 10 goblins"
+        },
+        {
+          "type": "kill_tag",
+          "tag": "orc",
+          "quantity": 5,
+          "label": "Defeat 5 half-orcs"
+        }
+      ],
+      "turn_in": { "node_id": "cerel_turn_in_check", "npc_id": "cerel" },
+      "rewards": {
+        "gold": 30,
+        "party_exp": 10,
+        "items": [],
+        "set_flags": {
+          "flag_sq_cerel_completed": true,
+          "flag_sq_cerel_ready": false
+        }
+      },
+      "accept_flags": ["flag_sq_cerel_accepted"],
+      "complete_flags": ["flag_sq_cerel_ready"]
+    }
+  }
+}

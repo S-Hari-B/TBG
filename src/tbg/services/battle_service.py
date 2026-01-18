@@ -22,6 +22,7 @@ from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment
 from tbg.domain.state import GameState
 from tbg.services.errors import FactoryError
 from tbg.services.factories import create_enemy_instance, make_instance_id
+from tbg.services.quest_service import QuestService
 
 
 @dataclass(slots=True)
@@ -145,6 +146,7 @@ class BattleService:
         skills_repo: SkillsRepository,
         items_repo: ItemsRepository,
         loot_tables_repo: LootTablesRepository,
+        quest_service: QuestService | None = None,
     ) -> None:
         self._enemies_repo = enemies_repo
         self._party_members_repo = party_members_repo
@@ -155,6 +157,7 @@ class BattleService:
         self._items_repo = items_repo
         self._loot_tables_repo = loot_tables_repo
         self._loot_tables_cache: List[LootTableDef] | None = None
+        self._quest_service = quest_service
 
     # -----------------------
     # Battle Lifecycle
@@ -186,6 +189,7 @@ class BattleService:
                 )
             )
 
+        self._ensure_unique_enemy_instances(enemies, state.rng)
         self._disambiguate_enemy_names(enemies)
         allies = [self._player_to_combatant(state)]
         for member_id in state.party_members:
@@ -544,6 +548,33 @@ class BattleService:
             for idx, combatant in enumerate(group, start=1):
                 combatant.display_name = f"{base_name} ({idx})"
 
+    @staticmethod
+    def _ensure_unique_enemy_instances(enemies: List[Combatant], rng: RNG) -> None:
+        """Ensure enemy entries are distinct objects before name disambiguation."""
+        seen: set[int] = set()
+        for index, enemy in enumerate(enemies):
+            identity = id(enemy)
+            if identity in seen:
+                enemies[index] = Combatant(
+                    instance_id=make_instance_id("enemy", rng),
+                    display_name=enemy.display_name,
+                    side=enemy.side,
+                    stats=Stats(
+                        max_hp=enemy.stats.max_hp,
+                        hp=enemy.stats.hp,
+                        max_mp=enemy.stats.max_mp,
+                        mp=enemy.stats.mp,
+                        attack=enemy.stats.attack,
+                        defense=enemy.stats.defense,
+                        speed=enemy.stats.speed,
+                    ),
+                    tags=enemy.tags,
+                    weapon_tags=enemy.weapon_tags,
+                    source_id=enemy.source_id,
+                )
+            else:
+                seen.add(identity)
+
     def _weapon_ids_from_equipment(self, equipment: MemberEquipment | None) -> List[str]:
         if equipment is None:
             return []
@@ -695,6 +726,10 @@ class BattleService:
 
         reward_events.extend(self._roll_loot(defeated, state))
         reward_events.extend(self._apply_floor_one_side_quest_rewards(defeated, state))
+        if self._quest_service and defeated:
+            defeated_tags = [tuple(getattr(enemy_def, "tags", ())) for _, enemy_def in defeated]
+            self._quest_service.record_battle_victory(state, defeated_tags)
+            self._quest_service.refresh_collect_objectives(state)
         self.restore_party_resources(state, restore_hp=False, restore_mp=True)
         state.flags["flag_last_battle_defeat"] = False
         if len(reward_events) == 1:

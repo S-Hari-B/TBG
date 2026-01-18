@@ -12,6 +12,7 @@ from tbg.data.repositories import (
     KnowledgeRepository,
     LootTablesRepository,
     PartyMembersRepository,
+    QuestsRepository,
     StoryRepository,
     SkillsRepository,
     WeaponsRepository,
@@ -35,6 +36,10 @@ from tbg.services import (
     PartyLevelUpEvent,
     PartyMemberJoinedEvent,
     PlayerClassSetEvent,
+    QuestAcceptedEvent,
+    QuestCompletedEvent,
+    QuestTurnedInEvent,
+    QuestService,
     SaveLoadError,
     SaveService,
     StoryNodeView,
@@ -42,6 +47,7 @@ from tbg.services import (
     TravelBlockedError,
     TravelPerformedEvent,
 )
+from tbg.services.quest_service import QuestJournalView, QuestTurnInView
 from tbg.services.area_service import TRAVEL_BLOCKED_MESSAGE
 from tbg.services.battle_service import (
     AttackResolvedEvent,
@@ -95,6 +101,7 @@ _BATTLE_UI_WIDTH = 60
 _BATTLE_STATE_LEFT_COL = 27
 _BATTLE_STATE_RIGHT_COL = _BATTLE_UI_WIDTH - 3 - _BATTLE_STATE_LEFT_COL
 _TURN_SEPARATOR = "=" * _BATTLE_UI_WIDTH
+_MENU_RESELECT = object()
 
 
 def _battle_box_border(char: str = "-") -> str:
@@ -141,6 +148,24 @@ def _truncate_cell(text: str, width: int) -> str:
     return f"{text[: width - 3]}...".ljust(width)
 
 
+def _truncate_enemy_name(name_segment: str, width: int, *, raw_name: str) -> str:
+    if len(name_segment) <= width:
+        return name_segment.ljust(width)
+    if not (raw_name.endswith(")") and " (" in raw_name):
+        return _truncate_cell(name_segment, width)
+    suffix = raw_name[raw_name.rfind(" (") :]
+    base_name = raw_name[: -len(suffix)]
+    prefix = name_segment[:2]
+    base_width = width - len(prefix) - len(suffix)
+    if base_width <= 0:
+        return _truncate_cell(name_segment, width)
+    if len(base_name) > base_width and base_width > 3:
+        base = f"{base_name[: base_width - 3]}..."
+    else:
+        base = base_name[:base_width]
+    return f"{prefix}{base}{suffix}".ljust(width)
+
+
 def _render_state_row(left: str, right: str) -> None:
     left_display = f" {left}" if left else ""
     right_display = f" {right}" if right else ""
@@ -167,17 +192,24 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
         hp_display = ally.hp_display if ally.is_alive else "DOWN"
         allies_lines.append(f"{marker} {ally.name}  HP {hp_display} MP {mp_text}")
     enemies_lines: List[str] = []
+    enemy_name_lookup = {
+        combatant.instance_id: combatant.display_name
+        for combatant in battle_state.enemies
+    }
     for enemy in view.enemies:
         marker = ">" if enemy.instance_id == active_id else " "
         status = _format_enemy_hp_display(enemy, debug_enabled=debug_enabled)
-        name_segment = f"{marker} {enemy.name}"
+        display_name = enemy_name_lookup.get(enemy.instance_id, enemy.name)
+        name_segment = f"{marker} {display_name}"
         gap = " "
         available_width = _BATTLE_STATE_RIGHT_COL - 1  # account for leading space applied later
         name_width = available_width - len(status) - len(gap)
         if name_width < 0:
             name_width = 0
         if name_width > 0:
-            trimmed_name = _truncate_cell(name_segment, name_width).rstrip()
+            trimmed_name = _truncate_enemy_name(
+                name_segment, name_width, raw_name=display_name
+            ).rstrip()
         else:
             trimmed_name = ""
         spacer = gap if trimmed_name else ""
@@ -238,6 +270,24 @@ def _build_camp_menu_entries(state: GameState) -> List[tuple[str, str]]:
     return entries
 
 
+def _build_town_menu_entries(state: GameState) -> List[tuple[str, str]]:
+    entries: List[tuple[str, str]] = [
+        ("Continue", "continue"),
+        ("Travel", "travel"),
+    ]
+    if _debug_enabled():
+        entries.append(("Location Debug (DEBUG)", "location_debug"))
+    entries.append(("Converse", "converse"))
+    entries.append(("Quests", "quests"))
+    entries.append(("Shops (Coming Soon)", "shops"))
+    entries.append(("Inventory / Equipment", "inventory"))
+    if state.party_members:
+        entries.append(("Party Talk", "talk"))
+    entries.append(("Save Game", "save"))
+    entries.append(("Quit to Main Menu", "quit"))
+    return entries
+
+
 def _format_slot_label(meta: SlotMetadata) -> str:
     if not meta.exists:
         return f"Slot {meta.slot}: Empty"
@@ -289,6 +339,7 @@ def main() -> None:
         inventory_service,
         save_service,
         area_service,
+        quest_service,
     ) = _build_services()
     slot_store = SaveSlotStore()
     print("=== Text Based Game (To be renamed) ===")
@@ -310,6 +361,7 @@ def main() -> None:
             story_service,
             battle_service,
             inventory_service,
+            quest_service,
             game_state,
             save_service,
             slot_store,
@@ -339,7 +391,9 @@ def _main_menu_loop() -> MenuAction:
         print(f"Invalid selection. Please enter 1 to {len(options)}.")
 
 
-def _build_services() -> tuple[StoryService, BattleService, InventoryService, SaveService, AreaService]:
+def _build_services() -> tuple[
+    StoryService, BattleService, InventoryService, SaveService, AreaService, QuestService
+]:
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
     story_repo = StoryRepository()
@@ -350,6 +404,23 @@ def _build_services() -> tuple[StoryService, BattleService, InventoryService, Sa
         armour_repo=armour_repo,
         party_members_repo=party_repo,
     )
+    enemies_repo = EnemiesRepository()
+    knowledge_repo = KnowledgeRepository()
+    skills_repo = SkillsRepository()
+    items_repo = ItemsRepository()
+    loot_repo = LootTablesRepository()
+    areas_repo = AreasRepository()
+    quests_repo = QuestsRepository(
+        items_repo=items_repo,
+        areas_repo=areas_repo,
+        story_repo=story_repo,
+    )
+    quest_service = QuestService(
+        quests_repo=quests_repo,
+        items_repo=items_repo,
+        areas_repo=areas_repo,
+        party_members_repo=party_repo,
+    )
     story_service = StoryService(
         story_repo=story_repo,
         classes_repo=classes_repo,
@@ -357,12 +428,8 @@ def _build_services() -> tuple[StoryService, BattleService, InventoryService, Sa
         armour_repo=armour_repo,
         party_members_repo=party_repo,
         inventory_service=inventory_service,
+        quest_service=quest_service,
     )
-    enemies_repo = EnemiesRepository()
-    knowledge_repo = KnowledgeRepository()
-    skills_repo = SkillsRepository()
-    items_repo = ItemsRepository()
-    loot_repo = LootTablesRepository()
     battle_service = BattleService(
         enemies_repo=enemies_repo,
         party_members_repo=party_repo,
@@ -372,9 +439,9 @@ def _build_services() -> tuple[StoryService, BattleService, InventoryService, Sa
         skills_repo=skills_repo,
         items_repo=items_repo,
         loot_tables_repo=loot_repo,
+        quest_service=quest_service,
     )
-    areas_repo = AreasRepository()
-    area_service = AreaService(areas_repo=areas_repo)
+    area_service = AreaService(areas_repo=areas_repo, quest_service=quest_service)
     save_service = SaveService(
         story_repo=story_repo,
         classes_repo=classes_repo,
@@ -383,8 +450,9 @@ def _build_services() -> tuple[StoryService, BattleService, InventoryService, Sa
         items_repo=items_repo,
         party_members_repo=party_repo,
         areas_repo=areas_repo,
+        quests_repo=quests_repo,
     )
-    return story_service, battle_service, inventory_service, save_service, area_service
+    return story_service, battle_service, inventory_service, save_service, area_service, quest_service
 
 
 def _start_new_game(story_service: StoryService, area_service: AreaService) -> GameState:
@@ -447,6 +515,7 @@ def _run_story_loop(
     story_service: StoryService,
     battle_service: BattleService,
     inventory_service: InventoryService,
+    quest_service: QuestService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -462,6 +531,7 @@ def _run_story_loop(
                 state.camp_message or "",
                 story_service,
                 inventory_service,
+                quest_service,
                 state,
                 save_service,
                 slot_store,
@@ -475,6 +545,7 @@ def _run_story_loop(
                 battle_service,
                 story_service,
                 inventory_service,
+                quest_service,
                 state,
                 save_service,
                 slot_store,
@@ -488,6 +559,23 @@ def _run_story_loop(
         node_view = story_service.get_current_node_view(state)
         _render_node_view(node_view)
         if not node_view.choices:
+            if state.pending_story_node_id:
+                resumed_events = story_service.resume_pending_flow(state)
+                if resumed_events:
+                    if not _handle_story_events(
+                        resumed_events,
+                        battle_service,
+                        story_service,
+                        inventory_service,
+                        quest_service,
+                        state,
+                        save_service,
+                        slot_store,
+                        area_service,
+                        print_header=bool(resumed_events),
+                    ):
+                        return False
+                continue
             print("End of demo slice. Returning to main menu.\n")
             return True
         choice_index = _prompt_choice(len(node_view.choices))
@@ -497,6 +585,7 @@ def _run_story_loop(
             battle_service,
             story_service,
             inventory_service,
+            quest_service,
             state,
             save_service,
             slot_store,
@@ -528,6 +617,7 @@ def _process_story_events(
     battle_service: BattleService,
     story_service: StoryService,
     inventory_service: InventoryService,
+    quest_service: QuestService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -538,6 +628,7 @@ def _process_story_events(
         battle_service,
         story_service,
         inventory_service,
+        quest_service,
         state,
         save_service,
         slot_store,
@@ -551,6 +642,7 @@ def _handle_story_events(
     battle_service: BattleService,
     story_service: StoryService,
     inventory_service: InventoryService,
+    quest_service: QuestService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -579,6 +671,7 @@ def _handle_story_events(
                     battle_service,
                     story_service,
                     inventory_service,
+                    quest_service,
                     state,
                     save_service,
                     slot_store,
@@ -594,6 +687,7 @@ def _handle_story_events(
                 battle_service,
                 story_service,
                 inventory_service,
+                quest_service,
                 state,
                 save_service,
                 slot_store,
@@ -607,6 +701,12 @@ def _handle_story_events(
             print(f"- {event.member_name} gains {event.amount} EXP (Level {event.new_level}).")
         elif isinstance(event, PartyLevelUpEvent):
             print(f"- {event.member_name} reached Level {event.new_level}!")
+        elif isinstance(event, QuestAcceptedEvent):
+            print(f"- Quest accepted: {event.quest_name}.")
+        elif isinstance(event, QuestCompletedEvent):
+            print(f"- Quest completed: {event.quest_name}.")
+        elif isinstance(event, QuestTurnedInEvent):
+            print(f"- Quest turned in: {event.quest_name}.")
         elif isinstance(event, GoldGainedEvent):
             print(f"- Gained {event.amount} gold (Total: {event.total_gold}).")
         elif isinstance(event, ExpGainedEvent):
@@ -628,6 +728,7 @@ def _handle_story_events(
                 event.message,
                 story_service,
                 inventory_service,
+                quest_service,
                 state,
                 save_service,
                 slot_store,
@@ -641,6 +742,7 @@ def _handle_story_events(
                 battle_service,
                 story_service,
                 inventory_service,
+                quest_service,
                 state,
                 save_service,
                 slot_store,
@@ -659,6 +761,7 @@ def _run_post_battle_interlude(
     message: str,
     story_service: StoryService,
     inventory_service: InventoryService,
+    quest_service: QuestService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -669,6 +772,46 @@ def _run_post_battle_interlude(
     if message:
         print(message)
     state.mode = "camp_menu"
+    while True:
+        location_view = area_service.get_current_location_view(state)
+        if "town" in location_view.tags:
+            result = _run_town_menu(
+                story_service,
+                inventory_service,
+                quest_service,
+                state,
+                save_service,
+                slot_store,
+                battle_service,
+                area_service,
+            )
+        else:
+            result = _run_camp_menu(
+                story_service,
+                inventory_service,
+                quest_service,
+                state,
+                save_service,
+                slot_store,
+                battle_service,
+                area_service,
+            )
+        if result is _MENU_RESELECT:
+            continue
+        return result
+
+
+def _run_camp_menu(
+    story_service: StoryService,
+    inventory_service: InventoryService,
+    quest_service: QuestService,
+    state: GameState,
+    save_service: SaveService,
+    slot_store: SaveSlotStore,
+    battle_service: BattleService,
+    area_service: AreaService,
+) -> List[object] | None:
+    del battle_service  # Camp menu does not expose battle-specific flows.
     while True:
         menu_entries = _build_camp_menu_entries(state)
         _print_debug_status(state, context="camp")
@@ -689,9 +832,69 @@ def _run_post_battle_interlude(
             travel_follow_up = _handle_travel_menu(area_service, story_service, state)
             if travel_follow_up is not None:
                 return travel_follow_up
-            continue
+            return _MENU_RESELECT
         if action == "location_debug":
-            _render_location_debug_snapshot(area_service, state)
+            _render_location_debug_snapshot(area_service, quest_service, story_service, state)
+            continue
+        if action == "inventory":
+            _run_inventory_flow(inventory_service, state)
+            continue
+        if action == "talk":
+            _handle_menu_party_talk(state)
+            continue
+        if action == "save":
+            _handle_save_request(state, save_service, slot_store)
+            continue
+        return None
+
+
+def _run_town_menu(
+    story_service: StoryService,
+    inventory_service: InventoryService,
+    quest_service: QuestService,
+    state: GameState,
+    save_service: SaveService,
+    slot_store: SaveSlotStore,
+    battle_service: BattleService,
+    area_service: AreaService,
+) -> List[object] | None:
+    del battle_service
+    while True:
+        menu_entries = _build_town_menu_entries(state)
+        _print_debug_status(state, context="town")
+        render_menu("Town Menu", [label for label, _ in menu_entries])
+        index = _prompt_menu_index(len(menu_entries))
+        action = menu_entries[index][1]
+        if action == "continue":
+            if state.story_checkpoint_thread_id in (None, "main_story"):
+                _warp_to_checkpoint_location(area_service, state)
+            resumed_events = story_service.resume_pending_flow(state)
+            if not resumed_events:
+                print("No pending story nodes. Explore via Travel or Save your progress.")
+                continue
+            state.mode = "story"
+            state.camp_message = None
+            return resumed_events
+        if action == "travel":
+            travel_follow_up = _handle_travel_menu(area_service, story_service, state)
+            if travel_follow_up is not None:
+                return travel_follow_up
+            return _MENU_RESELECT
+        if action == "location_debug":
+            _render_location_debug_snapshot(area_service, quest_service, story_service, state)
+            continue
+        if action == "converse":
+            follow_up = _handle_converse_menu(area_service, story_service, state)
+            if follow_up is not None:
+                return follow_up
+            continue
+        if action == "quests":
+            quest_follow_up = _handle_quests_menu(quest_service, area_service, story_service, state)
+            if quest_follow_up is not None:
+                return quest_follow_up
+            continue
+        if action == "shops":
+            print("Shops are coming soon.")
             continue
         if action == "inventory":
             _run_inventory_flow(inventory_service, state)
@@ -709,6 +912,7 @@ def _handle_defeat_flow(
     battle_service: BattleService,
     story_service: StoryService,
     inventory_service: InventoryService,
+    quest_service: QuestService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -730,6 +934,7 @@ def _handle_defeat_flow(
         message,
         story_service,
         inventory_service,
+        quest_service,
         state,
         save_service,
         slot_store,
@@ -745,6 +950,7 @@ def _handle_defeat_flow(
         battle_service,
         story_service,
         inventory_service,
+        quest_service,
         state,
         save_service,
         slot_store,
@@ -791,7 +997,8 @@ def _handle_travel_menu(
         if choice == len(connections):
             return None
         destination = connections[choice]
-        if state.story_checkpoint_node_id and destination.progresses_story:
+        checkpoint_thread = state.story_checkpoint_thread_id or "main_story"
+        if state.story_checkpoint_node_id and checkpoint_thread == "main_story" and destination.progresses_story:
             print(TRAVEL_BLOCKED_MESSAGE)
             continue
         try:
@@ -806,6 +1013,118 @@ def _handle_travel_menu(
         if result.entry_story_node_id:
             return story_service.play_node(state, result.entry_story_node_id)
         return None
+
+
+def _handle_converse_menu(
+    area_service: AreaService, story_service: StoryService, state: GameState
+) -> List[object] | None:
+    location_view = area_service.get_current_location_view(state)
+    npcs = list(location_view.npcs_present)
+    if not npcs:
+        print("No one is available to converse here.")
+        return None
+    options = [npc.npc_id.title() for npc in npcs]
+    options.append("Back")
+    render_menu("Converse", options)
+    choice = _prompt_menu_index(len(options))
+    if choice == len(npcs):
+        return None
+    npc = npcs[choice]
+    return _play_node_with_auto_resume(story_service, state, npc.talk_node_id)
+
+
+def _handle_quests_menu(
+    quest_service: QuestService,
+    area_service: AreaService,
+    story_service: StoryService,
+    state: GameState,
+) -> List[object] | None:
+    while True:
+        journal = quest_service.build_journal_view(state)
+        render_heading("Quest Journal")
+        _render_quest_journal(journal)
+        location_view = area_service.get_current_location_view(state)
+        turn_ins = _filter_turn_ins_for_location(journal.turn_ins, location_view)
+        turn_ins = _order_turn_ins(turn_ins, location_view)
+        options = [
+            f"Turn in: {entry.name} ({entry.npc_id or 'Unknown'})" for entry in turn_ins
+        ]
+        options.append("Back")
+        if not options[:-1]:
+            print("No quest turn-ins available here yet.")
+        render_menu("Quest Options", options)
+        choice = _prompt_menu_index(len(options))
+        if choice == len(options) - 1:
+            return None
+        selected = turn_ins[choice]
+        return _play_node_with_auto_resume(story_service, state, selected.node_id)
+
+
+def _play_node_with_auto_resume(
+    story_service: StoryService, state: GameState, node_id: str
+) -> List[object]:
+    events: List[object] = []
+    events.extend(story_service.play_node(state, node_id))
+    while True:
+        if any(isinstance(evt, (BattleRequestedEvent, GameMenuEnteredEvent)) for evt in events):
+            return events
+        node_view = story_service.get_current_node_view(state)
+        if node_view.choices:
+            return events
+        if not state.pending_story_node_id:
+            return events
+        events.extend(story_service.resume_pending_flow(state))
+
+
+def _render_quest_journal(journal: QuestJournalView) -> None:
+    if journal.active:
+        print("Active Quests:")
+        for quest in journal.active:
+            status = " (Complete)" if quest.is_completed else ""
+            print(f"- {quest.name}{status}")
+            for objective in quest.objectives:
+                progress = f"{objective.current}/{objective.target}"
+                marker = "X" if objective.completed else " "
+                print(f"  [{marker}] {objective.label} ({progress})")
+    else:
+        print("Active Quests: (none)")
+    if journal.turned_in:
+        print("Turned In:")
+        for name in journal.turned_in:
+            print(f"- {name}")
+    if journal.turn_ins:
+        print("Turn-ins:")
+        grouped: dict[str, List[QuestTurnInView]] = {}
+        for entry in journal.turn_ins:
+            key = entry.npc_id or "Unknown"
+            grouped.setdefault(key, []).append(entry)
+        for npc_id in sorted(grouped.keys()):
+            print(f"  {npc_id}:")
+            for entry in grouped[npc_id]:
+                print(f"    - {entry.name}")
+
+
+def _order_turn_ins(turn_ins: List[QuestTurnInView], location_view: LocationView) -> List[QuestTurnInView]:
+    npc_order = [npc.npc_id for npc in location_view.npcs_present]
+    def _sort_key(entry: QuestTurnInView) -> tuple[int, str]:
+        if entry.npc_id and entry.npc_id in npc_order:
+            return (npc_order.index(entry.npc_id), entry.name)
+        return (len(npc_order) + 1, entry.name)
+
+    return sorted(turn_ins, key=_sort_key)
+
+
+def _filter_turn_ins_for_location(
+    turn_ins: List[QuestTurnInView], location_view: LocationView
+) -> List[QuestTurnInView]:
+    npc_ids = {npc.npc_id for npc in location_view.npcs_present}
+    filtered: List[QuestTurnInView] = []
+    for entry in turn_ins:
+        if entry.npc_id is None:
+            continue
+        if entry.npc_id in npc_ids:
+            filtered.append(entry)
+    return filtered
 
 
 def _render_travel_context(location_view: LocationView, state: GameState) -> None:
@@ -841,26 +1160,99 @@ def _render_location_arrival(location_view: LocationView) -> None:
         print(f"[DEBUG] id={location_view.id} tags=[{tags}] entry_story={entry_story} entry_seen={location_view.entry_seen}")
 
 
-def _render_location_debug_snapshot(area_service: AreaService, state: GameState) -> None:
+def _render_location_debug_snapshot(
+    area_service: AreaService,
+    quest_service: QuestService,
+    story_service: StoryService,
+    state: GameState,
+) -> None:
+    while True:
+        options = [
+            "Quest Debug",
+            "Conversation Debug",
+            "Definition Integrity Check",
+            "Back",
+        ]
+        render_menu("DEBUG Menu", options)
+        choice = _prompt_menu_index(len(options))
+        if choice == 0:
+            _render_quest_debug(quest_service, state)
+        elif choice == 1:
+            _render_conversation_debug(area_service, story_service, state)
+        elif choice == 2:
+            _render_definition_integrity(area_service, quest_service, story_service, state)
+        else:
+            return
+
+
+def _render_quest_debug(quest_service: QuestService, state: GameState) -> None:
+    debug_view = quest_service.build_debug_view(state)
+    render_heading("DEBUG: Quests")
+    print(f"Definitions loaded: {debug_view.total_definitions}")
+    active = ", ".join(debug_view.active_ids) if debug_view.active_ids else "(none)"
+    completed = ", ".join(debug_view.completed_ids) if debug_view.completed_ids else "(none)"
+    turned_in = ", ".join(debug_view.turned_in_ids) if debug_view.turned_in_ids else "(none)"
+    print(f"Active: {active}")
+    print(f"Completed: {completed}")
+    print(f"Turned in: {turned_in}")
+    print("Prereqs:")
+    for prereq in debug_view.prereqs:
+        status = "READY" if prereq.ready else "BLOCKED"
+        missing = ", ".join(prereq.missing_required) if prereq.missing_required else "none"
+        blocked = ", ".join(prereq.blocked_by) if prereq.blocked_by else "none"
+        print(f"  {prereq.quest_id} [{status}] missing={missing} blocked={blocked}")
+    journal = quest_service.build_journal_view(state)
+    if journal.turn_ins:
+        print("Turn-in targets:")
+        for entry in journal.turn_ins:
+            npc = entry.npc_id or "unknown"
+            print(f"  {entry.quest_id} -> {npc} ({entry.node_id})")
+
+
+def _render_conversation_debug(
+    area_service: AreaService, story_service: StoryService, state: GameState
+) -> None:
     debug_view = area_service.build_debug_view(state)
-    render_heading("DEBUG: Location State")
     location = debug_view.location
+    render_heading("DEBUG: Conversations")
     print(f"Current: {location.name} ({location.id})")
     print(f"Tags: {', '.join(location.tags)}")
-    print(
-        f"Entry story: {location.entry_story_node_id or 'None'} | entry_seen={location.entry_seen}"
-    )
-    if location.connections:
-        print("Connections:")
-        for conn in location.connections:
-            print(f"  -> {conn.label} ({conn.destination_id})")
+    if location.npcs_present:
+        print("NPCs present:")
+        for npc in location.npcs_present:
+            talk_ok = story_service.has_node(npc.talk_node_id)
+            quest_ok = (
+                story_service.has_node(npc.quest_hub_node_id) if npc.quest_hub_node_id else True
+            )
+            print(
+                f"  {npc.npc_id} talk={npc.talk_node_id} ok={talk_ok} "
+                f"quest_hub={npc.quest_hub_node_id or 'None'} ok={quest_ok}"
+            )
     else:
-        print("Connections: (none)")
-    visited = ", ".join(debug_view.visited_locations) if debug_view.visited_locations else "(none)"
-    print(f"Visited order: {visited}")
-    print("Entry flags:")
-    for area_id, seen in debug_view.entry_seen_flags:
-        print(f"  {area_id}: {seen}")
+        print("NPCs present: (none)")
+
+
+def _render_definition_integrity(
+    area_service: AreaService,
+    quest_service: QuestService,
+    story_service: StoryService,
+    state: GameState,
+) -> None:
+    render_heading("DEBUG: Definition Integrity")
+    print(quest_service.get_definition_summary())
+    location = area_service.get_current_location_view(state)
+    invalid_nodes: List[str] = []
+    for npc in location.npcs_present:
+        if not story_service.has_node(npc.talk_node_id):
+            invalid_nodes.append(npc.talk_node_id)
+        if npc.quest_hub_node_id and not story_service.has_node(npc.quest_hub_node_id):
+            invalid_nodes.append(npc.quest_hub_node_id)
+    if invalid_nodes:
+        print("NPC story node validation: FAILED")
+        for node_id in sorted(set(invalid_nodes)):
+            print(f"  missing node: {node_id}")
+    else:
+        print("NPC story node validation: OK")
 def _handle_save_request(state: GameState, save_service: SaveService, slot_store: SaveSlotStore) -> None:
     selection = _prompt_slot_choice(slot_store, title="Save Game")
     if selection is None:
@@ -1255,7 +1647,16 @@ def _format_skill_failure_reason(reason: str) -> str:
 def _format_battle_event_lines(events: List[BattleEvent]) -> List[str]:
     """Canonical battle event formatter. All battle event rendering must use this function."""
     lines: List[str] = []
+    loot_order: List[str] = []
+    loot_totals: dict[str, tuple[str, int]] = {}
     for event in events:
+        if isinstance(event, LootAcquiredEvent):
+            if event.item_id not in loot_totals:
+                loot_order.append(event.item_id)
+                loot_totals[event.item_id] = (event.item_name, 0)
+            name, qty = loot_totals[event.item_id]
+            loot_totals[event.item_id] = (name, qty + event.quantity)
+            continue
         if isinstance(event, BattleStartedEvent):
             lines.append(f"- Battle started against {', '.join(event.enemy_names)}.")
         elif isinstance(event, AttackResolvedEvent):
@@ -1280,12 +1681,13 @@ def _format_battle_event_lines(events: List[BattleEvent]) -> List[str]:
             lines.append(f"- {event.member_name} gains {event.amount} EXP (Level {event.new_level}).")
         elif isinstance(event, BattleLevelUpEvent):
             lines.append(f"- {event.member_name} reached Level {event.new_level}!")
-        elif isinstance(event, LootAcquiredEvent):
-            lines.append(f"- Loot: {event.item_name} x{event.quantity}")
         elif isinstance(event, BattleRewardsHeaderEvent):
             pass
         else:
             lines.append(f"- {event}")
+    for item_id in loot_order:
+        item_name, quantity = loot_totals[item_id]
+        lines.append(f"- Loot: {item_name} x{quantity}")
     return lines
 
 
@@ -1441,7 +1843,7 @@ def _format_enemy_hp_display(enemy: BattleCombatantView, *, debug_enabled: bool)
         return "DOWN"
     if not debug_enabled:
         return enemy.hp_display
-    return f"{enemy.hp_display} [{enemy.current_hp}/{enemy.max_hp}]"
+    return f"{enemy.hp_display}[{enemy.current_hp}/{enemy.max_hp}]"
 
 
 def _render_story_if_needed(

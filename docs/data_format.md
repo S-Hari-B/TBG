@@ -372,8 +372,9 @@ Party members define recruitable allies such as Emma. Fields mirror the class de
 * `name`: string
 * `description`: string
 * `tags`: list[string] — lowercase tags such as `village`, `outskirts`, `forest`, `safe`. These tags allow future encounter gating/balance rules.
-* `connections`: list of `{ "to": "<area_id>", "label": "<menu label>", "progresses_story": bool }`. `progresses_story` is optional and defaults to `false`. Connections are directional; add reciprocal entries explicitly.
+* `connections`: list of `{ "to": "<area_id>", "label": "<menu label>", "progresses_story": bool, "requires_quest_active"?: string, "hide_if_quest_completed"?: string, "hide_if_quest_turned_in"?: string, "show_if_flag_true"?: string, "hide_if_flag_true"?: string }`. `progresses_story` is optional and defaults to `false`. Connections are directional; add reciprocal entries explicitly. Optional gating fields filter travel destinations based on quest state and flags.
 * `entry_story_node_id`: optional string referencing a node in `story.json`. If present, that node auto-plays exactly once the first time the player arrives at the area.
+* `npcs_present`: optional list of `{ "npc_id": string, "talk_node_id": string, "quest_hub_node_id"?: string }`. These are used by the Town Menu for Converse and quest turn-ins.
 
 Repositories validate that:
 
@@ -382,6 +383,26 @@ Repositories validate that:
 * `entry_story_node_id` values exist in the story definitions (see below).
 
 At runtime the single `AreaService` loads these definitions, keeps `GameState.current_location_id` synchronized, and tracks `visited_locations` (ordered list) plus a `location_entry_seen` map used to guard entry hooks.
+
+---
+
+## Quests (`quests.json`)
+
+`quests.json` stores quest definitions as a JSON object with a single `quests` map. Each quest entry includes:
+
+* `quest_id`: string (must match the map key)
+* `name`: string
+* `prereqs`: optional `{ "required_flags": [string], "forbidden_flags": [string] }`
+* `objectives`: list of objective definitions:
+  * `kill_tag { "tag": string, "quantity": int, "label": string }`
+  * `collect_item { "item_id": string, "quantity": int, "label": string }`
+  * `visit_area { "area_id": string, "quantity": int, "label": string }`
+* `turn_in`: optional `{ "node_id": string, "npc_id"?: string }` (story node to route into for turn-in)
+* `rewards`: `{ "gold": int, "party_exp": int, "items": [ { "item_id": string, "quantity": int } ], "set_flags": { flag_id: bool } }`
+* `accept_flags`: optional list of legacy flags to set when the quest is accepted
+* `complete_flags`: optional list of legacy flags to set when the quest objectives are completed
+
+Repositories validate referenced item ids, area ids, and turn-in story node ids so quests remain data-driven and deterministic.
 
 ---
 
@@ -460,6 +481,7 @@ Effect types supported in v1:
 * `set_flag { "flag_id": string, "value"?: bool }` – stores/overrides boolean flags in `GameState.flags`
 * `remove_item { "item_id": string, "quantity"?: int }` – removes items from shared inventory (fails if insufficient)
 * `branch_on_flag { "flag_id": string, "expected"?: bool, "next_on_true": string, "next_on_false": string }` – conditional branch by flag state
+* `quest { "action": "accept" | "turn_in", "quest_id": string }` – delegates quest acceptance or turn-in to `QuestService`
 
 Because the repository enforces chapter order, story progression stays deterministic even as additional chapters ship later.
 
@@ -477,7 +499,7 @@ Manual saves are plain JSON written to `data/saves/slot_1.json` through `slot_3.
 * `save_version`: integer schema version (v1 = `1`). Loaders refuse mismatched versions.
 * `metadata`: presentation summary used when rendering the slot picker (player name, current node id, current location id, mode, gold, seed, ISO timestamp).
 * `rng`: deterministic RNG snapshot (`{"version": 3, "state": [...], "gauss": null}`).
-* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, checkpoint metadata, and the player object).
+* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, checkpoint metadata, quest progress, and the player object).
 
 Example (trimmed):
 
@@ -529,6 +551,16 @@ Example (trimmed):
     "story_checkpoint_node_id": "forest_ambush",
     "story_checkpoint_location_id": "village_outskirts",
     "story_checkpoint_thread_id": "main_story",
+    "quests_active": {
+      "cerel_kill_hunt": {
+        "objectives": [
+          {"current": 4, "completed": false},
+          {"current": 2, "completed": false}
+        ]
+      }
+    },
+    "quests_completed": [],
+    "quests_turned_in": [],
     "player": {
       "id": "player_x1",
       "name": "Hero",
@@ -554,6 +586,9 @@ Additional state fields:
 * `story_checkpoint_node_id`: string | null — the most recent story node that should be replayed if the player was defeated. When non-null, Camp Menu’s “Continue story” rewinds to that node instead of skipping ahead.
 * `story_checkpoint_location_id`: string | null — the area id the player must return to before replaying the checkpoint encounter. Continue auto-warps to this location when needed.
 * `story_checkpoint_thread_id`: string | null — identifier describing which checkpoint thread is active (`"main_story"` today; quests can introduce additional threads later). Thread ids keep different checkpoint categories from interfering with one another.
+* `quests_active`: map of quest id → `{ "objectives": [ { "current": int, "completed": bool } ] }`
+* `quests_completed`: list[string] — quest ids that have completed objectives
+* `quests_turned_in`: list[string] — quest ids that have been turned in for rewards
 
 ---
 

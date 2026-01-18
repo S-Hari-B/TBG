@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tbg.domain.inventory import MemberEquipment
+from tbg.domain.quest_state import QuestObjectiveProgress, QuestProgress
 from tbg.services.battle_service import BattleService
 from tbg.services.inventory_service import InventoryService
 from tbg.services.save_service import SaveService
@@ -19,10 +20,12 @@ from tbg.data.repositories import (
     KnowledgeRepository,
     LootTablesRepository,
     PartyMembersRepository,
+    QuestsRepository,
     SkillsRepository,
     StoryRepository,
     WeaponsRepository,
 )
+from tbg.services.quest_service import QuestService
 
 
 def _build_test_services() -> tuple[StoryService, BattleService, InventoryService, SaveService, AreaService, dict]:
@@ -36,6 +39,19 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         armour_repo=armour_repo,
         party_members_repo=party_repo,
     )
+    items_repo = ItemsRepository()
+    areas_repo = AreasRepository()
+    quests_repo = QuestsRepository(
+        items_repo=items_repo,
+        areas_repo=areas_repo,
+        story_repo=story_repo,
+    )
+    quest_service = QuestService(
+        quests_repo=quests_repo,
+        items_repo=items_repo,
+        areas_repo=areas_repo,
+        party_members_repo=party_repo,
+    )
     story_service = StoryService(
         story_repo=story_repo,
         classes_repo=classes_repo,
@@ -43,11 +59,11 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         armour_repo=armour_repo,
         party_members_repo=party_repo,
         inventory_service=inventory_service,
+        quest_service=quest_service,
     )
     enemies_repo = EnemiesRepository()
     knowledge_repo = KnowledgeRepository()
     skills_repo = SkillsRepository()
-    items_repo = ItemsRepository()
     loot_repo = LootTablesRepository()
     battle_service = BattleService(
         enemies_repo=enemies_repo,
@@ -59,8 +75,7 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         items_repo=items_repo,
         loot_tables_repo=loot_repo,
     )
-    areas_repo = AreasRepository()
-    area_service = AreaService(areas_repo=areas_repo)
+    area_service = AreaService(areas_repo=areas_repo, quest_service=quest_service)
     save_service = SaveService(
         story_repo=story_repo,
         classes_repo=classes_repo,
@@ -69,6 +84,7 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         items_repo=items_repo,
         party_members_repo=party_repo,
         areas_repo=areas_repo,
+        quests_repo=quests_repo,
     )
     repos = {
         "weapons": weapons_repo,
@@ -117,6 +133,14 @@ def test_save_round_trip_preserves_state() -> None:
     state.story_checkpoint_node_id = "battle_trial_1v1"
     state.story_checkpoint_location_id = "threshold_inn"
     state.story_checkpoint_thread_id = "main_story"
+    state.quests_active["cerel_kill_hunt"] = QuestProgress(
+        quest_id="cerel_kill_hunt",
+        objectives=[
+            QuestObjectiveProgress(current=4, completed=False),
+            QuestObjectiveProgress(current=2, completed=False),
+        ],
+    )
+    state.quests_completed.append("cerel_kill_hunt")
 
     payload = save_service.serialize(state)
     restored = save_service.deserialize(payload)
@@ -138,6 +162,8 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.story_checkpoint_node_id == state.story_checkpoint_node_id
     assert restored.story_checkpoint_location_id == state.story_checkpoint_location_id
     assert restored.story_checkpoint_thread_id == state.story_checkpoint_thread_id
+    assert "cerel_kill_hunt" in restored.quests_active
+    assert restored.quests_completed == state.quests_completed
 
 
 def test_rng_determinism_survives_save_round_trip() -> None:
@@ -235,4 +261,27 @@ def test_checkpoint_blocks_story_progress_travel_after_load() -> None:
     restored.story_checkpoint_location_id = None
     restored.story_checkpoint_thread_id = None
     area_service.travel_to(restored, "floor_one_gate")
+
+
+def test_missing_quest_fields_default_empty() -> None:
+    (
+        story_service,
+        _battle_service,
+        _inventory_service,
+        save_service,
+        area_service,
+        _repos,
+    ) = _build_test_services()
+    state = story_service.start_new_game(seed=2024, player_name="Tester")
+    area_service.initialize_state(state)
+    payload = save_service.serialize(state)
+    payload_state = payload.get("state", {})
+    if isinstance(payload_state, dict):
+        payload_state.pop("quests_active", None)
+        payload_state.pop("quests_completed", None)
+        payload_state.pop("quests_turned_in", None)
+    restored = save_service.deserialize(payload)
+    assert restored.quests_active == {}
+    assert restored.quests_completed == []
+    assert restored.quests_turned_in == []
 

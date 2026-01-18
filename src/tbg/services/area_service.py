@@ -8,6 +8,7 @@ from tbg.data.repositories import AreasRepository
 from tbg.domain.defs import AreaDef
 from tbg.domain.state import GameState
 from tbg.services.errors import TravelBlockedError
+from tbg.services.quest_service import QuestService
 
 DEFAULT_STARTING_AREA_ID = "threshold_inn"
 TRAVEL_BLOCKED_MESSAGE = "You can't push onward yet. Something unresolved still blocks your path."
@@ -33,6 +34,7 @@ class LocationView:
     connections: Tuple[TravelOptionView, ...]
     entry_story_node_id: str | None
     entry_seen: bool
+    npcs_present: Tuple["NpcPresenceView", ...]
 
 
 @dataclass(slots=True)
@@ -75,11 +77,19 @@ class TravelResult:
     entry_story_node_id: str | None
 
 
+@dataclass(slots=True)
+class NpcPresenceView:
+    npc_id: str
+    talk_node_id: str
+    quest_hub_node_id: str | None
+
+
 class AreaService:
     """Coordinates travel between areas and related state."""
 
-    def __init__(self, areas_repo: AreasRepository) -> None:
+    def __init__(self, areas_repo: AreasRepository, *, quest_service: QuestService | None = None) -> None:
         self._areas_repo = areas_repo
+        self._quest_service = quest_service
 
     def initialize_state(self, state: GameState, starting_location_id: str | None = None) -> None:
         """Ensure the game state has a valid current location."""
@@ -118,6 +128,8 @@ class AreaService:
         connection = connection_lookup.get(destination_id)
         if connection is None:
             raise ValueError(f"Destination '{destination_id}' is not reachable from '{current_id}'.")
+        if not self._connection_is_visible(connection, state):
+            raise ValueError(f"Destination '{destination_id}' is not available from '{current_id}'.")
         checkpoint_thread = state.story_checkpoint_thread_id or "main_story"
         checkpoint_active = bool(state.story_checkpoint_node_id and checkpoint_thread == "main_story")
         if checkpoint_active and connection.progresses_story:
@@ -148,11 +160,14 @@ class AreaService:
             ),
             LocationEnteredEvent(location=location_view),
         ]
-        return TravelResult(
+        result = TravelResult(
             events=events,
             location_view=location_view,
             entry_story_node_id=entry_story_node_id,
         )
+        if self._quest_service:
+            self._quest_service.record_area_visit(state, destination_def.id)
+        return result
 
     def force_set_location(self, state: GameState, location_id: str) -> None:
         """Teleport the party without triggering story hooks or travel events."""
@@ -179,10 +194,38 @@ class AreaService:
                     progresses_story=conn.progresses_story,
                 )
                 for conn in area_def.connections
+                if self._connection_is_visible(conn, state)
             ),
             entry_story_node_id=area_def.entry_story_node_id,
             entry_seen=state.location_entry_seen.get(
                 area_def.id, area_def.entry_story_node_id is None
             ),
+            npcs_present=tuple(
+                NpcPresenceView(
+                    npc_id=npc.npc_id,
+                    talk_node_id=npc.talk_node_id,
+                    quest_hub_node_id=npc.quest_hub_node_id,
+                )
+                for npc in area_def.npcs_present
+            ),
         )
+
+    @staticmethod
+    def _connection_is_visible(connection: AreaConnectionDef, state: GameState) -> bool:
+        if connection.show_if_flag_true:
+            if not state.flags.get(connection.show_if_flag_true, False):
+                return False
+        if connection.hide_if_flag_true:
+            if state.flags.get(connection.hide_if_flag_true, False):
+                return False
+        if connection.requires_quest_active:
+            if connection.requires_quest_active not in state.quests_active:
+                return False
+        if connection.hide_if_quest_completed:
+            if connection.hide_if_quest_completed in state.quests_completed:
+                return False
+        if connection.hide_if_quest_turned_in:
+            if connection.hide_if_quest_turned_in in state.quests_turned_in:
+                return False
+        return True
 

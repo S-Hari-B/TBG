@@ -5,8 +5,19 @@
       "name": "Threshold Inn",
       "description": "A sturdy waypoint for arrivals. Warm light, worn tables, and the hum of cautious conversation.",
       "tags": ["safe", "town", "floor_zero", "hub"],
+      "npcs_present": [
+        { "npc_id": "dana", "talk_node_id": "threshold_inn_hub_router", "quest_hub_node_id": "dana_turn_in_check" }
+      ],
       "connections": [
-        { "to": "shoreline_ruins", "label": "Side Quest: Dana's rumor (Shoreline Ruins)", "progresses_story": false },
+        {
+          "to": "shoreline_ruins",
+          "label": "Side Quest: Dana's rumor (Shoreline Ruins)",
+          "progresses_story": false,
+          "requires_quest_active": "dana_shoreline_rumor",
+          "hide_if_quest_completed": "dana_shoreline_rumor",
+          "hide_if_quest_turned_in": "dana_shoreline_rumor",
+          "hide_if_flag_true": "flag_protoquest_declined"
+        },
         { "to": "floor_one_gate", "label": "Proceed to Floor One", "progresses_story": true }
       ],
       "entry_story_node_id": null
@@ -59,6 +70,9 @@
       "name": "Goblin Cave Entrance",
       "description": "A shallow cave mouth with crude totems and smoke-stained rock. The goblin camp lies inside.",
       "tags": ["cave", "floor_one", "hub"],
+      "npcs_present": [
+        { "npc_id": "cerel", "talk_node_id": "cave_entrance_router", "quest_hub_node_id": "cerel_turn_in_check" }
+      ],
       "connections": [
         { "to": "open_plains", "label": "Return to the Open Plains" },
         { "to": "goblin_camp", "label": "Enter the goblin camp", "progresses_story": false },

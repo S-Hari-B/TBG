@@ -16,6 +16,7 @@ from tbg.domain.defs import StoryEffectDef, StoryNodeDef
 from tbg.domain.state import GameState
 from tbg.services.factories import create_player_from_class_id
 from tbg.services.inventory_service import InventoryService
+from tbg.services.quest_service import QuestService, QuestUpdate
 
 
 @dataclass(slots=True)
@@ -77,6 +78,24 @@ class PartyLevelUpEvent(StoryEvent):
 
 
 @dataclass(slots=True)
+class QuestAcceptedEvent(StoryEvent):
+    quest_id: str
+    quest_name: str
+
+
+@dataclass(slots=True)
+class QuestCompletedEvent(StoryEvent):
+    quest_id: str
+    quest_name: str
+
+
+@dataclass(slots=True)
+class QuestTurnedInEvent(StoryEvent):
+    quest_id: str
+    quest_name: str
+
+
+@dataclass(slots=True)
 class GameMenuEnteredEvent(StoryEvent):
     message: str
 
@@ -101,6 +120,7 @@ class StoryService:
         party_members_repo: PartyMembersRepository,
         *,
         inventory_service: InventoryService | None = None,
+        quest_service: QuestService | None = None,
         default_player_name: str = "Hero",
     ) -> None:
         self._story_repo = story_repo
@@ -113,6 +133,7 @@ class StoryService:
             armour_repo=self._armour_repo,
             party_members_repo=self._party_members_repo,
         )
+        self._quest_service = quest_service
         self._default_player_name = default_player_name
 
     def start_new_game(self, seed: int, player_name: str | None = None) -> GameState:
@@ -210,6 +231,14 @@ class StoryService:
         self._enter_node(state, node_id, events)
         return events
 
+    def has_node(self, node_id: str) -> bool:
+        """Return True if the node exists in the story repository."""
+        try:
+            self._story_repo.get(node_id)
+        except KeyError:
+            return False
+        return True
+
     def _apply_effects(self, effects: Sequence[StoryEffectDef], state: GameState) -> tuple[List[StoryEvent], bool]:
         emitted: List[StoryEvent] = []
         halt_flow = False
@@ -279,6 +308,8 @@ class StoryService:
                     continue
                 if not state.inventory.remove_item(item_id, quantity):
                     raise ValueError(f"remove_item could not remove {quantity} of '{item_id}'.")
+                if self._quest_service:
+                    self._quest_service.refresh_collect_objectives(state)
             elif effect_type == "branch_on_flag":
                 flag_id = self._require_str(effect.data.get("flag_id"), "branch_on_flag.flag_id")
                 expected = effect.data.get("expected", True)
@@ -289,10 +320,49 @@ class StoryService:
                 flag_value = state.flags.get(flag_id, False)
                 state.pending_story_node_id = next_on_true if flag_value == expected else next_on_false
                 halt_flow = True
+            elif effect_type == "quest":
+                if not self._quest_service:
+                    raise ValueError("quest effect requires QuestService.")
+                action = self._require_str(effect.data.get("action"), "quest.action")
+                quest_id = self._require_str(effect.data.get("quest_id"), "quest.quest_id")
+                updates = self._apply_quest_action(action, quest_id, state)
+                emitted.extend(self._quest_updates_to_events(updates))
             else:
                 # Unknown effects are ignored for now to keep the interpreter forward compatible.
                 continue
         return emitted, halt_flow
+
+    def _apply_quest_action(self, action: str, quest_id: str, state: GameState) -> List[QuestUpdate]:
+        updates: List[QuestUpdate] = []
+        if action == "accept":
+            result = self._quest_service.accept_quest(state, quest_id)
+            if result:
+                updates.append(result)
+        elif action == "turn_in":
+            result = self._quest_service.turn_in_quest(state, quest_id)
+            if result:
+                updates.append(result)
+        else:
+            raise ValueError("quest.action must be 'accept' or 'turn_in'.")
+        return updates
+
+    @staticmethod
+    def _quest_updates_to_events(updates: Sequence[QuestUpdate]) -> List[StoryEvent]:
+        events: List[StoryEvent] = []
+        for update in updates:
+            if update.accepted:
+                events.append(
+                    QuestAcceptedEvent(quest_id=update.quest_id, quest_name=update.quest_name)
+                )
+            if update.completed:
+                events.append(
+                    QuestCompletedEvent(quest_id=update.quest_id, quest_name=update.quest_name)
+                )
+            if update.turned_in:
+                events.append(
+                    QuestTurnedInEvent(quest_id=update.quest_id, quest_name=update.quest_name)
+                )
+        return events
 
     def _grant_party_exp(self, state: GameState, amount: int) -> List[StoryEvent]:
         if amount <= 0:

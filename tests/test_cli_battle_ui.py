@@ -197,18 +197,45 @@ def _build_panel_view() -> Tuple[BattleView, BattleState]:
     enemy_a_stats = Stats(max_hp=15, hp=15, max_mp=0, mp=0, attack=2, defense=1, speed=4)
     enemy_b_stats = Stats(max_hp=15, hp=0, max_mp=0, mp=0, attack=2, defense=1, speed=4)
 
+    enemy_one = Combatant(
+        instance_id="enemy_1",
+        display_name="Goblin Grunt (1)",
+        side="enemies",
+        stats=enemy_a_stats,
+    )
+    enemy_two = Combatant(
+        instance_id="enemy_2",
+        display_name="Goblin Grunt (2)",
+        side="enemies",
+        stats=enemy_b_stats,
+    )
     battle_state = BattleState(
         battle_id="panel",
         allies=[
             Combatant(instance_id="hero", display_name="Hero", side="allies", stats=hero_stats),
             Combatant(instance_id="ally_emma", display_name="Emma", side="allies", stats=ally_stats),
         ],
-        enemies=[
-            Combatant(instance_id="enemy_1", display_name="Goblin Grunt (1)", side="enemies", stats=enemy_a_stats),
-            Combatant(instance_id="enemy_2", display_name="Goblin Grunt (2)", side="enemies", stats=enemy_b_stats),
-        ],
+        enemies=[enemy_one, enemy_two],
         current_actor_id="hero",
         player_id="hero",
+    )
+    enemy_view_one = BattleCombatantView(
+        instance_id="enemy_1",
+        name="Goblin Grunt (1)",
+        hp_display="???",
+        side="enemies",
+        is_alive=True,
+        current_hp=15,
+        max_hp=15,
+    )
+    enemy_view_two = BattleCombatantView(
+        instance_id="enemy_2",
+        name="Goblin Grunt (2)",
+        hp_display="???",
+        side="enemies",
+        is_alive=False,
+        current_hp=0,
+        max_hp=15,
     )
     view = BattleView(
         battle_id="panel",
@@ -232,33 +259,29 @@ def _build_panel_view() -> Tuple[BattleView, BattleState]:
                 max_hp=26,
             ),
         ],
-        enemies=[
-            BattleCombatantView(
-                instance_id="enemy_1",
-                name="Goblin Grunt (1)",
-                hp_display="???",
-                side="enemies",
-                is_alive=True,
-                current_hp=15,
-                max_hp=15,
-            ),
-            BattleCombatantView(
-                instance_id="enemy_2",
-                name="Goblin Grunt (2)",
-                hp_display="???",
-                side="enemies",
-                is_alive=False,
-                current_hp=0,
-                max_hp=15,
-            ),
-        ],
+        enemies=[enemy_view_one, enemy_view_two],
         current_actor_id="hero",
     )
     return view, battle_state
 
 
-def test_enemy_numbering_and_down_status(capsys) -> None:
+def test_enemy_numbering_and_down_status(monkeypatch, capsys) -> None:
     view, battle_state = _build_panel_view()
+    monkeypatch.setenv("TBG_DEBUG", "0")
+    assert view.enemies[0] is not view.enemies[1]
+    assert battle_state.enemies[0] is not battle_state.enemies[1]
+    app._render_battle_state_panel(view, battle_state, active_id="hero")
+    out = capsys.readouterr().out
+    assert "Goblin Grunt (1)" in out
+    assert "Goblin Grunt (2)" in out
+    assert "DOWN" in out
+
+
+def test_enemy_numbering_and_down_status_debug(monkeypatch, capsys) -> None:
+    view, battle_state = _build_panel_view()
+    monkeypatch.setenv("TBG_DEBUG", "1")
+    assert view.enemies[0] is not view.enemies[1]
+    assert battle_state.enemies[0] is not battle_state.enemies[1]
     app._render_battle_state_panel(view, battle_state, active_id="hero")
     out = capsys.readouterr().out
     assert "Goblin Grunt (1)" in out
@@ -312,3 +335,15 @@ def test_state_panel_lines_match_frame_width(capsys) -> None:
     expected_width = app._BATTLE_UI_WIDTH
     assert all(len(line) == expected_width for line in block)
     assert all(line.endswith(("+", "|")) for line in block)
+
+
+def test_loot_lines_aggregate() -> None:
+    from tbg.services.battle_service import LootAcquiredEvent
+    from tbg.presentation.cli.app import _format_battle_event_lines
+
+    events = [
+        LootAcquiredEvent(item_id="goblin_horn", item_name="Goblin Horn", quantity=1),
+        LootAcquiredEvent(item_id="goblin_horn", item_name="Goblin Horn", quantity=2),
+    ]
+    lines = _format_battle_event_lines(events)
+    assert lines == ["- Loot: Goblin Horn x3"]

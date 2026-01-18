@@ -11,6 +11,9 @@ from .story_service import (
     PartyLevelUpEvent,
     PartyMemberJoinedEvent,
     PlayerClassSetEvent,
+    QuestAcceptedEvent,
+    QuestCompletedEvent,
+    QuestTurnedInEvent,
     StoryNodeView,
     StoryService,
 )
@@ -22,6 +25,7 @@ from .area_service import (
     TravelResult,
 )
 from .battle_service import BattleService
+from .quest_service import QuestService
 from .save_service import SaveService
 from .controllers import BattleController, BattleAction, BattleActionType
 
@@ -38,6 +42,9 @@ __all__ = [
     "PartyLevelUpEvent",
     "PartyMemberJoinedEvent",
     "PlayerClassSetEvent",
+    "QuestAcceptedEvent",
+    "QuestCompletedEvent",
+    "QuestTurnedInEvent",
     "StoryNodeView",
     "StoryService",
     "AreaService",
@@ -46,6 +53,7 @@ __all__ = [
     "TravelPerformedEvent",
     "TravelResult",
     "BattleService",
+    "QuestService",
     "SaveService",
     "BattleController",
     "BattleAction",

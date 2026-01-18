@@ -8,6 +8,7 @@ from tbg.core.rng import RNG
 from tbg.core.types import GameMode
 from tbg.domain.entities import Player
 from tbg.domain.inventory import MemberEquipment, PartyInventory
+from tbg.domain.quest_state import QuestProgress
 
 
 @dataclass
@@ -37,5 +38,8 @@ class GameState:
     current_location_id: str = ""
     visited_locations: List[str] = field(default_factory=list)
     location_entry_seen: Dict[str, bool] = field(default_factory=dict)
+    quests_active: Dict[str, QuestProgress] = field(default_factory=dict)
+    quests_completed: List[str] = field(default_factory=list)
+    quests_turned_in: List[str] = field(default_factory=list)
 
 

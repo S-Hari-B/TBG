@@ -200,7 +200,7 @@
   "protoquest_accept": {
     "text": "\"Alright,\" you say. \"Let's check it out.\"\n\nDana nods. \"Smart. I'll mark it on your map. Don't take too long—ruins attract scavengers.\"",
     "effects": [
-      { "type": "set_flag", "flag_id": "flag_protoquest_accepted", "value": true },
+      { "type": "quest", "action": "accept", "quest_id": "dana_shoreline_rumor" },
       {
         "type": "enter_game_menu",
         "message": "The shoreline ruins are now accessible via Travel. Return to Floor One gate when ready."
@@ -209,8 +209,9 @@
     "next": "floor1_open_handoff"
   },
   "protoquest_decline": {
-    "text": "\"We'll pass,\" you say. \"Let's keep moving.\"\n\nDana shrugs. \"Your call. Floor One's waiting.\"\n\nYour companion nods. \"Fair. Let's go.\"",
+    "text": "\"We'll pass,\" you say. \"Let's keep moving.\"\n\nDana shrugs. \"Your call. Floor One's waiting.\"\n\n\"Fair. Let's go.\"",
     "effects": [
+      { "type": "set_flag", "flag_id": "flag_protoquest_declined", "value": true },
       {
         "type": "enter_game_menu",
         "message": "Floor One gate is now accessible via Travel. Explore at your own pace."
@@ -227,7 +228,7 @@
         "message": "Floor One is unlocked. Use Travel to reach the gate when you're ready."
       }
     ],
-    "next": "threshold_inn_hub"
+    "next": "threshold_inn_hub_router"
   },
   "protoquest_ruins_entry": {
     "text": "The shoreline ruins are half-buried in sand, their stones worn by salt and time. Your companion scans the area.\n\n\"Quiet. Too quiet. Stay sharp.\"\n\nA shape moves in the shadows—another goblin scavenger, larger than the trial ones.",
@@ -241,9 +242,8 @@
     "next": "protoquest_complete"
   },
   "protoquest_complete": {
-    "text": "The scavenger falls. Behind it, a weathered chest. Inside: a small potion and a handful of gold.\n\nYou pocket the loot. \"Not bad. Let's head back.\"\n\nDana will be pleased.",
+    "text": "The scavenger falls. Behind it, a weathered chest. Inside: a small potion and a handful of gold.\n\nYou pocket the loot. \"Not bad. Let's head back.\"\n\nIf you want to report in, Dana is waiting at the inn.",
     "effects": [
-      { "type": "set_flag", "flag_id": "flag_protoquest_ready", "value": true },
       {
         "type": "enter_game_menu",
         "message": "Objective complete. Return to Dana at the Threshold Inn for your reward."
@@ -251,7 +251,102 @@
     ],
     "next": "floor1_open_handoff"
   },
-  "threshold_inn_hub": {
+  "threshold_inn_hub_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_protoquest_ready",
+        "expected": true,
+        "next_on_true": "threshold_inn_hub_rumor_ready_router",
+        "next_on_false": "threshold_inn_hub_wolf_router"
+      }
+    ]
+  },
+  "threshold_inn_hub_wolf_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_dana_accepted",
+        "expected": true,
+        "next_on_true": "threshold_inn_hub_wolf_ready",
+        "next_on_false": "threshold_inn_hub_basic"
+      }
+    ]
+  },
+  "threshold_inn_hub_rumor_ready_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_dana_accepted",
+        "expected": true,
+        "next_on_true": "threshold_inn_hub_both_ready",
+        "next_on_false": "threshold_inn_hub_rumor_ready"
+      }
+    ]
+  },
+  "threshold_inn_hub_basic": {
+    "text": "The Threshold Inn hums behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows outside.\n\nYou can ask around for work or step through when you're ready.",
+    "choices": [
+      {
+        "label": "Ask Dana about work",
+        "next": "dana_sidequest_offer"
+      },
+      {
+        "label": "Step through the Floor One gate",
+        "next": "floor1_gate_prompt"
+      },
+      {
+        "label": "Return to camp menu",
+        "next": "threshold_inn_return"
+      }
+    ]
+  },
+  "threshold_inn_hub_wolf_ready": {
+    "text": "The Threshold Inn hums behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows outside.\n\nYou can ask around for work or step through when you're ready.",
+    "choices": [
+      {
+        "label": "Ask Dana about work",
+        "next": "dana_sidequest_offer"
+      },
+      {
+        "label": "Return to Dana (wolf teeth turn-in)",
+        "next": "dana_turn_in_check"
+      },
+      {
+        "label": "Step through the Floor One gate",
+        "next": "floor1_gate_prompt"
+      },
+      {
+        "label": "Return to camp menu",
+        "next": "threshold_inn_return"
+      }
+    ]
+  },
+  "threshold_inn_hub_rumor_ready": {
+    "text": "The Threshold Inn hums behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows outside.\n\nYou can ask around for work or step through when you're ready.",
+    "choices": [
+      {
+        "label": "Ask Dana about work",
+        "next": "dana_sidequest_offer"
+      },
+      {
+        "label": "Turn in: Dana's rumor reward",
+        "next": "dana_protoquest_turn_in_check"
+      },
+      {
+        "label": "Step through the Floor One gate",
+        "next": "floor1_gate_prompt"
+      },
+      {
+        "label": "Return to town menu",
+        "next": "threshold_inn_return"
+      }
+    ]
+  },
+  "threshold_inn_hub_both_ready": {
     "text": "The Threshold Inn hums behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows outside.\n\nYou can ask around for work or step through when you're ready.",
     "choices": [
       {
@@ -304,13 +399,13 @@
   "dana_sidequest_accept": {
     "text": "Dana nods. \"Good. Wolves roam the Open Plains and the off-road trails. Bring me three teeth and I'll pay you on the spot.\"",
     "effects": [
-      { "type": "set_flag", "flag_id": "flag_sq_dana_accepted", "value": true }
+      { "type": "quest", "action": "accept", "quest_id": "dana_wolf_teeth" }
     ],
-    "next": "threshold_inn_hub"
+    "next": "threshold_inn_hub_router"
   },
   "dana_sidequest_decline": {
     "text": "Dana shrugs. \"No pressure. If you change your mind, ask me again.\"",
-    "next": "threshold_inn_hub"
+    "next": "threshold_inn_hub_router"
   },
   "dana_turn_in_check": {
     "text": "Dana looks up as you approach. \"Back already?\"",
@@ -339,21 +434,17 @@
   "dana_turn_in_success": {
     "text": "Dana inspects the wolf teeth and nods. \"Clean work. Here's your cut.\"",
     "effects": [
-      { "type": "remove_item", "item_id": "wolf_tooth", "quantity": 3 },
-      { "type": "give_gold", "amount": 18 },
-      { "type": "give_party_exp", "amount": 6 },
-      { "type": "set_flag", "flag_id": "flag_sq_dana_completed", "value": true },
-      { "type": "set_flag", "flag_id": "flag_sq_dana_ready", "value": false }
+      { "type": "quest", "action": "turn_in", "quest_id": "dana_wolf_teeth" }
     ],
-    "next": "threshold_inn_hub"
+    "next": "threshold_inn_hub_router"
   },
   "dana_turn_in_not_ready": {
     "text": "Dana shakes her head. \"Still short. Bring me three wolf teeth and we'll talk.\"",
-    "next": "threshold_inn_hub"
+    "next": "threshold_inn_hub_router"
   },
   "dana_turn_in_completed": {
     "text": "Dana nods at you. \"You've already been paid. Stay sharp out there.\"",
-    "next": "threshold_inn_hub"
+    "next": "threshold_inn_hub_router"
   },
   "dana_protoquest_turn_in_check": {
     "text": "Dana looks up. \"Back from the ruins?\"",
@@ -382,19 +473,17 @@
   "dana_protoquest_turn_in_success": {
     "text": "Dana inspects what you recovered and nods. \"Good work. Here's your cut.\"",
     "effects": [
-      { "type": "give_gold", "amount": 10 },
-      { "type": "set_flag", "flag_id": "flag_protoquest_completed", "value": true },
-      { "type": "set_flag", "flag_id": "flag_protoquest_ready", "value": false }
+      { "type": "quest", "action": "turn_in", "quest_id": "dana_shoreline_rumor" }
     ],
-    "next": "threshold_inn_hub"
+    "next": "threshold_inn_hub_router"
   },
   "dana_protoquest_turn_in_not_ready": {
     "text": "Dana shakes her head. \"Not yet. Clear the ruins and come back.\"",
-    "next": "threshold_inn_hub"
+    "next": "threshold_inn_hub_router"
   },
   "dana_protoquest_turn_in_done": {
     "text": "Dana nods. \"You've already been paid for that one.\"",
-    "next": "threshold_inn_hub"
+    "next": "threshold_inn_hub_router"
   },
   "floor1_gate_prompt": {
     "text": "You step outside. The Floor One gate shimmers, waiting.",
@@ -474,9 +563,34 @@
     "effects": [
       { "type": "set_flag", "flag_id": "flag_story_goblin_cave_reached", "value": true }
     ],
-    "next": "cave_entrance_choice"
+    "next": "cave_entrance_router"
   },
-  "cave_entrance_choice": {
+  "cave_entrance_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_accepted",
+        "expected": true,
+        "next_on_true": "cave_entrance_turn_in",
+        "next_on_false": "cave_entrance_basic"
+      }
+    ]
+  },
+  "cave_entrance_basic": {
+    "text": "Cerel eyes the path ahead. \"The camp inside is open hunting. The deeper tunnels are harder and more dangerous. Choose your pace.\"\n\nHe gestures toward the cave mouth. \"If you want extra work, ask.\"",
+    "choices": [
+      {
+        "label": "Speak with Cerel about work",
+        "next": "cerel_kill_quest_offer"
+      },
+      {
+        "label": "Step back and prepare",
+        "next": "cave_entrance_exit"
+      }
+    ]
+  },
+  "cave_entrance_turn_in": {
     "text": "Cerel eyes the path ahead. \"The camp inside is open hunting. The deeper tunnels are harder and more dangerous. Choose your pace.\"\n\nHe gestures toward the cave mouth. \"If you want extra work, ask.\"",
     "choices": [
       {
@@ -512,7 +626,7 @@
   "cerel_kill_quest_accept": {
     "text": "Cerel nods. \"Good. The goblin camp is just inside, and half-orcs are roaming the deeper tunnels. Keep count.\"",
     "effects": [
-      { "type": "set_flag", "flag_id": "flag_sq_cerel_accepted", "value": true }
+      { "type": "quest", "action": "accept", "quest_id": "cerel_kill_hunt" }
     ],
     "next": "cave_entrance_exit"
   },
@@ -547,10 +661,7 @@
   "cerel_turn_in_success": {
     "text": "Cerel nods, tallying your report. \"Good. The cave will be quieter now. Take this.\"\n\n\"Stay sharp in the deeper tunnels.\"",
     "effects": [
-      { "type": "give_gold", "amount": 30 },
-      { "type": "give_party_exp", "amount": 10 },
-      { "type": "set_flag", "flag_id": "flag_sq_cerel_completed", "value": true },
-      { "type": "set_flag", "flag_id": "flag_sq_cerel_ready", "value": false }
+      { "type": "quest", "action": "turn_in", "quest_id": "cerel_kill_hunt" }
     ],
     "next": "cave_entrance_exit"
   },

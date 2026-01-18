@@ -23,7 +23,7 @@ Layers:
 * Owns GameState (overall runtime state)
 * Returns structured results and events for presentation to render
 * Implements persistence orchestration (`SaveService`) to serialize/deserialize `GameState` + RNG snapshots, validate ids against current definitions, and guard against schema/version drift
-* Maintains auxiliary services such as `AreaService`, which drives location state, travel events, and one-shot entry story hooks while keeping the CLI ignorant of map topology
+* Maintains auxiliary services such as `AreaService` (location state, travel events, entry-story hooks) and `QuestService` (quest acceptance/progress/turn-in) so the CLI stays declarative and story remains data-driven
 * **Controllers**: UI-agnostic orchestration layer (e.g., `BattleController`) that wraps services and exposes structured state + actions. Controllers do NOT print, format, or prompt—they only progress state and return events. See `battle_controller.md` for details.
 
 ## domain (game rules)

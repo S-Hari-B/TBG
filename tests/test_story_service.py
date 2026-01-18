@@ -2,12 +2,14 @@ import pytest
 
 from tbg.data.repositories import (
     ArmourRepository,
+    AreasRepository,
     ClassesRepository,
     EnemiesRepository,
     ItemsRepository,
     KnowledgeRepository,
     LootTablesRepository,
     PartyMembersRepository,
+    QuestsRepository,
     SkillsRepository,
     StoryRepository,
     WeaponsRepository,
@@ -21,6 +23,7 @@ from tbg.services.story_service import (
 )
 from tbg.services.battle_service import BattleService
 from tbg.services.inventory_service import InventoryService
+from tbg.services.quest_service import QuestService
 
 
 def _make_story_service() -> StoryService:
@@ -32,13 +35,28 @@ def _make_story_service() -> StoryService:
         armour_repo=armour_repo,
         party_members_repo=party_repo,
     )
+    items_repo = ItemsRepository()
+    areas_repo = AreasRepository()
+    story_repo = StoryRepository()
+    quests_repo = QuestsRepository(
+        items_repo=items_repo,
+        areas_repo=areas_repo,
+        story_repo=story_repo,
+    )
+    quest_service = QuestService(
+        quests_repo=quests_repo,
+        items_repo=items_repo,
+        areas_repo=areas_repo,
+        party_members_repo=party_repo,
+    )
     return StoryService(
-        story_repo=StoryRepository(),
+        story_repo=story_repo,
         classes_repo=ClassesRepository(weapons_repo=weapons_repo, armour_repo=armour_repo),
         weapons_repo=weapons_repo,
         armour_repo=armour_repo,
         party_members_repo=party_repo,
         inventory_service=inventory_service,
+        quest_service=quest_service,
     )
 
 
@@ -343,13 +361,92 @@ def test_side_quest_offer_does_not_block_main_story() -> None:
     state = service.start_new_game(seed=888, player_name="Hero")
 
     # Jump to the Threshold Inn hub (post-Floor One unlock).
-    service.play_node(state, "threshold_inn_hub")
+    service.play_node(state, "threshold_inn_hub_router")
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
 
     # Ask Dana about work, then accept.
     service.choose(state, 0)  # Dana offer
     service.choose(state, 0)  # Accept quest
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
 
     # Still able to proceed to the gate prompt.
-    result = service.choose(state, 3)
+    result = service.choose(state, 2)
     assert result.node_view.node_id == "floor1_gate_prompt"
+
+
+def _resolve_hub_variant(service: StoryService, state) -> list[str]:
+    service.play_node(state, "threshold_inn_hub_router")
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
+    return service.get_current_node_view(state).choices
+
+
+def test_threshold_inn_hub_gating_no_flags() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=501, player_name="Hero")
+    choices = _resolve_hub_variant(service, state)
+    assert "Return to Dana (wolf teeth turn-in)" not in choices
+    assert "Turn in: Dana's rumor reward" not in choices
+
+
+def test_threshold_inn_hub_gating_rumor_ready_only() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=502, player_name="Hero")
+    state.flags["flag_protoquest_ready"] = True
+    choices = _resolve_hub_variant(service, state)
+    assert "Turn in: Dana's rumor reward" in choices
+    assert "Return to Dana (wolf teeth turn-in)" not in choices
+
+
+def test_threshold_inn_hub_gating_wolf_ready_only() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=503, player_name="Hero")
+    state.flags["flag_sq_dana_accepted"] = True
+    choices = _resolve_hub_variant(service, state)
+    assert "Return to Dana (wolf teeth turn-in)" in choices
+    assert "Turn in: Dana's rumor reward" not in choices
+
+
+def test_threshold_inn_hub_gating_both_ready() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=504, player_name="Hero")
+    state.flags["flag_protoquest_ready"] = True
+    state.flags["flag_sq_dana_accepted"] = True
+    choices = _resolve_hub_variant(service, state)
+    assert "Return to Dana (wolf teeth turn-in)" in choices
+    assert "Turn in: Dana's rumor reward" in choices
+
+
+def test_threshold_inn_router_text_prints_once() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=505, player_name="Hero")
+    state.flags["flag_protoquest_ready"] = True
+    state.flags["flag_sq_dana_accepted"] = True
+    service.play_node(state, "threshold_inn_hub_router")
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
+    segments = [text for _, text in service.get_current_node_view(state).segments]
+    text_lines = [segment for segment in segments if segment.strip()]
+    matches = [segment for segment in text_lines if "Threshold Inn hums behind you" in segment]
+    assert len(matches) == 1
+
+
+def test_cave_entrance_turn_in_choice_gating() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=506, player_name="Hero")
+
+    service.play_node(state, "cave_entrance_router")
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
+    choices = service.get_current_node_view(state).choices
+    assert "Return to Cerel (kill-count turn-in)" not in choices
+
+    state.flags["flag_sq_cerel_accepted"] = True
+    service.play_node(state, "cave_entrance_router")
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
+    choices = service.get_current_node_view(state).choices
+    assert "Return to Cerel (kill-count turn-in)" in choices
 

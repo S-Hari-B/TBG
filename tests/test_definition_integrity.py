@@ -28,6 +28,7 @@ def definitions_dir() -> Path:
         "skills.json",
         "loot_tables.json",
         "areas.json",
+        "quests.json",
     ],
 )
 def test_definition_files_are_valid_json(definitions_dir: Path, filename: str) -> None:
@@ -52,7 +53,9 @@ def test_definition_integrity_and_references(definitions_dir: Path) -> None:
     _validate_loot_tables(definitions_dir, items)
     story_node_ids = _validate_story(definitions_dir, classes, enemies)
     _validate_abilities(definitions_dir)
-    _validate_areas(definitions_dir, story_node_ids)
+    quest_ids = _validate_quests(definitions_dir, item_ids=items, area_ids=set(), story_node_ids=story_node_ids)
+    area_ids = _validate_areas(definitions_dir, story_node_ids, quest_ids=quest_ids)
+    _validate_quests(definitions_dir, item_ids=items, area_ids=area_ids, story_node_ids=story_node_ids)
     assert skills  # ensure skills file not empty
 
 
@@ -484,7 +487,9 @@ def _validate_abilities(definitions_dir: Path) -> None:
             _require_number(effect["power"], f"ability '{ability_id}' effect.power")
 
 
-def _validate_areas(definitions_dir: Path, story_node_ids: set[str]) -> set[str]:
+def _validate_areas(
+    definitions_dir: Path, story_node_ids: set[str], *, quest_ids: set[str] | None = None
+) -> set[str]:
     path = definitions_dir / "areas.json"
     assert path.exists(), "areas.json is missing."
     data = load_json(path)
@@ -510,13 +515,157 @@ def _validate_areas(definitions_dir: Path, story_node_ids: set[str]) -> set[str]
             to_id = _require_str(conn_map.get("to"), f"area '{area_id}' connections[{index}].to")
             assert to_id in staged, f"area '{area_id}' references unknown destination '{to_id}'."
             _require_str(conn_map.get("label"), f"area '{area_id}' connections[{index}].label")
+            requires_quest_active = conn_map.get("requires_quest_active")
+            if requires_quest_active is not None:
+                _require_str(
+                    requires_quest_active,
+                    f"area '{area_id}' connections[{index}].requires_quest_active",
+                )
+                if quest_ids is not None:
+                    assert requires_quest_active in quest_ids, (
+                        f"area '{area_id}' requires unknown quest '{requires_quest_active}'"
+                    )
+            hide_if_quest_completed = conn_map.get("hide_if_quest_completed")
+            if hide_if_quest_completed is not None:
+                _require_str(
+                    hide_if_quest_completed,
+                    f"area '{area_id}' connections[{index}].hide_if_quest_completed",
+                )
+                if quest_ids is not None:
+                    assert hide_if_quest_completed in quest_ids, (
+                        f"area '{area_id}' hide_if_quest_completed unknown quest '{hide_if_quest_completed}'"
+                    )
+            hide_if_quest_turned_in = conn_map.get("hide_if_quest_turned_in")
+            if hide_if_quest_turned_in is not None:
+                _require_str(
+                    hide_if_quest_turned_in,
+                    f"area '{area_id}' connections[{index}].hide_if_quest_turned_in",
+                )
+                if quest_ids is not None:
+                    assert hide_if_quest_turned_in in quest_ids, (
+                        f"area '{area_id}' hide_if_quest_turned_in unknown quest '{hide_if_quest_turned_in}'"
+                    )
+            show_if_flag_true = conn_map.get("show_if_flag_true")
+            if show_if_flag_true is not None:
+                _require_str(
+                    show_if_flag_true,
+                    f"area '{area_id}' connections[{index}].show_if_flag_true",
+                )
+            hide_if_flag_true = conn_map.get("hide_if_flag_true")
+            if hide_if_flag_true is not None:
+                _require_str(
+                    hide_if_flag_true,
+                    f"area '{area_id}' connections[{index}].hide_if_flag_true",
+                )
         entry_story = mapping.get("entry_story_node_id")
         if entry_story is not None:
             entry_story_id = _require_str(entry_story, f"area '{area_id}' entry_story_node_id")
             assert entry_story_id in story_node_ids, (
                 f"area '{area_id}' entry_story_node_id '{entry_story_id}' not found in story definitions"
             )
+        npcs = mapping.get("npcs_present", [])
+        if npcs:
+            assert isinstance(npcs, list), f"area '{area_id}' npcs_present must be a list."
+            for index, npc in enumerate(npcs):
+                npc_map = _require_mapping(npc, f"area '{area_id}' npcs_present[{index}]")
+                npc_id = _require_str(npc_map.get("npc_id"), f"area '{area_id}' npc_id")
+                assert npc_id, f"area '{area_id}' npc_id must not be empty."
+                talk_node_id = _require_str(
+                    npc_map.get("talk_node_id"),
+                    f"area '{area_id}' npcs_present[{index}].talk_node_id",
+                )
+                assert talk_node_id in story_node_ids, (
+                    f"area '{area_id}' npcs_present[{index}].talk_node_id '{talk_node_id}' missing"
+                )
+                quest_hub_node_id = npc_map.get("quest_hub_node_id")
+                if quest_hub_node_id is not None:
+                    quest_id = _require_str(
+                        quest_hub_node_id,
+                        f"area '{area_id}' npcs_present[{index}].quest_hub_node_id",
+                    )
+                    assert quest_id in story_node_ids, (
+                        f"area '{area_id}' npcs_present[{index}].quest_hub_node_id '{quest_id}' missing"
+                    )
     return set(staged.keys())
+
+
+def _validate_quests(
+    definitions_dir: Path,
+    *,
+    item_ids: set[str],
+    area_ids: set[str],
+    story_node_ids: set[str],
+) -> set[str]:
+    data = _load_required_dict(definitions_dir, "quests.json")
+    quests = _require_mapping(data.get("quests"), "quests.json.quests")
+    quest_ids: set[str] = set()
+    for quest_id, payload in quests.items():
+        _require_str(quest_id, "quest id")
+        mapping = _require_mapping(payload, f"quest '{quest_id}'")
+        quest_id_value = _require_str(mapping.get("quest_id"), f"quest '{quest_id}' quest_id")
+        assert quest_id_value == quest_id, f"quest '{quest_id}' quest_id must match key"
+        _require_str(mapping.get("name"), f"quest '{quest_id}' name")
+        prereqs = mapping.get("prereqs")
+        if prereqs is not None:
+            prereq_map = _require_mapping(prereqs, f"quest '{quest_id}' prereqs")
+            _require_str_list(prereq_map.get("required_flags", []), f"quest '{quest_id}' required_flags")
+            _require_str_list(prereq_map.get("forbidden_flags", []), f"quest '{quest_id}' forbidden_flags")
+        objectives = mapping.get("objectives")
+        assert isinstance(objectives, list) and objectives, f"quest '{quest_id}' objectives must be a list."
+        for index, objective in enumerate(objectives):
+            obj_map = _require_mapping(objective, f"quest '{quest_id}' objectives[{index}]")
+            obj_type = _require_str(obj_map.get("type"), f"quest '{quest_id}' objectives[{index}].type")
+            _require_str(obj_map.get("label"), f"quest '{quest_id}' objectives[{index}].label")
+            quantity = obj_map.get("quantity", 1)
+            assert isinstance(quantity, int) and quantity > 0, (
+                f"quest '{quest_id}' objectives[{index}].quantity must be positive."
+            )
+            if obj_type == "kill_tag":
+                _require_str(obj_map.get("tag"), f"quest '{quest_id}' objectives[{index}].tag")
+            elif obj_type == "collect_item":
+                item_id = _require_str(obj_map.get("item_id"), f"quest '{quest_id}' objectives[{index}].item_id")
+                assert item_id in item_ids, f"quest '{quest_id}' objectives[{index}] unknown item '{item_id}'."
+            elif obj_type == "visit_area":
+                area_id = _require_str(obj_map.get("area_id"), f"quest '{quest_id}' objectives[{index}].area_id")
+                if area_ids:
+                    assert area_id in area_ids, (
+                        f"quest '{quest_id}' objectives[{index}] unknown area '{area_id}'."
+                    )
+            else:
+                raise AssertionError(
+                    f"quest '{quest_id}' objectives[{index}].type must be kill_tag, collect_item, or visit_area."
+                )
+        turn_in = mapping.get("turn_in")
+        if turn_in is not None:
+            turn_in_map = _require_mapping(turn_in, f"quest '{quest_id}' turn_in")
+            node_id = _require_str(turn_in_map.get("node_id"), f"quest '{quest_id}' turn_in.node_id")
+            assert node_id in story_node_ids, (
+                f"quest '{quest_id}' turn_in node '{node_id}' not found in story definitions"
+            )
+            npc_id = turn_in_map.get("npc_id")
+            if npc_id is not None:
+                _require_str(npc_id, f"quest '{quest_id}' turn_in.npc_id")
+        rewards = _require_mapping(mapping.get("rewards"), f"quest '{quest_id}' rewards")
+        if "gold" in rewards:
+            _require_int(rewards["gold"], f"quest '{quest_id}' rewards.gold")
+        if "party_exp" in rewards:
+            _require_int(rewards["party_exp"], f"quest '{quest_id}' rewards.party_exp")
+        items = rewards.get("items", [])
+        assert isinstance(items, list), f"quest '{quest_id}' rewards.items must be a list."
+        for index, entry in enumerate(items):
+            entry_map = _require_mapping(entry, f"quest '{quest_id}' rewards.items[{index}]")
+            item_id = _require_str(entry_map.get("item_id"), f"quest '{quest_id}' rewards.items[{index}].item_id")
+            assert item_id in item_ids, f"quest '{quest_id}' rewards.items[{index}] unknown item '{item_id}'."
+            _require_int(entry_map.get("quantity"), f"quest '{quest_id}' rewards.items[{index}].quantity")
+        flags = rewards.get("set_flags", {})
+        flags_map = _require_mapping(flags, f"quest '{quest_id}' rewards.set_flags")
+        for flag_id, flag_value in flags_map.items():
+            assert isinstance(flag_id, str), f"quest '{quest_id}' rewards.set_flags keys must be strings."
+            assert isinstance(flag_value, bool), f"quest '{quest_id}' rewards.set_flags values must be boolean."
+        _require_str_list(mapping.get("accept_flags", []), f"quest '{quest_id}' accept_flags")
+        _require_str_list(mapping.get("complete_flags", []), f"quest '{quest_id}' complete_flags")
+        quest_ids.add(quest_id)
+    return quest_ids
 
 
 def _load_required_dict(definitions_dir: Path, filename: str) -> dict[str, Any]:

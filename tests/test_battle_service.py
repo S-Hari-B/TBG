@@ -96,6 +96,7 @@ def test_start_battle_group_enemy_creates_multiple_enemies() -> None:
     names = [enemy.display_name for enemy in battle_state.enemies]
     assert len(set(names)) == len(names)
     assert all("(" in name for name in names)
+    assert len({id(enemy) for enemy in battle_state.enemies}) == len(battle_state.enemies)
 
 
 def test_basic_attack_reduces_hp_and_can_kill() -> None:

@@ -10,13 +10,16 @@ from tbg.data.repositories import (
     SkillsRepository,
     StoryRepository,
     WeaponsRepository,
+    AreasRepository,
+    QuestsRepository,
 )
 from tbg.services.battle_service import BattleService
 from tbg.services.inventory_service import InventoryService
 from tbg.services.story_service import StoryService
+from tbg.services.quest_service import QuestService
 
 
-def _make_story_service() -> StoryService:
+def _build_services() -> tuple[StoryService, BattleService, QuestService]:
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
     party_repo = PartyMembersRepository()
@@ -25,47 +28,61 @@ def _make_story_service() -> StoryService:
         armour_repo=armour_repo,
         party_members_repo=party_repo,
     )
-    return StoryService(
-        story_repo=StoryRepository(),
+    items_repo = ItemsRepository()
+    areas_repo = AreasRepository()
+    story_repo = StoryRepository()
+    quests_repo = QuestsRepository(
+        items_repo=items_repo,
+        areas_repo=areas_repo,
+        story_repo=story_repo,
+    )
+    quest_service = QuestService(
+        quests_repo=quests_repo,
+        items_repo=items_repo,
+        areas_repo=areas_repo,
+        party_members_repo=party_repo,
+    )
+    story_service = StoryService(
+        story_repo=story_repo,
         classes_repo=ClassesRepository(weapons_repo=weapons_repo, armour_repo=armour_repo),
         weapons_repo=weapons_repo,
         armour_repo=armour_repo,
         party_members_repo=party_repo,
         inventory_service=inventory_service,
+        quest_service=quest_service,
     )
-
-
-def _make_battle_service() -> BattleService:
-    return BattleService(
+    battle_service = BattleService(
         enemies_repo=EnemiesRepository(),
-        party_members_repo=PartyMembersRepository(),
+        party_members_repo=party_repo,
         knowledge_repo=KnowledgeRepository(),
-        weapons_repo=WeaponsRepository(),
-        armour_repo=ArmourRepository(),
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
         skills_repo=SkillsRepository(),
-        items_repo=ItemsRepository(),
+        items_repo=items_repo,
         loot_tables_repo=LootTablesRepository(),
+        quest_service=quest_service,
     )
+    return story_service, battle_service, quest_service
 
 
-def _make_state_with_player():
-    story_service = _make_story_service()
+def _make_state_with_player(story_service: StoryService):
     state = story_service.start_new_game(seed=111, player_name="Hero")
     story_service.choose(state, 0)  # warrior
     state.story_checkpoint_node_id = None
     state.story_checkpoint_location_id = None
     state.story_checkpoint_thread_id = None
     state.pending_story_node_id = None
-    state.current_node_id = "threshold_inn_hub"
+    state.current_node_id = "threshold_inn_hub_router"
     return state
 
 
 def test_dana_side_quest_turn_in_flow() -> None:
-    battle_service = _make_battle_service()
-    story_service = _make_story_service()
-    state = _make_state_with_player()
+    story_service, battle_service, quest_service = _build_services()
+    state = _make_state_with_player(story_service)
 
-    state.flags["flag_sq_dana_accepted"] = True
+    state.flags["flag_sq_dana_offered"] = True
+    story_service.play_node(state, "dana_sidequest_accept")
+    story_service.resume_pending_flow(state)
     starting_gold = state.gold
 
     # Turn-in before ready should fail.
@@ -74,10 +91,9 @@ def test_dana_side_quest_turn_in_flow() -> None:
     story_service.resume_pending_flow(state)
     assert state.flags.get("flag_sq_dana_completed") is not True
 
-    # Earn teeth and trigger readiness via victory rewards.
+    # Earn teeth and trigger readiness via quest refresh.
     state.inventory.items["wolf_tooth"] = 3
-    battle_state, _ = battle_service.start_battle("wolf", state)
-    battle_service.apply_victory_rewards(battle_state, state)
+    quest_service.refresh_collect_objectives(state)
     assert state.flags.get("flag_sq_dana_ready") is True
 
     # Turn-in success should remove items and grant rewards once.
@@ -97,11 +113,12 @@ def test_dana_side_quest_turn_in_flow() -> None:
 
 
 def test_cerel_kill_quest_turn_in_flow() -> None:
-    battle_service = _make_battle_service()
-    story_service = _make_story_service()
-    state = _make_state_with_player()
+    story_service, battle_service, _quest_service = _build_services()
+    state = _make_state_with_player(story_service)
 
-    state.flags["flag_sq_cerel_accepted"] = True
+    state.flags["flag_sq_cerel_offered"] = True
+    story_service.play_node(state, "cerel_kill_quest_accept")
+    story_service.resume_pending_flow(state)
     starting_gold = state.gold
 
     # Turn-in before ready should fail.
@@ -140,17 +157,20 @@ def test_cerel_kill_quest_turn_in_flow() -> None:
 
 
 def test_protoquest_turn_in_rewards_once() -> None:
-    story_service = _make_story_service()
-    state = _make_state_with_player()
+    story_service, battle_service, _quest_service = _build_services()
+    state = _make_state_with_player(story_service)
 
     starting_gold = state.gold
 
     # Completing ruins should only set ready flag, no gold.
-    story_service.play_node(state, "protoquest_complete")
+    story_service.play_node(state, "protoquest_offer")
+    story_service.play_node(state, "protoquest_accept")
     story_service.resume_pending_flow(state)
+    battle_state, _ = battle_service.start_battle("goblin_grunt", state)
+    battle_service.apply_victory_rewards(battle_state, state)
     assert state.flags.get("flag_protoquest_ready") is True
     assert state.flags.get("flag_protoquest_completed") is not True
-    assert state.gold == starting_gold
+    gold_after_battle = state.gold
 
     # Turn in to Dana for reward.
     story_service.play_node(state, "dana_protoquest_turn_in_check")
@@ -158,7 +178,7 @@ def test_protoquest_turn_in_rewards_once() -> None:
     story_service.resume_pending_flow(state)
     assert state.flags.get("flag_protoquest_completed") is True
     assert state.flags.get("flag_protoquest_ready") is False
-    assert state.gold == starting_gold + 10
+    assert state.gold == gold_after_battle + 10
 
     # Turn in again should not grant more gold.
     gold_after = state.gold

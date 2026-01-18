@@ -3,6 +3,7 @@ import pytest
 from tbg.core.rng import RNG
 from tbg.data.repositories import AreasRepository
 from tbg.domain.state import GameState
+from tbg.domain.quest_state import QuestObjectiveProgress, QuestProgress
 from tbg.services.area_service import AreaService, TravelPerformedEvent
 from tbg.services.errors import TravelBlockedError
 
@@ -15,6 +16,11 @@ def test_travel_updates_location_and_emits_events() -> None:
     service = AreaService(AreasRepository())
     state = _make_state()
     service.initialize_state(state)
+    state.flags["flag_protoquest_offered"] = True
+    state.quests_active["dana_shoreline_rumor"] = QuestProgress(
+        quest_id="dana_shoreline_rumor",
+        objectives=[QuestObjectiveProgress(current=0, completed=False)],
+    )
 
     result = service.travel_to(state, "shoreline_ruins")
 
@@ -27,6 +33,11 @@ def test_entry_story_triggers_once_per_location() -> None:
     service = AreaService(AreasRepository())
     state = _make_state()
     service.initialize_state(state)
+    state.flags["flag_protoquest_offered"] = True
+    state.quests_active["dana_shoreline_rumor"] = QuestProgress(
+        quest_id="dana_shoreline_rumor",
+        objectives=[QuestObjectiveProgress(current=0, completed=False)],
+    )
 
     first_visit = service.travel_to(state, "shoreline_ruins")
     assert first_visit.entry_story_node_id == "protoquest_ruins_entry"
@@ -49,6 +60,11 @@ def test_story_progress_travel_blocked_when_checkpoint_active() -> None:
         service.travel_to(state, "floor_one_gate")
 
     # Backtracking remains allowed
+    state.flags["flag_protoquest_offered"] = True
+    state.quests_active["dana_shoreline_rumor"] = QuestProgress(
+        quest_id="dana_shoreline_rumor",
+        objectives=[QuestObjectiveProgress(current=0, completed=False)],
+    )
     service.travel_to(state, "shoreline_ruins")
     service.travel_to(state, "threshold_inn")
 
@@ -64,6 +80,11 @@ def test_entry_story_suppressed_when_checkpoint_active() -> None:
     service.initialize_state(state)
     state.story_checkpoint_node_id = "battle_trial_1v1"
     state.story_checkpoint_thread_id = "main_story"
+    state.flags["flag_protoquest_offered"] = True
+    state.quests_active["dana_shoreline_rumor"] = QuestProgress(
+        quest_id="dana_shoreline_rumor",
+        objectives=[QuestObjectiveProgress(current=0, completed=False)],
+    )
 
     visit = service.travel_to(state, "shoreline_ruins")
     assert visit.entry_story_node_id is None
@@ -73,6 +94,11 @@ def test_entry_story_suppressed_when_checkpoint_active() -> None:
     service.travel_to(state, "threshold_inn")
     state.story_checkpoint_node_id = None
     state.story_checkpoint_thread_id = None
+    state.flags["flag_protoquest_offered"] = True
+    state.quests_active["dana_shoreline_rumor"] = QuestProgress(
+        quest_id="dana_shoreline_rumor",
+        objectives=[QuestObjectiveProgress(current=0, completed=False)],
+    )
     second_visit = service.travel_to(state, "shoreline_ruins")
     assert second_visit.entry_story_node_id == "protoquest_ruins_entry"
 
@@ -87,3 +113,33 @@ def test_non_story_checkpoint_does_not_block_progress() -> None:
     # Should not block forward travel
     result = service.travel_to(state, "floor_one_gate")
     assert result.location_view.id == "floor_one_gate"
+
+
+def test_shoreline_ruins_connection_gated_by_quest_state() -> None:
+    service = AreaService(AreasRepository())
+    state = _make_state()
+    service.initialize_state(state)
+
+    view = service.get_current_location_view(state)
+    destinations = {conn.destination_id for conn in view.connections}
+    assert "shoreline_ruins" not in destinations
+
+    state.flags["flag_protoquest_offered"] = True
+    state.quests_active["dana_shoreline_rumor"] = QuestProgress(
+        quest_id="dana_shoreline_rumor",
+        objectives=[QuestObjectiveProgress(current=0, completed=False)],
+    )
+    view = service.get_current_location_view(state)
+    destinations = {conn.destination_id for conn in view.connections}
+    assert "shoreline_ruins" in destinations
+
+    state.quests_completed.append("dana_shoreline_rumor")
+    view = service.get_current_location_view(state)
+    destinations = {conn.destination_id for conn in view.connections}
+    assert "shoreline_ruins" not in destinations
+
+    state.flags["flag_protoquest_declined"] = True
+    state.quests_completed.clear()
+    view = service.get_current_location_view(state)
+    destinations = {conn.destination_id for conn in view.connections}
+    assert "shoreline_ruins" not in destinations

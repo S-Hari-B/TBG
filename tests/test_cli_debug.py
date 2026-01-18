@@ -26,7 +26,7 @@ def test_format_enemy_hp_display_debug_enabled() -> None:
         current_hp=10,
         max_hp=20,
     )
-    assert _format_enemy_hp_display(enemy_view, debug_enabled=True) == "??? [10/20]"
+    assert _format_enemy_hp_display(enemy_view, debug_enabled=True) == "???[10/20]"
 
 
 def test_format_enemy_hp_display_dead() -> None:

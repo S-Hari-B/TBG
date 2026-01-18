@@ -5,7 +5,7 @@ from typing import Dict, List
 
 from tbg.data.errors import DataReferenceError, DataValidationError
 from tbg.data.repositories.base import RepositoryBase
-from tbg.domain.defs import AreaConnectionDef, AreaDef
+from tbg.domain.defs import AreaConnectionDef, AreaDef, NpcPresenceDef
 
 
 class AreasRepository(RepositoryBase[AreaDef]):
@@ -67,14 +67,73 @@ class AreasRepository(RepositoryBase[AreaDef]):
                     raise DataValidationError(
                         f"area '{area_id}' connections[{index}].progresses_story must be a boolean if provided."
                     )
+                requires_quest_active = conn_map.get("requires_quest_active")
+                if requires_quest_active is not None and not isinstance(requires_quest_active, str):
+                    raise DataValidationError(
+                        f"area '{area_id}' connections[{index}].requires_quest_active must be a string if provided."
+                    )
+                hide_if_quest_completed = conn_map.get("hide_if_quest_completed")
+                if hide_if_quest_completed is not None and not isinstance(hide_if_quest_completed, str):
+                    raise DataValidationError(
+                        f"area '{area_id}' connections[{index}].hide_if_quest_completed must be a string if provided."
+                    )
+                hide_if_quest_turned_in = conn_map.get("hide_if_quest_turned_in")
+                if hide_if_quest_turned_in is not None and not isinstance(hide_if_quest_turned_in, str):
+                    raise DataValidationError(
+                        f"area '{area_id}' connections[{index}].hide_if_quest_turned_in must be a string if provided."
+                    )
+                show_if_flag_true = conn_map.get("show_if_flag_true")
+                if show_if_flag_true is not None and not isinstance(show_if_flag_true, str):
+                    raise DataValidationError(
+                        f"area '{area_id}' connections[{index}].show_if_flag_true must be a string if provided."
+                    )
+                hide_if_flag_true = conn_map.get("hide_if_flag_true")
+                if hide_if_flag_true is not None and not isinstance(hide_if_flag_true, str):
+                    raise DataValidationError(
+                        f"area '{area_id}' connections[{index}].hide_if_flag_true must be a string if provided."
+                    )
                 connections.append(
-                    AreaConnectionDef(to_id=to_id, label=label, progresses_story=progresses_story)
+                    AreaConnectionDef(
+                        to_id=to_id,
+                        label=label,
+                        progresses_story=progresses_story,
+                        requires_quest_active=requires_quest_active,
+                        hide_if_quest_completed=hide_if_quest_completed,
+                        hide_if_quest_turned_in=hide_if_quest_turned_in,
+                        show_if_flag_true=show_if_flag_true,
+                        hide_if_flag_true=hide_if_flag_true,
+                    )
                 )
             entry_story_node_id = area_map.get("entry_story_node_id")
             if entry_story_node_id is not None:
                 entry_story_node_id = self._require_str(
                     entry_story_node_id, f"area '{area_id}' entry_story_node_id"
                 )
+            npcs_present: List[NpcPresenceDef] = []
+            npcs_data = area_map.get("npcs_present", [])
+            if npcs_data:
+                for index, npc in enumerate(self._require_list(npcs_data, f"area '{area_id}' npcs_present")):
+                    npc_map = self._require_mapping(npc, f"area '{area_id}' npcs_present[{index}]")
+                    npc_id = self._require_str(
+                        npc_map.get("npc_id"), f"area '{area_id}' npcs_present[{index}].npc_id"
+                    )
+                    talk_node_id = self._require_str(
+                        npc_map.get("talk_node_id"),
+                        f"area '{area_id}' npcs_present[{index}].talk_node_id",
+                    )
+                    quest_hub_node_id = npc_map.get("quest_hub_node_id")
+                    if quest_hub_node_id is not None:
+                        quest_hub_node_id = self._require_str(
+                            quest_hub_node_id,
+                            f"area '{area_id}' npcs_present[{index}].quest_hub_node_id",
+                        )
+                    npcs_present.append(
+                        NpcPresenceDef(
+                            npc_id=npc_id,
+                            talk_node_id=talk_node_id,
+                            quest_hub_node_id=quest_hub_node_id,
+                        )
+                    )
 
             definitions[area_id] = AreaDef(
                 id=area_id,
@@ -83,6 +142,7 @@ class AreasRepository(RepositoryBase[AreaDef]):
                 tags=tuple(tags),
                 connections=tuple(connections),
                 entry_story_node_id=entry_story_node_id,
+                npcs_present=tuple(npcs_present),
             )
         return definitions
 

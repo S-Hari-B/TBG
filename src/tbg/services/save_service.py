@@ -12,11 +12,13 @@ from tbg.data.repositories import (
     ClassesRepository,
     ItemsRepository,
     PartyMembersRepository,
+    QuestsRepository,
     StoryRepository,
     WeaponsRepository,
 )
 from tbg.domain.entities import Player, Stats
 from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment, PartyInventory
+from tbg.domain.quest_state import QuestObjectiveProgress, QuestProgress
 from tbg.domain.state import GameState
 from tbg.services.errors import SaveLoadError
 from tbg.services.area_service import DEFAULT_STARTING_AREA_ID
@@ -41,6 +43,7 @@ class SaveService:
         items_repo: ItemsRepository,
         party_members_repo: PartyMembersRepository,
         areas_repo: AreasRepository,
+        quests_repo: QuestsRepository | None = None,
     ) -> None:
         self._story_repo = story_repo
         self._classes_repo = classes_repo
@@ -49,6 +52,7 @@ class SaveService:
         self._items_repo = items_repo
         self._party_members_repo = party_members_repo
         self._areas_repo = areas_repo
+        self._quests_repo = quests_repo
 
     def serialize(self, state: GameState) -> SavePayload:
         """Return a JSON-serializable payload for disk persistence."""
@@ -127,6 +131,13 @@ class SaveService:
         state.location_entry_seen = self._coerce_location_entry_flags(
             state_payload.get("location_entry_seen"), current_location_id
         )
+        state.quests_active = self._coerce_quests_active(state_payload.get("quests_active"))
+        state.quests_completed = self._coerce_str_list(
+            state_payload.get("quests_completed"), "state.quests_completed"
+        )
+        state.quests_turned_in = self._coerce_str_list(
+            state_payload.get("quests_turned_in"), "state.quests_turned_in"
+        )
 
         player_payload = state_payload.get("player")
         if player_payload is not None:
@@ -135,6 +146,7 @@ class SaveService:
         state.equipment = self._coerce_equipment(state_payload.get("equipment"), state)
 
         self._validate_progress_consistency(state)
+        self._validate_quest_state(state)
 
         return state
 
@@ -187,6 +199,9 @@ class SaveService:
             "story_checkpoint_node_id": state.story_checkpoint_node_id,
             "story_checkpoint_location_id": state.story_checkpoint_location_id,
             "story_checkpoint_thread_id": state.story_checkpoint_thread_id,
+            "quests_active": self._serialize_quests_active(state),
+            "quests_completed": list(state.quests_completed),
+            "quests_turned_in": list(state.quests_turned_in),
         }
 
     @staticmethod
@@ -256,6 +271,18 @@ class SaveService:
             if not isinstance(entry, int):
                 raise SaveLoadError(f"{context}.{key} must be an integer.")
             result[key] = entry
+        return result
+
+    def _coerce_str_list(self, value: Any, context: str) -> List[str]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise SaveLoadError(f"{context} must be a list.")
+        result: List[str] = []
+        for entry in value:
+            if not isinstance(entry, str):
+                raise SaveLoadError(f"{context} entries must be strings.")
+            result.append(entry)
         return result
 
     def _coerce_party_members(self, value: Any) -> List[str]:
@@ -328,6 +355,48 @@ class SaveService:
         inventory.armour = armour
         inventory.items = items
         return inventory
+
+    def _coerce_quests_active(self, value: Any) -> Dict[str, QuestProgress]:
+        if value is None:
+            return {}
+        mapping = self._require_dict(value, "state.quests_active")
+        result: Dict[str, QuestProgress] = {}
+        for quest_id, payload in mapping.items():
+            if not isinstance(quest_id, str):
+                raise SaveLoadError("state.quests_active keys must be strings.")
+            if self._quests_repo:
+                self._validate_quest_id(quest_id)
+            progress_map = self._require_dict(payload, f"state.quests_active['{quest_id}']")
+            objectives_data = progress_map.get("objectives", [])
+            if not isinstance(objectives_data, list):
+                raise SaveLoadError(f"state.quests_active['{quest_id}'].objectives must be a list.")
+            objectives: List[QuestObjectiveProgress] = []
+            for index, entry in enumerate(objectives_data):
+                entry_map = self._require_dict(
+                    entry, f"state.quests_active['{quest_id}'].objectives[{index}]"
+                )
+                current = self._require_int(
+                    entry_map.get("current"),
+                    f"state.quests_active['{quest_id}'].objectives[{index}].current",
+                )
+                completed = entry_map.get("completed")
+                if not isinstance(completed, bool):
+                    raise SaveLoadError(
+                        f"state.quests_active['{quest_id}'].objectives[{index}].completed must be a boolean."
+                    )
+                objectives.append(QuestObjectiveProgress(current=current, completed=completed))
+            result[quest_id] = QuestProgress(quest_id=quest_id, objectives=objectives)
+        return result
+
+    def _serialize_quests_active(self, state: GameState) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        for quest_id, progress in state.quests_active.items():
+            payload[quest_id] = {
+                "objectives": [
+                    {"current": obj.current, "completed": obj.completed} for obj in progress.objectives
+                ]
+            }
+        return payload
 
     def _coerce_item_counts(self, value: Any, context: str, validate_fn) -> Dict[str, int]:
         mapping = self._require_dict(value, context)
@@ -443,6 +512,26 @@ class SaveService:
         extra_equipment = equipment_keys - member_ids
         if extra_equipment:
             raise SaveLoadError(f"Equipment references unknown members: {sorted(extra_equipment)}.")
+
+    def _validate_quest_state(self, state: GameState) -> None:
+        if not self._quests_repo:
+            return
+        for quest_id in state.quests_active.keys():
+            self._validate_quest_id(quest_id)
+        for quest_id in state.quests_completed:
+            self._validate_quest_id(quest_id)
+        for quest_id in state.quests_turned_in:
+            self._validate_quest_id(quest_id)
+
+    def _validate_quest_id(self, quest_id: str) -> None:
+        if not self._quests_repo:
+            return
+        try:
+            self._quests_repo.get(quest_id)
+        except KeyError as exc:
+            raise SaveLoadError(
+                f"Save incompatible with current definitions: quest '{quest_id}' missing."
+            ) from exc
 
     def _validate_area_id(self, area_id: str) -> None:
         try:
