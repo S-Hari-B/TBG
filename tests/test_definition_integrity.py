@@ -407,6 +407,8 @@ def _validate_story_effects(
             _require_int(effect_map.get("amount"), f"story node '{node_id}' give_gold.amount")
         elif effect_type == "give_exp":
             _require_int(effect_map.get("amount"), f"story node '{node_id}' give_exp.amount")
+        elif effect_type == "give_party_exp":
+            _require_int(effect_map.get("amount"), f"story node '{node_id}' give_party_exp.amount")
         elif effect_type == "add_party_member":
             _require_str(
                 effect_map.get("member_id"), f"story node '{node_id}' add_party_member.member_id"
@@ -422,6 +424,28 @@ def _validate_story_effects(
             _require_str(effect_map.get("flag_id"), f"story node '{node_id}' set_flag.flag_id")
             value = effect_map.get("value", True)
             assert isinstance(value, bool), f"story node '{node_id}' set_flag.value must be boolean if provided"
+        elif effect_type == "remove_item":
+            _require_str(effect_map.get("item_id"), f"story node '{node_id}' remove_item.item_id")
+            quantity = effect_map.get("quantity", 1)
+            _require_int(quantity, f"story node '{node_id}' remove_item.quantity")
+        elif effect_type == "branch_on_flag":
+            _require_str(effect_map.get("flag_id"), f"story node '{node_id}' branch_on_flag.flag_id")
+            expected = effect_map.get("expected", True)
+            assert isinstance(expected, bool), (
+                f"story node '{node_id}' branch_on_flag.expected must be boolean if provided"
+            )
+            next_on_true = _require_str(
+                effect_map.get("next_on_true"), f"story node '{node_id}' branch_on_flag.next_on_true"
+            )
+            next_on_false = _require_str(
+                effect_map.get("next_on_false"), f"story node '{node_id}' branch_on_flag.next_on_false"
+            )
+            assert (
+                next_on_true in story_nodes
+            ), f"story node '{node_id}' branch_on_flag.next_on_true references missing node '{next_on_true}'"
+            assert (
+                next_on_false in story_nodes
+            ), f"story node '{node_id}' branch_on_flag.next_on_false references missing node '{next_on_false}'"
         else:
             # Unknown effect types are allowed for forward compatibility, but must at least be strings.
             _require_str(effect_type, f"story node '{node_id}' effect type")

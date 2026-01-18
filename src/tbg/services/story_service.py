@@ -62,6 +62,21 @@ class ExpGainedEvent(StoryEvent):
 
 
 @dataclass(slots=True)
+class PartyExpGrantedEvent(StoryEvent):
+    member_id: str
+    member_name: str
+    amount: int
+    new_level: int
+
+
+@dataclass(slots=True)
+class PartyLevelUpEvent(StoryEvent):
+    member_id: str
+    member_name: str
+    new_level: int
+
+
+@dataclass(slots=True)
 class GameMenuEnteredEvent(StoryEvent):
     message: str
 
@@ -161,7 +176,8 @@ class StoryService:
             node_events, halt = self._apply_effects(node.effects, state)
             events.extend(node_events)
             if halt:
-                state.pending_story_node_id = node.next_node_id
+                if state.pending_story_node_id is None:
+                    state.pending_story_node_id = node.next_node_id
                 return
             if node.choices or not node.next_node_id:
                 state.pending_story_node_id = None
@@ -241,6 +257,9 @@ class StoryService:
                 amount = self._require_int(effect.data.get("amount"), "give_exp.amount")
                 state.exp += amount
                 emitted.append(ExpGainedEvent(amount=amount, total_exp=state.exp))
+            elif effect_type == "give_party_exp":
+                amount = self._require_int(effect.data.get("amount"), "give_party_exp.amount")
+                emitted.extend(self._grant_party_exp(state, amount))
             elif effect_type == "enter_game_menu":
                 message = self._require_optional_str(effect.data.get("message"), "enter_game_menu.message") or ""
                 state.mode = "camp_menu"
@@ -253,10 +272,114 @@ class StoryService:
                 if not isinstance(value, bool):
                     raise ValueError("set_flag.value must be a boolean.")
                 state.flags[flag_id] = value
+            elif effect_type == "remove_item":
+                item_id = self._require_str(effect.data.get("item_id"), "remove_item.item_id")
+                quantity = self._require_int(effect.data.get("quantity", 1), "remove_item.quantity")
+                if quantity <= 0:
+                    continue
+                if not state.inventory.remove_item(item_id, quantity):
+                    raise ValueError(f"remove_item could not remove {quantity} of '{item_id}'.")
+            elif effect_type == "branch_on_flag":
+                flag_id = self._require_str(effect.data.get("flag_id"), "branch_on_flag.flag_id")
+                expected = effect.data.get("expected", True)
+                if not isinstance(expected, bool):
+                    raise ValueError("branch_on_flag.expected must be a boolean.")
+                next_on_true = self._require_str(effect.data.get("next_on_true"), "branch_on_flag.next_on_true")
+                next_on_false = self._require_str(effect.data.get("next_on_false"), "branch_on_flag.next_on_false")
+                flag_value = state.flags.get(flag_id, False)
+                state.pending_story_node_id = next_on_true if flag_value == expected else next_on_false
+                halt_flow = True
             else:
                 # Unknown effects are ignored for now to keep the interpreter forward compatible.
                 continue
         return emitted, halt_flow
+
+    def _grant_party_exp(self, state: GameState, amount: int) -> List[StoryEvent]:
+        if amount <= 0:
+            return []
+        participants = self._active_party_ids(state)
+        if not participants:
+            return []
+        base = amount // len(participants)
+        remainder = amount % len(participants)
+        events: List[StoryEvent] = []
+        for member_id in participants:
+            share = base
+            if state.player and member_id == state.player.id:
+                share += remainder
+            if share > 0:
+                events.extend(self._award_party_exp(state, member_id, share))
+        return events
+
+    def _award_party_exp(self, state: GameState, member_id: str, amount: int) -> List[StoryEvent]:
+        if amount <= 0:
+            return []
+        events: List[StoryEvent] = []
+        current_level = state.member_levels.get(member_id, 1)
+        current_exp = state.member_exp.get(member_id, 0)
+        current_exp += amount
+        leveled: List[int] = []
+        threshold = self._xp_to_next_level(current_level)
+        while current_exp >= threshold:
+            current_exp -= threshold
+            current_level += 1
+            leveled.append(current_level)
+            threshold = self._xp_to_next_level(current_level)
+        state.member_levels[member_id] = current_level
+        state.member_exp[member_id] = current_exp
+        member_name = self._resolve_member_name(state, member_id)
+        events.append(
+            PartyExpGrantedEvent(
+                member_id=member_id,
+                member_name=member_name,
+                amount=amount,
+                new_level=current_level,
+            )
+        )
+        for level in leveled:
+            events.append(
+                PartyLevelUpEvent(
+                    member_id=member_id,
+                    member_name=member_name,
+                    new_level=level,
+                )
+            )
+            self._restore_member_resources(state, member_id, restore_hp=True, restore_mp=True)
+        return events
+
+    def _resolve_member_name(self, state: GameState, member_id: str) -> str:
+        if state.player and member_id == state.player.id:
+            return state.player.name
+        try:
+            member = self._party_members_repo.get(member_id)
+            return member.name
+        except KeyError:
+            return member_id
+
+    @staticmethod
+    def _xp_to_next_level(level: int) -> int:
+        return 10 + (level - 1) * 5
+
+    def _active_party_ids(self, state: GameState) -> List[str]:
+        ids: List[str] = []
+        if state.player:
+            ids.append(state.player.id)
+        ids.extend(state.party_members)
+        return ids
+
+    def _restore_member_resources(
+        self,
+        state: GameState,
+        member_id: str,
+        *,
+        restore_hp: bool,
+        restore_mp: bool,
+    ) -> None:
+        if state.player and member_id == state.player.id:
+            if restore_hp:
+                state.player.stats.hp = state.player.stats.max_hp
+            if restore_mp:
+                state.player.stats.mp = state.player.stats.max_mp
 
     def clear_checkpoint(self, state: GameState, thread_id: str = "main_story") -> None:
         """Clear any stored story checkpoint after a successful battle."""

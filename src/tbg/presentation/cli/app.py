@@ -31,6 +31,8 @@ from tbg.services import (
     GoldGainedEvent,
     LocationEnteredEvent,
     LocationView,
+    PartyExpGrantedEvent,
+    PartyLevelUpEvent,
     PartyMemberJoinedEvent,
     PlayerClassSetEvent,
     SaveLoadError,
@@ -601,6 +603,10 @@ def _handle_story_events(
                 return False
         elif isinstance(event, PartyMemberJoinedEvent):
             print(f"- {event.member_id.title()} joins the party.")
+        elif isinstance(event, PartyExpGrantedEvent):
+            print(f"- {event.member_name} gains {event.amount} EXP (Level {event.new_level}).")
+        elif isinstance(event, PartyLevelUpEvent):
+            print(f"- {event.member_name} reached Level {event.new_level}!")
         elif isinstance(event, GoldGainedEvent):
             print(f"- Gained {event.amount} gold (Total: {event.total_gold}).")
         elif isinstance(event, ExpGainedEvent):
@@ -708,10 +714,16 @@ def _handle_defeat_flow(
     slot_store: SaveSlotStore,
     area_service: AreaService,
 ) -> bool:
-    story_service.rewind_to_checkpoint(state)
-    battle_service.restore_party_resources(state, restore_hp=True, restore_mp=True)
+    lost_gold = _apply_defeat_gold_loss(state)
+    open_area_battle = _is_open_area_location(area_service, state)
+    if open_area_battle:
+        _restore_minimum_resources(state)
+        message = f"{_DEFEAT_CAMP_MESSAGE} You keep your place, but drop {lost_gold} gold."
+    else:
+        story_service.rewind_to_checkpoint(state)
+        battle_service.restore_party_resources(state, restore_hp=True, restore_mp=True)
+        message = f"{_DEFEAT_CAMP_MESSAGE} You drop {lost_gold} gold."
     state.flags["flag_last_battle_defeat"] = True
-    message = _DEFEAT_CAMP_MESSAGE
     state.mode = "camp_menu"
     state.camp_message = message
     follow_up = _run_post_battle_interlude(
@@ -739,6 +751,27 @@ def _handle_defeat_flow(
         area_service,
         print_header=bool(follow_up),
     )
+
+
+def _apply_defeat_gold_loss(state: GameState) -> int:
+    lost_gold = state.gold // 2
+    state.gold -= lost_gold
+    return lost_gold
+
+
+def _restore_minimum_resources(state: GameState) -> None:
+    if not state.player:
+        return
+    state.player.stats.hp = max(1, state.player.stats.hp)
+    state.player.stats.mp = max(1, state.player.stats.mp)
+
+
+def _is_open_area_location(area_service: AreaService, state: GameState) -> bool:
+    try:
+        location = area_service.get_current_location_view(state)
+    except Exception:
+        return False
+    return "open" in location.tags
 
 
 def _handle_travel_menu(

@@ -43,7 +43,7 @@
     "speed": 8,
     "rewards_exp": 8,
     "rewards_gold": 5,
-    "tags": ["beast"],
+    "tags": ["beast", "wolf"],
     "equipment": {
       "weapons": [],
       "armour": "wolf_hide_cloak"
@@ -93,5 +93,40 @@
       "weapons": [],
       "armour": "goblin_rags"
     }
+  },
+  "half_orc_raider": {
+    "name": "Half-Orc Raider",
+    "hp": 36,
+    "mp": 0,
+    "attack": 10,
+    "defense": 4,
+    "speed": 4,
+    "rewards_exp": 14,
+    "rewards_gold": 10,
+    "tags": ["orc", "humanoid"],
+    "equipment": {
+      "weapons": ["wooden_club"],
+      "armour": "bandit_leathers"
+    }
+  },
+  "wolf_pack_2": {
+    "name": "Wolf Pack",
+    "enemy_ids": ["wolf", "wolf"],
+    "tags": ["beast", "wolf"]
+  },
+  "goblin_camp_patrol": {
+    "name": "Goblin Patrol",
+    "enemy_ids": ["goblin_grunt", "goblin_archer", "goblin_grunt"],
+    "tags": ["goblin", "humanoid"]
+  },
+  "cave_sentry_pair": {
+    "name": "Cave Sentries",
+    "enemy_ids": ["goblin_archer", "goblin_grunt"],
+    "tags": ["goblin", "humanoid"]
+  },
+  "half_orc_pair": {
+    "name": "Half-Orc Enforcers",
+    "enemy_ids": ["half_orc_raider", "half_orc_raider"],
+    "tags": ["orc", "humanoid"]
   }
 }

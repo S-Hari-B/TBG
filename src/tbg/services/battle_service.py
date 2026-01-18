@@ -694,11 +694,61 @@ class BattleService:
                         reward_events.extend(self._award_exp(state, member_id, share))
 
         reward_events.extend(self._roll_loot(defeated, state))
+        reward_events.extend(self._apply_floor_one_side_quest_rewards(defeated, state))
         self.restore_party_resources(state, restore_hp=False, restore_mp=True)
         state.flags["flag_last_battle_defeat"] = False
         if len(reward_events) == 1:
             return []
         return reward_events
+
+    def _apply_floor_one_side_quest_rewards(
+        self, defeated: List[tuple[Combatant, object]], state: GameState
+    ) -> List[BattleEvent]:
+        """Handle Floor One side quest progress and rewards using flags only."""
+        events: List[BattleEvent] = []
+
+        # Dana side quest: collect 3 wolf teeth (tracked via inventory).
+        if state.flags.get("flag_sq_dana_accepted") and not state.flags.get("flag_sq_dana_completed"):
+            teeth = state.inventory.items.get("wolf_tooth", 0)
+            if teeth >= 3:
+                state.flags["flag_sq_dana_ready"] = True
+
+        # Cerel side quest: kill counts for goblin grunts and half-orcs.
+        if state.flags.get("flag_sq_cerel_accepted") and not state.flags.get("flag_sq_cerel_completed"):
+            goblin_kills = 0
+            orc_kills = 0
+            for _enemy, enemy_def in defeated:
+                if getattr(enemy_def, "id", "") == "goblin_grunt":
+                    goblin_kills += 1
+                if getattr(enemy_def, "id", "") == "half_orc_raider":
+                    orc_kills += 1
+            if goblin_kills:
+                self._increment_flag_counter(state, "flag_kill_goblin_grunt", 10, goblin_kills)
+            if orc_kills:
+                self._increment_flag_counter(state, "flag_kill_half_orc", 5, orc_kills)
+
+            goblin_count = self._flag_counter_value(state, "flag_kill_goblin_grunt", 10)
+            orc_count = self._flag_counter_value(state, "flag_kill_half_orc", 5)
+            if goblin_count >= 10 and orc_count >= 5:
+                state.flags["flag_sq_cerel_ready"] = True
+
+        return events
+
+    @staticmethod
+    def _flag_counter_value(state: GameState, prefix: str, maximum: int) -> int:
+        return sum(1 for idx in range(1, maximum + 1) if state.flags.get(f"{prefix}_{idx}"))
+
+    @staticmethod
+    def _increment_flag_counter(
+        state: GameState, prefix: str, maximum: int, increment: int = 1
+    ) -> None:
+        current = 0
+        while current < maximum and state.flags.get(f"{prefix}_{current + 1}"):
+            current += 1
+        new_value = min(maximum, current + max(0, increment))
+        for idx in range(current + 1, new_value + 1):
+            state.flags[f"{prefix}_{idx}"] = True
+
 
     def _active_party_ids(self, state: GameState) -> List[str]:
         ids: List[str] = []

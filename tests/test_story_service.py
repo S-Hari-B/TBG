@@ -337,3 +337,19 @@ def test_intro_flags_are_set() -> None:
     state = service.start_new_game(seed=77, player_name="Hero")
     assert state.flags.get("flag_ch00_arrived") is True
 
+
+def test_side_quest_offer_does_not_block_main_story() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=888, player_name="Hero")
+
+    # Jump to the Threshold Inn hub (post-Floor One unlock).
+    service.play_node(state, "threshold_inn_hub")
+
+    # Ask Dana about work, then accept.
+    service.choose(state, 0)  # Dana offer
+    service.choose(state, 0)  # Accept quest
+
+    # Still able to proceed to the gate prompt.
+    result = service.choose(state, 3)
+    assert result.node_view.node_id == "floor1_gate_prompt"
+

@@ -68,7 +68,7 @@
     "next": "trial_setup"
   },
   "trial_setup": {
-    "text": "Cerel leads you outside, past the inn's training yard. A small fenced enclosure holds a single restless creature—a shoreline scavenger, teeth bared, eyes wild.\n\n\"Standard trial. One-on-one. I'll observe, but I won't intervene. Defeat it, and we'll talk about what comes next.\"\n\nHe steps back. The gate opens.\n\n\"Your move.\"",
+    "text": "Cerel leads you outside, past the inn's training yard. A small fenced enclosure holds a single goblin scavenger, teeth bared, eyes wild.\n\n\"Standard trial. One-on-one. I'll observe, but I won't intervene. Defeat it, and we'll talk about what comes next.\"\n\nHe steps back. The gate opens.\n\n\"Your move.\"",
     "next": "battle_trial_1v1"
   },
   "battle_trial_1v1": {
@@ -219,20 +219,18 @@
     "next": "floor1_open_handoff"
   },
   "floor1_open_handoff": {
-    "text": "Cerel walks you to the edge of the settlement. Beyond, a shimmering threshold marks the boundary to Floor One.\n\n\"This is where I leave you,\" he says. \"Floor One is larger, more dangerous, and more rewarding. Towns exist, but they're farther apart. The guardian waits at the far end—defeat it, and Floor Two opens.\"\n\nYour companion adjusts their gear. \"No turning back now. Let's see what this place has.\"",
+    "text": "Cerel walks you to the edge of the settlement. Beyond, a shimmering threshold marks the boundary to Floor One.\n\n\"This is where I leave you,\" he says. \"Floor One is larger, more dangerous, and more rewarding. Towns exist, but they're farther apart. The guardian waits at the far end—defeat it, and Floor Two opens.\"\n\nYou adjust your gear. \"No turning back now. Let's see what this place has.\"",
     "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_floor1_gate_opened", "value": true },
       {
         "type": "enter_game_menu",
-        "message": "Chapter 00 complete. Explore Floor One and build your strength."
+        "message": "Floor One is unlocked. Use Travel to reach the gate when you're ready."
       }
     ],
-    "next": "ch00_complete"
-  },
-  "ch00_complete": {
-    "text": "The tutorial is complete. Floor One awaits. Your journey has just begun."
+    "next": "threshold_inn_hub"
   },
   "protoquest_ruins_entry": {
-    "text": "The shoreline ruins are half-buried in sand, their stones worn by salt and time. Your companion scans the area.\n\n\"Quiet. Too quiet. Stay sharp.\"\n\nA shape moves in the shadows—another scavenger, larger than the trial ones.",
+    "text": "The shoreline ruins are half-buried in sand, their stones worn by salt and time. Your companion scans the area.\n\n\"Quiet. Too quiet. Stay sharp.\"\n\nA shape moves in the shadows—another goblin scavenger, larger than the trial ones.",
     "next": "protoquest_battle"
   },
   "protoquest_battle": {
@@ -245,13 +243,422 @@
   "protoquest_complete": {
     "text": "The scavenger falls. Behind it, a weathered chest. Inside: a small potion and a handful of gold.\n\nYou pocket the loot. \"Not bad. Let's head back.\"\n\nDana will be pleased.",
     "effects": [
-      { "type": "give_gold", "amount": 10 },
-      { "type": "set_flag", "flag_id": "flag_protoquest_completed", "value": true },
+      { "type": "set_flag", "flag_id": "flag_protoquest_ready", "value": true },
       {
         "type": "enter_game_menu",
-        "message": "Optional objective complete. Return to Floor One gate when ready."
+        "message": "Objective complete. Return to Dana at the Threshold Inn for your reward."
       }
     ],
     "next": "floor1_open_handoff"
+  },
+  "threshold_inn_hub": {
+    "text": "The Threshold Inn hums behind you. Dana and Cerel are still around, watching new arrivals. The gate to Floor One glows outside.\n\nYou can ask around for work or step through when you're ready.",
+    "choices": [
+      {
+        "label": "Ask Dana about work",
+        "next": "dana_sidequest_offer"
+      },
+      {
+        "label": "Return to Dana (wolf teeth turn-in)",
+        "next": "dana_turn_in_check"
+      },
+      {
+        "label": "Turn in: Dana's rumor reward",
+        "next": "dana_protoquest_turn_in_check"
+      },
+      {
+        "label": "Step through the Floor One gate",
+        "next": "floor1_gate_prompt"
+      },
+      {
+        "label": "Return to camp menu",
+        "next": "threshold_inn_return"
+      }
+    ]
+  },
+  "threshold_inn_return": {
+    "text": "You take a moment to breathe, then prepare to move.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Use Travel to enter Floor One or explore the shoreline ruins."
+      }
+    ]
+  },
+  "dana_sidequest_offer": {
+    "text": "Dana leans on the counter. \"If you want a simple job, I can pay for materials. Wolves are prowling the open plains. Bring me three wolf teeth, clean and intact.\"\n\n\"It's optional,\" she adds. \"But it'll put coin in your pocket and keep the plains a little safer.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_sq_dana_offered", "value": true }
+    ],
+    "choices": [
+      {
+        "label": "Accept the request (collect 3 wolf teeth)",
+        "next": "dana_sidequest_accept"
+      },
+      {
+        "label": "Decline for now",
+        "next": "dana_sidequest_decline"
+      }
+    ]
+  },
+  "dana_sidequest_accept": {
+    "text": "Dana nods. \"Good. Wolves roam the Open Plains and the off-road trails. Bring me three teeth and I'll pay you on the spot.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_sq_dana_accepted", "value": true }
+    ],
+    "next": "threshold_inn_hub"
+  },
+  "dana_sidequest_decline": {
+    "text": "Dana shrugs. \"No pressure. If you change your mind, ask me again.\"",
+    "next": "threshold_inn_hub"
+  },
+  "dana_turn_in_check": {
+    "text": "Dana looks up as you approach. \"Back already?\"",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_dana_completed",
+        "expected": true,
+        "next_on_true": "dana_turn_in_completed",
+        "next_on_false": "dana_turn_in_ready_check"
+      }
+    ]
+  },
+  "dana_turn_in_ready_check": {
+    "text": "Dana waits for you to speak.",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_dana_ready",
+        "expected": true,
+        "next_on_true": "dana_turn_in_success",
+        "next_on_false": "dana_turn_in_not_ready"
+      }
+    ]
+  },
+  "dana_turn_in_success": {
+    "text": "Dana inspects the wolf teeth and nods. \"Clean work. Here's your cut.\"",
+    "effects": [
+      { "type": "remove_item", "item_id": "wolf_tooth", "quantity": 3 },
+      { "type": "give_gold", "amount": 18 },
+      { "type": "give_party_exp", "amount": 6 },
+      { "type": "set_flag", "flag_id": "flag_sq_dana_completed", "value": true },
+      { "type": "set_flag", "flag_id": "flag_sq_dana_ready", "value": false }
+    ],
+    "next": "threshold_inn_hub"
+  },
+  "dana_turn_in_not_ready": {
+    "text": "Dana shakes her head. \"Still short. Bring me three wolf teeth and we'll talk.\"",
+    "next": "threshold_inn_hub"
+  },
+  "dana_turn_in_completed": {
+    "text": "Dana nods at you. \"You've already been paid. Stay sharp out there.\"",
+    "next": "threshold_inn_hub"
+  },
+  "dana_protoquest_turn_in_check": {
+    "text": "Dana looks up. \"Back from the ruins?\"",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_protoquest_completed",
+        "expected": true,
+        "next_on_true": "dana_protoquest_turn_in_done",
+        "next_on_false": "dana_protoquest_turn_in_ready_check"
+      }
+    ]
+  },
+  "dana_protoquest_turn_in_ready_check": {
+    "text": "Dana waits for your report.",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_protoquest_ready",
+        "expected": true,
+        "next_on_true": "dana_protoquest_turn_in_success",
+        "next_on_false": "dana_protoquest_turn_in_not_ready"
+      }
+    ]
+  },
+  "dana_protoquest_turn_in_success": {
+    "text": "Dana inspects what you recovered and nods. \"Good work. Here's your cut.\"",
+    "effects": [
+      { "type": "give_gold", "amount": 10 },
+      { "type": "set_flag", "flag_id": "flag_protoquest_completed", "value": true },
+      { "type": "set_flag", "flag_id": "flag_protoquest_ready", "value": false }
+    ],
+    "next": "threshold_inn_hub"
+  },
+  "dana_protoquest_turn_in_not_ready": {
+    "text": "Dana shakes her head. \"Not yet. Clear the ruins and come back.\"",
+    "next": "threshold_inn_hub"
+  },
+  "dana_protoquest_turn_in_done": {
+    "text": "Dana nods. \"You've already been paid for that one.\"",
+    "next": "threshold_inn_hub"
+  },
+  "floor1_gate_prompt": {
+    "text": "You step outside. The Floor One gate shimmers, waiting.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Travel to the Floor One Threshold to begin your exploration."
+      }
+    ]
+  },
+  "floor1_gate_entry": {
+    "text": "Crossing the boundary feels like passing through cold mist. The air changes. The sky seems wider. Floor One is real.\n\nThe road ahead leads into open plains.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_floor1_gate_entered", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "Floor One Threshold reached. Travel onward to the Open Plains."
+      }
+    ]
+  },
+  "plains_entry": {
+    "text": "Grasslands roll out in every direction. The main road cuts east toward a distant ridge. Off to the north, the grass grows taller and the wind carries the scent of beasts.\n\nDana's words echo: wolves, and worse, roam the open plains.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_plains_entered", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "Open Plains unlocked. Stay on the road to reach the goblin cave, or go off-road to hunt."
+      }
+    ]
+  },
+  "plains_offroad_intro": {
+    "text": "You step off the road into the tall grass. The terrain is uneven, and the wind masks distant movement.",
+    "choices": [
+      {
+        "label": "Hunt a wolf pack",
+        "next": "plains_offroad_wolf_fight"
+      },
+      {
+        "label": "Track a great boar",
+        "next": "plains_offroad_boar_fight"
+      },
+      {
+        "label": "Return to the road",
+        "next": "plains_offroad_leave"
+      }
+    ]
+  },
+  "plains_offroad_wolf_fight": {
+    "text": "Low growls surround you as a pack circles in from the grass.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "wolf_pack_2" }
+    ],
+    "next": "plains_offroad_after_battle"
+  },
+  "plains_offroad_boar_fight": {
+    "text": "A hulking boar charges from the brush, tusks bared.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "great_boar" }
+    ],
+    "next": "plains_offroad_after_battle"
+  },
+  "plains_offroad_after_battle": {
+    "text": "The grass settles. You take stock of your supplies.",
+    "next": "plains_offroad_intro"
+  },
+  "plains_offroad_leave": {
+    "text": "You return to the road, the wind at your back.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Back on the road. Use Travel to head toward the goblin cave."
+      }
+    ]
+  },
+  "goblin_cave_entrance_intro": {
+    "text": "The ridge opens into a shallow cave mouth. Smoke curls from inside, and crude totems hang from the rocks.\n\nCerel waits near the entrance, arms folded. \"You made it. This is the goblin cave—Floor One's first real hurdle.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_goblin_cave_reached", "value": true }
+    ],
+    "next": "cave_entrance_choice"
+  },
+  "cave_entrance_choice": {
+    "text": "Cerel eyes the path ahead. \"The camp inside is open hunting. The deeper tunnels are harder and more dangerous. Choose your pace.\"\n\nHe gestures toward the cave mouth. \"If you want extra work, ask.\"",
+    "choices": [
+      {
+        "label": "Speak with Cerel about work",
+        "next": "cerel_kill_quest_offer"
+      },
+      {
+        "label": "Return to Cerel (kill-count turn-in)",
+        "next": "cerel_turn_in_check"
+      },
+      {
+        "label": "Step back and prepare",
+        "next": "cave_entrance_exit"
+      }
+    ]
+  },
+  "cerel_kill_quest_offer": {
+    "text": "\"Kill counts matter down here,\" Cerel says. \"Clear out ten goblin grunts and five half-orcs. Bring me proof, and I'll pay. You'll learn their patterns along the way.\"\n\n\"Optional,\" he adds. \"But it will sharpen you.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_sq_cerel_offered", "value": true }
+    ],
+    "choices": [
+      {
+        "label": "Accept the hunt (10 goblins, 5 half-orcs)",
+        "next": "cerel_kill_quest_accept"
+      },
+      {
+        "label": "Decline for now",
+        "next": "cerel_kill_quest_decline"
+      }
+    ]
+  },
+  "cerel_kill_quest_accept": {
+    "text": "Cerel nods. \"Good. The goblin camp is just inside, and half-orcs are roaming the deeper tunnels. Keep count.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_sq_cerel_accepted", "value": true }
+    ],
+    "next": "cave_entrance_exit"
+  },
+  "cerel_kill_quest_decline": {
+    "text": "Cerel shrugs. \"If you change your mind, I'll be here.\"",
+    "next": "cave_entrance_exit"
+  },
+  "cerel_turn_in_check": {
+    "text": "Cerel turns as you approach. \"Back from the tunnels?\"",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_completed",
+        "expected": true,
+        "next_on_true": "cerel_turn_in_completed",
+        "next_on_false": "cerel_turn_in_ready_check"
+      }
+    ]
+  },
+  "cerel_turn_in_ready_check": {
+    "text": "Cerel waits for your report.",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_ready",
+        "expected": true,
+        "next_on_true": "cerel_turn_in_success",
+        "next_on_false": "cerel_turn_in_not_ready"
+      }
+    ]
+  },
+  "cerel_turn_in_success": {
+    "text": "Cerel nods, tallying your report. \"Good. The cave will be quieter now. Take this.\"\n\n\"Stay sharp in the deeper tunnels.\"",
+    "effects": [
+      { "type": "give_gold", "amount": 30 },
+      { "type": "give_party_exp", "amount": 10 },
+      { "type": "set_flag", "flag_id": "flag_sq_cerel_completed", "value": true },
+      { "type": "set_flag", "flag_id": "flag_sq_cerel_ready", "value": false }
+    ],
+    "next": "cave_entrance_exit"
+  },
+  "cerel_turn_in_not_ready": {
+    "text": "Cerel shakes his head. \"Not enough yet. Clear more goblins and half-orcs, then report back.\"",
+    "next": "cave_entrance_exit"
+  },
+  "cerel_turn_in_completed": {
+    "text": "Cerel nods. \"You've already been paid. Don't get complacent.\"",
+    "next": "cave_entrance_exit"
+  },
+  "cave_entrance_exit": {
+    "text": "The cave mouth yawns ahead. The air smells of smoke and damp stone.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Use Travel to enter the Goblin Camp or push into the Deeper Cave Path."
+      }
+    ]
+  },
+  "goblin_camp_hub": {
+    "text": "Crude tents and burning pits fill the chamber. Goblins chatter and bicker, but they scatter when they see you.",
+    "choices": [
+      {
+        "label": "Ambush a goblin patrol",
+        "next": "goblin_camp_goblin_fight"
+      },
+      {
+        "label": "Hunt half-orc enforcers",
+        "next": "goblin_camp_orc_fight"
+      },
+      {
+        "label": "Retreat to the entrance",
+        "next": "goblin_camp_leave"
+      }
+    ]
+  },
+  "goblin_camp_goblin_fight": {
+    "text": "A patrol of goblins breaks from the firelight, weapons raised.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "goblin_camp_patrol" }
+    ],
+    "next": "goblin_camp_after_battle"
+  },
+  "goblin_camp_orc_fight": {
+    "text": "A heavier shadow moves in the tunnel—half-orc enforcers, brutes with crude clubs.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "half_orc_pair" }
+    ],
+    "next": "goblin_camp_after_battle"
+  },
+  "goblin_camp_after_battle": {
+    "text": "The camp quiets after the clash. Smoke and ash hang in the air.",
+    "next": "goblin_camp_hub"
+  },
+  "goblin_camp_leave": {
+    "text": "You pull back from the camp and return to the cave entrance.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Back at the cave entrance. Travel again when ready."
+      }
+    ]
+  },
+  "cave_path_entry": {
+    "text": "The deeper path narrows. The light from the entrance fades, and the tunnels twist into a cold maze.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_deeper_cave_entered", "value": true }
+    ],
+    "next": "cave_path_battle_1"
+  },
+  "cave_path_battle_1": {
+    "text": "A pair of goblin sentries scramble to block the path.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "cave_sentry_pair" }
+    ],
+    "next": "cave_path_battle_2"
+  },
+  "cave_path_battle_2": {
+    "text": "Heavy footsteps follow. A half-orc brute lumbers into the tunnel, snarling.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "half_orc_raider" }
+    ],
+    "next": "cave_guardian_foreshadow"
+  },
+  "cave_guardian_foreshadow": {
+    "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nA lock mechanism glows faintly, unresponsive. This is the guardian's chamber. Not yet.\n\nYou turn back, the warning etched into your memory.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_guardian_foreshadowed", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "Guardian chamber locked. Return when stronger."
+      }
+    ],
+    "next": "floor1_ready"
+  },
+  "floor1_ready": {
+    "text": "Floor One is open. You can farm the plains, clear the goblin camp, finish side work, or prepare for the guardian.\n\nThe choice is yours—for now.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_floor1_ready", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "Floor One slice complete. Explore freely."
+      }
+    ],
+    "next": "ch00_complete"
+  },
+  "ch00_complete": {
+    "text": "Chapter 00 complete. The Floor One guardian still waits."
   }
 }

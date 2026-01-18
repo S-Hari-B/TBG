@@ -22,6 +22,8 @@ Secondary tags (e.g., `slash`, `blunt`, `fire`) can be combined with the primary
 | goblin  | Goblin foes (Emma’s knowledge entry)  |
 | humanoid| Used for general lore/knowledge hooks |
 | beast   | Wolves, boars, other animals          |
+| wolf    | Wolf-specific drops and quest hooks   |
+| orc     | Half-orc foes, heavier melee enemies  |
 | bandit  | Human raiders (future story beats)    |
 | slime   | Slime creatures                        |
 | ooze    | Variant of slime enemies               |
@@ -32,9 +34,16 @@ Secondary tags (e.g., `slash`, `blunt`, `fire`) can be combined with the primary
 |------------|--------------------------------------------------------|
 | safe       | Areas without random encounters                        |
 | town       | Settlement hubs (shops, NPCs)                          |
+| hub        | Travel hubs with multiple connections                  |
+| plains     | Open grasslands and farmland                           |
+| cave       | Underground tunnel networks                            |
+| open       | Open farming areas with repeatable battles             |
+| story      | Story-critical areas with forced encounters            |
+| gate       | Transition points between floors                       |
+| boss       | Boss/guardian locations (usually locked)               |
+| locked     | Visible but inaccessible locations                     |
 | ruins      | Ancient/abandoned structures                           |
 | optional   | Side content, not required for main progression        |
-| gate       | Transition points between floors                       |
 | floor_zero | Tutorial/starting floor content                        |
 | floor_one  | First main floor content                               |
 | legacy     | Deprecated locations preserved for save compatibility  |

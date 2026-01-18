@@ -8,10 +8,10 @@ Introduce core mechanics, story flow, combat, party formation, companion choice,
 
 ## Overview
 
-- **Entry point**: New Game → Beach Arrival → Inn Orientation → Class Selection
-- **Location**: Threshold Inn (Floor Zero)
-- **Party size progression**: 1 → 2 (player chooses Emma OR Niale)
-- **Enemy types**: Training scavengers (goblins serve as placeholders)
+- **Entry point**: New Game → Beach Arrival → Inn Orientation → Class Selection → Floor One expansion
+- **Location**: Threshold Inn (Floor Zero) → Open Plains → Goblin Cave
+- **Party size progression**: 1 → (solo / 2 / 3) depending on companion choice
+- **Enemy types**: Training scavengers, wolves, goblins, half-orcs
 - **Core mechanics introduced**:
   - Equipment-driven power
   - Turn-based combat
@@ -80,7 +80,14 @@ Ordered sequence:
     - **Accept** → `protoquest_accept` → sets `flag_protoquest_accepted`, opens ruins via Travel
     - **Decline** → `protoquest_decline` → skip to Floor One gate
 21. **`floor1_open_handoff`** → Cerel's farewell, Floor One gate opens
-22. **`ch00_complete`** → End of Chapter 00
+22. **`threshold_inn_hub`** → Dana offers wolf-tooth side quest; gate travel available
+23. **`floor1_gate_entry`** → Entry story for Floor One Threshold
+24. **`plains_entry`** → Open Plains hub and travel direction
+25. **`goblin_cave_entrance_intro`** → Cerel offers kill-count side quest
+26. **`cave_path_entry`** → Deeper Cave story path (forced battles)
+27. **`cave_guardian_foreshadow`** → Guardian chamber is visible but locked
+28. **`floor1_ready`** → Floor One open for farming and quests
+29. **`ch00_complete`** → End of Chapter 00 slice
 
 ### Optional Proto-Quest Branch
 
@@ -119,7 +126,16 @@ The non-chosen companion(s) remain "at the bar" for potential future recruitment
 
 - **threshold_inn**: Safe hub, starting location
 - **shoreline_ruins**: Optional proto-quest location (gated behind accepting quest)
-- **floor_one_gate**: Transition point to future Floor One content
+- **floor_one_gate**: Transition point to Floor One
+
+## Areas (Floor One)
+
+- **open_plains**: Travel hub with road vs off-road split
+- **plains_offroad**: Open farming (wolves, boars)
+- **goblin_cave_entrance**: Cave hub with Cerel side quest
+- **goblin_camp**: Open farming area (goblins, half-orcs)
+- **deeper_cave_path**: Story encounters with checkpoint rewind
+- **boss_chamber**: Visible but locked guardian chamber
 
 Legacy areas (village_outskirts, village, forest_deeper) preserved for save compatibility but not part of Chapter 00 flow.
 
@@ -137,6 +153,17 @@ Legacy areas (village_outskirts, village, forest_deeper) preserved for save comp
 - `flag_protoquest_offered`
 - `flag_protoquest_accepted` (if accepted)
 - `flag_protoquest_completed` (if completed)
+- `flag_story_floor1_gate_opened`
+- `flag_story_floor1_gate_entered`
+- `flag_story_plains_entered`
+- `flag_story_goblin_cave_reached`
+- `flag_story_deeper_cave_entered`
+- `flag_story_guardian_foreshadowed`
+- `flag_story_floor1_ready`
+- `flag_sq_dana_offered` / `flag_sq_dana_accepted` / `flag_sq_dana_completed`
+- `flag_sq_cerel_offered` / `flag_sq_cerel_accepted` / `flag_sq_cerel_completed`
+- `flag_kill_goblin_grunt_1` … `flag_kill_goblin_grunt_10`
+- `flag_kill_half_orc_1` … `flag_kill_half_orc_5`
 
 ## Combat Notes
 
@@ -145,7 +172,7 @@ Legacy areas (village_outskirts, village, forest_deeper) preserved for save comp
 - Both battles grant EXP; trial battle guarantees Level 2
 - After every battle, MP resets to full (HP does not)
 - Level-up: HP and MP snap to max immediately
-- Checkpoints: Both battles set checkpoints; defeat rewinds to checkpoint with full HP/MP restore
+- Checkpoints: Story battles set checkpoints; defeat rewinds with full HP/MP restore and half-gold loss. Open-area defeats keep location and set HP/MP to 1.
 
 ## Design Goals Achieved
 

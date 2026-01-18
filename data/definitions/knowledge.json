@@ -9,6 +9,24 @@
           "speed_hint": "Average, but quicker than most untrained adventurers.",
           "behavior": "Often attack in groups and try to overwhelm isolated targets."
         }
+      },
+      {
+        "enemy_tags": ["wolf"],
+        "max_level": 5,
+        "revealed_fields": {
+          "hp_range": [22, 30],
+          "speed_hint": "Fast and evasive. Expect them to act before slower allies.",
+          "behavior": "They circle and strike in bursts. Don't let them isolate you."
+        }
+      },
+      {
+        "enemy_tags": ["orc"],
+        "max_level": 5,
+        "revealed_fields": {
+          "hp_range": [30, 40],
+          "speed_hint": "Slow, but they hit hard.",
+          "behavior": "They favor heavy swings. Guarding can blunt the worst of it."
+        }
       }
     ]
   },
@@ -21,6 +39,24 @@
           "hp_range": [18, 26],
           "speed_hint": "Average, but quicker than most untrained adventurers.",
           "behavior": "Often attack in groups and try to overwhelm isolated targets."
+        }
+      },
+      {
+        "enemy_tags": ["wolf"],
+        "max_level": 5,
+        "revealed_fields": {
+          "hp_range": [22, 30],
+          "speed_hint": "They move fast, especially when they outnumber you.",
+          "behavior": "They probe for weak targets. Keep your guard up."
+        }
+      },
+      {
+        "enemy_tags": ["orc"],
+        "max_level": 5,
+        "revealed_fields": {
+          "hp_range": [30, 40],
+          "speed_hint": "Slow to act, but dangerous if they connect.",
+          "behavior": "Brutes. Bait their swings, then punish the opening."
         }
       }
     ]

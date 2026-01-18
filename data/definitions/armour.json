@@ -63,6 +63,14 @@
     "tags": ["medium_armour"],
     "hp_bonus": 1
   },
+  "leather_vest": {
+    "name": "Leather Vest",
+    "slot": "body",
+    "defense": 2,
+    "value": 20,
+    "tags": ["medium_armour"],
+    "hp_bonus": 1
+  },
   "leather_gloves": {
     "name": "Leather Gloves",
     "slot": "hands",

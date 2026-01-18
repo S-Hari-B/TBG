@@ -38,6 +38,7 @@
       "weapons": ["iron_dagger", "iron_dagger"],
       "armour_slots": {
         "body": "leather_vest",
+        "head": "leather_cap",
         "hands": "leather_gloves",
         "boots": "leather_boots"
       }

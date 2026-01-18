@@ -18,5 +18,10 @@
     "name": "Goblin Horn",
     "kind": "material",
     "value": 12
+  },
+  "wolf_tooth": {
+    "name": "Wolf Tooth",
+    "kind": "material",
+    "value": 8
   }
 }

@@ -40,5 +40,17 @@
         "max_qty": 1
       }
     ]
+  },
+  {
+    "id": "wolf_tooth_drop",
+    "required_enemy_tags": ["wolf"],
+    "drops": [
+      {
+        "item_id": "wolf_tooth",
+        "chance": 0.6,
+        "min_qty": 1,
+        "max_qty": 1
+      }
+    ]
   }
 ]

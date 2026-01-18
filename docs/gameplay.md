@@ -34,7 +34,7 @@ Game Menu
 * After every victorious battle the entire party’s MP is restored to full before any follow-up story or camp logic occurs. (HP remains unchanged unless specified elsewhere.)
 * Whenever a player-controlled character levels up (including multiple levels in one reward step) their HP and MP snap to their current max values immediately after the level-up calculation, guaranteeing they’re ready for the next encounter.
 * If the hero (player-controlled combatant) is reduced to 0 HP at any point in battle, the encounter ends instantly in defeat even if allies remain standing—no extra turns are played out after the hero falls.
-* When the party is defeated, no one dies permanently: `flag_last_battle_defeat` is set to `true`, everyone’s HP and MP are fully restored, and the CLI drops straight back into Camp Menu with the message “You barely make it back to camp…”. The story rewinds to the last checkpointed node (the moment that triggered the battle) so selecting “Continue story” replays the failed encounter rather than skipping ahead. Checkpoints are tagged by thread (`main_story` today), so future quest checkpoints can coexist without fighting over Camp Continue. No gold/EXP penalties are applied in this placeholder implementation.
+* When the party is defeated, no one dies permanently: `flag_last_battle_defeat` is set to `true` and the CLI drops back into Camp Menu with the message “You barely make it back to camp…”. Story battles rewind to the last checkpointed node (the moment that triggered the battle) so selecting “Continue story” replays the failed encounter rather than skipping ahead. Open-area battles keep the player in the same location with HP/MP set to a minimum of 1. Checkpoints are tagged by thread (`main_story` today), so future quest checkpoints can coexist without fighting over Camp Continue. Defeat now costs half of current gold (rounded down) regardless of battle type.
 
 ### Debug-mode UI helpers
 
@@ -61,7 +61,17 @@ Chapter 00 is a LitRPG-framed tutorial introducing core systems through story be
 8. **Party Battle** (`battle_party_setup`, `battle_party_pack`, `party_after_battle`) – Multi-enemy encounter demonstrating party coordination (skipped if solo path chosen), sets `flag_party_battle_completed`.
 9. **Knowledge Intro** (`knowledge_intro_party_talk` or `solo_knowledge_intro`) – Party Talk or solo knowledge advice explained, sets `flag_knowledge_intro_seen`.
 10. **Proto-Quest Hook** (`protoquest_offer`) – Dana mentions optional shoreline ruins loot, player can accept or decline, sets `flag_protoquest_offered`.
-11. **Floor One Handoff** (`floor1_open_handoff`, `ch00_complete`) – Cerel's farewell, Floor One gate opens.
+11. **Floor One Handoff** (`floor1_open_handoff`) – Cerel's farewell, Floor One gate opens.
+12. **Threshold Inn Hub** (`threshold_inn_hub`) – Dana offers an optional wolf-tooth quest; the gate is available.
+13. **Floor One Threshold** (`floor1_gate_entry`) – entry story when crossing the gate.
+14. **Open Plains** (`plains_entry`) – travel hub; stay on road (story) or go off-road (open farming).
+15. **Side Quest 1: Wolf Teeth** – collect 3 wolf teeth from off-road wolves, then return to Dana to turn in for rewards.
+16. **Goblin Cave Entrance** (`goblin_cave_entrance_intro`) – Cerel offers kill-count side quest; goblin camp and deeper path unlock.
+17. **Side Quest 2: Kill Quest** – defeat 10 Goblin Grunts + 5 Half-Orcs in goblin camp / cave encounters, then return to Cerel to claim rewards.
+18. **Goblin Camp** (`goblin_camp_hub`) – open farming area with repeatable fights.
+19. **Deeper Cave Path** (`cave_path_entry`) – forced story battles with checkpoint rewind on defeat.
+20. **Guardian Foreshadow** (`cave_guardian_foreshadow`) – sealed boss chamber is visible but locked.
+21. **Floor One Ready** (`floor1_ready`) – player free to farm, quest, and prepare.
 
 If proto-quest accepted, player can Travel to **Shoreline Ruins**, trigger `protoquest_ruins_entry` → `protoquest_battle` → `protoquest_complete` (10 gold reward, sets `flag_protoquest_completed`).
 

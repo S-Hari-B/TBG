@@ -455,8 +455,11 @@ Effect types supported in v1:
 * `add_party_member { "member_id": string }`
 * `give_gold { "amount": int }`
 * `give_exp { "amount": int }`
+* `give_party_exp { "amount": int }` – awards EXP across the active party (same split as battle rewards)
 * `enter_game_menu { "message"?: string }` – halts flow and pushes the player to Camp Menu before resuming at `next`
 * `set_flag { "flag_id": string, "value"?: bool }` – stores/overrides boolean flags in `GameState.flags`
+* `remove_item { "item_id": string, "quantity"?: int }` – removes items from shared inventory (fails if insufficient)
+* `branch_on_flag { "flag_id": string, "expected"?: bool, "next_on_true": string, "next_on_false": string }` – conditional branch by flag state
 
 Because the repository enforces chapter order, story progression stays deterministic even as additional chapters ship later.
 
