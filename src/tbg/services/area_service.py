@@ -9,7 +9,7 @@ from tbg.domain.defs import AreaDef
 from tbg.domain.state import GameState
 from tbg.services.errors import TravelBlockedError
 
-DEFAULT_STARTING_AREA_ID = "village_outskirts"
+DEFAULT_STARTING_AREA_ID = "threshold_inn"
 TRAVEL_BLOCKED_MESSAGE = "You can't push onward yet. Something unresolved still blocks your path."
 
 

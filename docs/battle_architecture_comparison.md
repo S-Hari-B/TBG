@@ -2,7 +2,7 @@
 
 ## Before: Mixed Responsibilities
 
-```
+```text
 presentation/cli/app.py
 ├── _run_battle_loop()
 │   ├── Renders turn header
@@ -21,6 +21,7 @@ presentation/cli/app.py
 ```
 
 **Problems**:
+
 - State progression mixed with rendering
 - Duplicate event formatting
 - State panel reprinted on invalid input
@@ -31,7 +32,7 @@ presentation/cli/app.py
 
 ## After: Clean Separation
 
-```
+```text
 services/controllers/battle_controller.py
 └── BattleController (UI-agnostic)
     ├── get_battle_view() → structured state
@@ -66,6 +67,7 @@ presentation/cli/app.py
 ```
 
 **Benefits**:
+
 - Clear separation: controller progresses, CLI renders
 - One canonical event formatter
 - State panel tied to decision points
@@ -78,7 +80,6 @@ presentation/cli/app.py
 
 ### Player Turn (Simplified)
 
-```
 [User Input]
      ↓
 [CLI Prompts] → "attack" + target
@@ -94,11 +95,9 @@ presentation/cli/app.py
 [Canonical Formatter] → ["- Hero hits Goblin for 5 damage."]
      ↓
 [CLI Renders] → prints to console
-```
 
 ### Future GUI Flow
 
-```
 [GUI Button Click]
      ↓
 [BattleAction] → { type: "attack", target_id: "enemy_1" }
@@ -110,7 +109,6 @@ presentation/cli/app.py
 [GUI Event Handler] → animates damage
      ↓
 [GUI Updates] → redraws health bars
-```
 
 **No changes to services or domain required!**
 
@@ -119,11 +117,13 @@ presentation/cli/app.py
 ## Testing Strategy
 
 ### Before
+
 - Mock CLI input/output
 - Test full integration path
 - Hard to isolate logic
 
 ### After
+
 - Test controller without CLI
 - Test CLI rendering separately
 - Test event formatting independently
@@ -134,7 +134,6 @@ presentation/cli/app.py
 ## Migration Impact
 
 | Aspect | Impact |
-|--------|--------|
 | Gameplay | ✅ None (100% identical) |
 | CLI Output | ✅ None (line-for-line identical) |
 | Determinism | ✅ None (same RNG usage) |

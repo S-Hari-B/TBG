@@ -28,12 +28,16 @@ Secondary tags (e.g., `slash`, `blunt`, `fire`) can be combined with the primary
 
 ## Area / Location Tags
 
-| Tag       | Notes                                           |
-|-----------|-------------------------------------------------|
-| village   | Settled safe-ish hubs; used for shop/story gates|
-| outskirts | Transitional tiles around towns                 |
-| forest    | Wild encounters; intro slice uses this heavily  |
-| safe      | Marks areas that should not spawn encounters    |
+| Tag        | Notes                                                  |
+|------------|--------------------------------------------------------|
+| safe       | Areas without random encounters                        |
+| town       | Settlement hubs (shops, NPCs)                          |
+| ruins      | Ancient/abandoned structures                           |
+| optional   | Side content, not required for main progression        |
+| gate       | Transition points between floors                       |
+| floor_zero | Tutorial/starting floor content                        |
+| floor_one  | First main floor content                               |
+| legacy     | Deprecated locations preserved for save compatibility  |
 
 ## Usage Summary
 

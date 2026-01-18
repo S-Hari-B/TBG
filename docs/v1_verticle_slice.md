@@ -1,257 +1,163 @@
-V1 Vertical Slice – Tutorial Campaign
-
-This document defines the first playable vertical slice of TBG v1.
-Its purpose is to introduce core mechanics, story flow, combat, party formation, and the knowledge system in a controlled, minimal scope.
-
-The slice is intentionally small and designed to be replayable and deterministic.
-
-Overview
-
-Entry point: New Game → Class Selection
-
-Location: Forest road outside the starting village
-
-Party size progression: 1 → 2
-
-Enemy types: Goblins
-
-Core mechanics introduced:
-
-Equipment-driven power
-
-Turn-based combat
-
-Party formation
-
-Hidden enemy information
-
-Party Talk (knowledge-based)
-
-Class Selection (Game Start)
-
-Class selection determines starting equipment and items only.
-Classes do not gate progression, skills, or long-term growth.
-
-All starting gear is Common quality.
-
-Warrior
-
-Weapon: One-handed sword (1 slot)
-
-Weapon: Shield (1 slot)
-
-Armour: Heavy body armour
-
-Role: High defense, steady damage
-
-Rogue
-
-Weapon: Dagger (1 slot)
-
-Weapon: Dagger (1 slot)
-
-Inventory: Shortbow (2-slot weapon)
-
-Armour: Medium body armour
-
-Role: High speed, flexible engagement
-
-Mage
-
-Weapon: Fire staff (2 slots)
-
-Armour: Light body armour
-
-Starting abilities:
-
-Single-target fire spell
-
-Multi-target fire spell
-
-Role: High energy, ability-focused damage
-
-Commoner (Hard Mode)
-
-Weapon: Club (1 slot)
-
-Armour: Light body armour
-
-Role: Low stats, challenge run
-
-Story Flow
-
-Ordered sequence (Slice A):
-
-1. `intro_decree` – the royal summons arrives and sets `flag_decree_received`.
-2. `intro_departure` – the hero commits to the road (`flag_left_village`).
-3. `class_select`
-4. `forest_intro`
-5. `forest_scream`
-6. `emma_encounter` → battle vs `goblin_grunt` (player only)
-7. `emma_join` → Emma formally joins the party (`flag_met_emma`)
-8. `forest_ambush` → battle vs `goblin_pack_3` (player + Emma)
-9. `post_ambush_menu` → short rest/menu interlude (player can Party Talk before continuing)
-10. `forest_aftermath` → awards a small gold stipend, re-enters camp, and nudges the player to Travel before advancing
-11. Optional `forest_deeper_entry` → `forest_deeper_path` → `forest_deeper_tracks` → (wolf or bandit battle) → `forest_deeper_clearing` (`flag_cleared_forest_path`)
-12. `demo_slice_complete` → final “End of slice” narration after the player leaves camp
-
-Node: intro_decree
-
-Purpose: establish the King’s request and the larger JRPG hook.
-
-Effects:
-
-* `set_flag`: `flag_decree_received`
-
-Next: intro_departure
-
-Node: intro_departure
-
-Text: The player prepares to leave as other volunteers march toward the capital.
-
-Effects:
-
-* `set_flag`: `flag_left_village`
-
-Next: class_select
-
-Node: class_select
-
-Player selects starting class
-
-Effects:
-
-Apply starting stats
-
-Equip starting gear
-
-Add starting items
-
-Next: forest_intro
-
-Node: forest_intro
-
-Text: Player leaves the village and enters a forest path toward the capital
-
-No combat
-
-Next: forest_scream
-
-Node: forest_scream
-
-Text: A scream echoes from deeper in the forest
-
-Choice:
-
-Investigate → emma_encounter
-
-Ignore → future alternate route (not implemented in v1)
-
-Node: emma_encounter
-
-Scene description:
-
-Player finds a wounded adventurer surrounded by three goblin corpses
-
-One goblin remains alive
-
-Combat:
-
-Party: Player
-
-Enemy: 1 Goblin
-
-Mechanics introduced:
-
-Basic combat
-Basic Attack and weapon-tag skills (Power Slash, Brace if tags match)
-
-Enemy stats hidden (shown as ???)
-
-Next: emma_join
-
-Node: emma_join
-
-Dialogue exchange between player and Emma
-
-Emma explains she was overwhelmed, not defeated
-
-Effects:
-
-Add party member: Emma
-
-Next: forest_ambush
-
-Node: forest_ambush
-
-Combat:
-
-Party: Player + Emma
-
-Enemies: 3 Goblins
-
-Mechanics introduced:
-
-Party-based combat
-
-Initiative with multiple actors
-
-Party Talk (knowledge reveal)
-Party Talk consumes the active character's turn and prints deterministic knowledge text
-
-Emma can reveal information about goblins via Party Talk
-Staff-user skills (Firebolt single-target, Ember Wave up to 3) unlock when Emma has the MP to spend.
-Victory rewards: defeating the goblin pack yields enough EXP for the Hero to reach Level 2, grants Emma her share (without changing her level 3 baseline), and always drops a `goblin_horn` plus a deterministic chance at bonus supplies.
-
-Next: post_ambush_menu
-
-Node: post_ambush_menu
-
-Purpose: Provide a rest/checkpoint beat where the player can re-enter the camp/game menu, talk with party members, then resume the story.
-
-Effects:
-
-* `enter_game_menu` – halts story flow and drops into the camp menu
-* Menu lets the player: Continue Story (resumes pending node), Inventory / Equipment (manage the shared party loadout), Party Talk (Emma has new deterministic flavour lines), Quit to Main Menu
-
-Next: forest_aftermath
-
-Node: forest_aftermath
-
-Dialogue and short banter about the King's timetable and the restless forest.
-
-Rewards:
-
-* Gold (small stipend)
-
-Effects:
-
-* `enter_game_menu` – immediately returns the player to the Camp Menu with explicit instructions to try the Travel option (village ↔ deep forest) before proceeding.
-
-Next: demo_slice_complete
-
-Node: forest_deeper_entry / path / tracks (Travel-triggered optional sequence)
-
-* Entry text warns about dangerous wildlife and bandit activity.
-* `forest_deeper_tracks` presents a choice:
-  * Follow the clawed tracks → `forest_deeper_follow` → battle vs `wolf`.
-  * Avoid the tracks / stay on the road → `forest_deeper_road` → battle vs `bandit_scout`.
-* Both paths converge on `forest_deeper_clearing`, which sets `flag_cleared_forest_path`, triggers another Camp Menu interlude, and foreshadows Chapter 01 on the King's highway.
-
-Node: demo_slice_complete
-
-Node: demo_slice_complete
-
-Purpose: Provide the final “End of demo slice” narration once the player chooses Continue from camp.
-
-Text reminds the player they have reached the current edge of content and that they can continue replaying encounters or travelling between `village_outskirts`, `village`, and `forest_deeper` for testing.
-
-Design Notes
-
-Enemy stats are hidden by default
-Battles now run directly inside the CLI with deterministic turn order and offer Basic Attack, Use Skill (weapon-tag gated), and Party Talk actions.
-Party Talk currently prints structured knowledge text directly (UI intel reveal remains future work and enemy HP stays `???`).
-Information is revealed only through Party Talk
-Additional enemies (wolves, bandits, slimes, goblin archers) plus the spear weapon line exist in the data to support future encounters even though Slice A focuses on goblins.
-
-This slice establishes party members as strategic assets, not just combat units
+# V1 Vertical Slice – Chapter 00 Tutorial
+
+This document defines the first playable vertical slice of TBG v1: Chapter 00.
+
+## Purpose
+
+Introduce core mechanics, story flow, combat, party formation, companion choice, and basic quest concepts (flags only) in a controlled, replayable, deterministic tutorial chapter.
+
+## Overview
+
+- **Entry point**: New Game → Beach Arrival → Inn Orientation → Class Selection
+- **Location**: Threshold Inn (Floor Zero)
+- **Party size progression**: 1 → 2 (player chooses Emma OR Niale)
+- **Enemy types**: Training scavengers (goblins serve as placeholders)
+- **Core mechanics introduced**:
+  - Equipment-driven power
+  - Turn-based combat
+  - Party formation & companion choice
+  - Hidden enemy information
+  - Party Talk (knowledge-based)
+  - Proto-quest hooks (flags only, no journal)
+  - Level-up progression
+  - Checkpoint/retry system
+
+## Class Selection
+
+Class selection determines starting equipment and items only. Classes do not gate progression, skills, or long-term growth. All starting gear is Common quality.
+
+### Warrior
+- **Weapons**: One-handed sword (1 slot), Shield (1 slot)
+- **Armour**: Heavy body armour
+- **Role**: High defense, steady damage
+
+### Rogue
+- **Weapons**: Dagger (1 slot), Dagger (1 slot)
+- **Inventory**: Shortbow (2-slot weapon)
+- **Armour**: Medium body armour
+- **Role**: High speed, flexible engagement
+
+### Mage
+- **Weapon**: Fire staff (2 slots)
+- **Armour**: Light body armour
+- **Starting abilities**: Single-target fire spell, Multi-target fire spell
+- **Role**: High MP, ability-focused damage
+
+### Commoner (Hard Mode)
+- **Weapon**: Club (1 slot)
+- **Armour**: Light body armour
+- **Role**: Low stats, challenge run
+
+## Story Flow (Chapter 00)
+
+Ordered sequence:
+
+1. **`arrival_beach_wake`** → Player wakes on beach, sets `flag_ch00_arrived`
+2. **`arrival_beach_rescue`** → NPCs escort player to inn
+3. **`inn_arrival`** → Introduction to Threshold Inn and Cerel
+4. **`inn_orientation_cerel`** → Floors concept, safe zones, progression explained
+5. **`inn_orientation_dana`** → Veteran insights, party trade-offs
+6. **`class_overview`** → Class explanation before selection
+7. **`class_select`** → Player chooses class, sets class flags
+8. **`class_confirm`** → Acknowledgment of class choice
+9. **`trial_setup`** → Cerel prepares solo trial
+10. **`battle_trial_1v1`** → Battle vs 1 scavenger (player only), checkpointed
+11. **`trial_victory_reflect`** → Level 2 achieved, MP/HP reset mechanics explained, sets `flag_trial_completed`
+12. **`party_intro`** → Emma (Mage) and Niale (Rogue) introduced
+13. **`companion_choice`** → Player chooses party configuration:
+    - **Go solo** (no companions)
+    - **Emma only** (Mage)
+    - **Niale only** (Rogue)
+    - **Both Emma and Niale** (full party)
+14. **Solo path**: If player chooses solo, skips to `solo_path_skip_party_battle` → `solo_knowledge_intro` (narrative knowledge teaching without party battle)
+15. **Party paths**: If player chooses any companion(s), proceeds to `companion_emma_join` / `companion_niale_join` / `companion_both_join`
+16. **`battle_party_setup`** → Cerel prepares party battle (skipped on solo path)
+16. **`battle_party_pack`** → Battle vs 3 scavengers (player + companion), checkpointed
+17. **`party_after_battle`** → Victory acknowledgment, sets `flag_party_battle_completed`
+18. **`knowledge_intro_party_talk`** → Party Talk mechanic introduced, sets `flag_knowledge_intro_seen`
+19. **`protoquest_offer`** → Dana mentions optional ruins loot, sets `flag_protoquest_offered`
+20. **Player Choice**:
+    - **Accept** → `protoquest_accept` → sets `flag_protoquest_accepted`, opens ruins via Travel
+    - **Decline** → `protoquest_decline` → skip to Floor One gate
+21. **`floor1_open_handoff`** → Cerel's farewell, Floor One gate opens
+22. **`ch00_complete`** → End of Chapter 00
+
+### Optional Proto-Quest Branch
+
+If player accepted proto-quest:
+
+- Travel to **Shoreline Ruins**
+- **`protoquest_ruins_entry`** → Entry node (auto-triggered on first visit)
+- **`protoquest_battle`** → Battle vs scavenger
+- **`protoquest_complete`** → Loot reward (10 gold), sets `flag_protoquest_completed`
+- Return to inn, proceed to Floor One gate
+
+## Companion Choice
+
+At the `companion_choice` node, the player selects their party configuration:
+
+1. **Go solo** (no companions) – Higher individual rewards, no Party Talk, narrative-only knowledge intro, party battle is skipped
+2. **Emma only** (Mage, Level 3) – High MP, area damage (Firebolt, Fireburst)
+3. **Niale only** (Rogue, Level 3) – High speed, mobility, single-target damage
+4. **Both Emma and Niale** – Full party (3 members), 3-way EXP split, maximum tactical flexibility
+
+The choice affects:
+- Party composition for all subsequent battles
+- EXP distribution (solo keeps 100%, party splits evenly)
+- Access to Party Talk (solo players cannot use Party Talk)
+- Party battle participation (solo skips the multi-enemy training fight)
+
+Flags set based on choice:
+- `flag_companion_none` (solo)
+- `flag_companion_emma` (Emma only)
+- `flag_companion_niale` (Niale only)
+- `flag_companion_both` (both companions)
+
+The non-chosen companion(s) remain "at the bar" for potential future recruitment.
+
+## Areas (Floor Zero)
+
+- **threshold_inn**: Safe hub, starting location
+- **shoreline_ruins**: Optional proto-quest location (gated behind accepting quest)
+- **floor_one_gate**: Transition point to future Floor One content
+
+Legacy areas (village_outskirts, village, forest_deeper) preserved for save compatibility but not part of Chapter 00 flow.
+
+## Flags Set in Chapter 00
+
+- `flag_ch00_arrived`
+- `flag_class_selected_warrior` / `_rogue` / `_mage` / `_commoner`
+- `flag_trial_completed`
+- `flag_companion_none` (solo path)
+- `flag_companion_emma` (Emma only path)
+- `flag_companion_niale` (Niale only path)
+- `flag_companion_both` (both companions path)
+- `flag_party_battle_completed` (set even if battle is skipped on solo path)
+- `flag_knowledge_intro_seen`
+- `flag_protoquest_offered`
+- `flag_protoquest_accepted` (if accepted)
+- `flag_protoquest_completed` (if completed)
+
+## Combat Notes
+
+- **Trial Battle**: Solo, 1v1, introduces basic attack and skills
+- **Party Battle**: 1v3, introduces multi-actor turns, party coordination, Party Talk
+- Both battles grant EXP; trial battle guarantees Level 2
+- After every battle, MP resets to full (HP does not)
+- Level-up: HP and MP snap to max immediately
+- Checkpoints: Both battles set checkpoints; defeat rewinds to checkpoint with full HP/MP restore
+
+## Design Goals Achieved
+
+- **Diegetic systems**: NPCs acknowledge levels, classes, floors
+- **Gradual teaching**: Solo combat → Party combat → Knowledge → Optional objectives
+- **Meaningful choice**: Companion selection affects party composition
+- **Quest scaffolding**: Proto-quest uses flags only, no journal required yet
+- **Deterministic**: All outcomes repeatable with same seed
+
+## Next Steps (Out of Scope for Chapter 00)
+
+- Full quest journal UI
+- Floor One exploration and content
+- Boss encounters and floor progression gates
+- Additional companions and party dynamics

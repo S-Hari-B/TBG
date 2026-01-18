@@ -1,126 +1,257 @@
 {
-  "intro_decree": {
-    "text": "A royal courier arrives before dawn, unfurling a decree stamped with the King's crest. Adventurers are summoned to the capital for a mission 'vital to the realm.' The promise of coin, reputation, and answers hums through the village square.",
+  "arrival_beach_wake": {
+    "text": "You wake on damp sand, ears ringing. The sky is gray. The ocean breathes beside you, indifferent.\n\nYour name feels distant. Your past? Fragmented. But something hums beneath your skin—a presence, a pattern, like words you almost remember.\n\nFootsteps approach.",
     "effects": [
-      { "type": "set_flag", "flag_id": "flag_decree_received", "value": true }
+      { "type": "set_flag", "flag_id": "flag_ch00_arrived", "value": true }
     ],
-    "next": "intro_departure"
+    "next": "arrival_beach_rescue"
   },
-  "intro_departure": {
-    "text": "You pack your gear and leave the village gate behind. Other hopefuls march along the road, answering the same call. The capital is days away, but every step feels like the start of something irreversible.",
-    "effects": [
-      { "type": "set_flag", "flag_id": "flag_left_village", "value": true }
-    ],
+  "arrival_beach_rescue": {
+    "text": "\"Another one.\" A woman's voice, calm and practiced. \"Can you stand?\"\n\nYou nod. Two figures help you to your feet: one wears traveler's leathers, the other a worn tunic marked with faded guild symbols.\n\n\"The inn's not far,\" the woman says. \"You'll want answers. Everyone does.\"",
+    "next": "inn_arrival"
+  },
+  "inn_arrival": {
+    "text": "The Threshold Inn sits just past the dunes, solid wood and warm light. Inside, a handful of arrivals sit nursing drinks or staring at their hands. You're shown to a table.\n\nA middle-aged man in crisp robes approaches. His smile is professional, reassuring.\n\n\"Welcome. I'm Cerel, integration specialist. You probably have a lot of questions. Don't worry, that is normal. Unfortunately, I cannot answer them all but I can help you learn the basics on how to survive in this world.\"",
+    "next": "inn_orientation_cerel"
+  },
+  "inn_orientation_cerel": {
+    "text": "Cerel explains:\n\nThe Floors are layered zones, each with towns, wilderness, and a guardian gate to the next level. You're on Floor Zero—the starting point. Safe, but limited.\n\nMost arrivals can't remember their past clearly. That's normal. What matters now is forward.\n\nYou'll grow stronger through experience. Levels, skills, equipment—all real, all measurable. The system acknowledges your progress.\n\n\"Think of this as… a second chance. Or a test. Depends who you ask.\"",
+    "next": "inn_orientation_dana"
+  },
+  "inn_orientation_dana": {
+    "text": "A scarred woman at the bar interjects, not looking up from her drink.\n\n\"Cerel makes it sound clean. It's not. Floors get harder. Monsters get meaner. Parties help, but they also slow you down—shared rewards, shared risk.\"\n\nShe finally glances your way. \"Name's Dana. Been here since the start. My advice? Pick your class carefully. It's not possible to change it later. And don't rush Floor One alone, if you plan on surviving, you should at least have a companion to help you.\"",
+    "next": "class_overview"
+  },
+  "class_overview": {
+    "text": "Cerel nods. \"Class selection is permanent for most. It shapes your combat style, your growth, your role in a party.\"\n\nHe gestures to a worn chart on the wall:\n\n**Warrior**: Frontline durability. High HP, solid defense. Reliable damage, shield skills.\n\n**Rogue**: Speed and precision. Lower HP, high evasion. Strong single-target burst.\n\n**Mage**: Ranged magic. Fragile, but devastating area attacks. MP-hungry.\n\n**Commoner**: Unspecialized. Balanced stats, no clear strengths. A challenge run for veterans.\n\n\"Take your time. This choice matters.\"",
     "next": "class_select"
   },
   "class_select": {
-    "text": "Choose your starting class.",
+    "text": "Cerel watches you, waiting.\n\n\"When you're ready, speak your choice. The system will… acknowledge it. You'll feel the shift.\"",
     "choices": [
-      { "label": "Warrior", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "warrior" }] },
-      { "label": "Rogue", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "rogue" }] },
-      { "label": "Mage", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "mage" }] },
-      { "label": "Commoner", "next": "forest_intro", "effects": [{ "type": "set_class", "class_id": "commoner" }] }
+      { 
+        "label": "Warrior", 
+        "next": "class_confirm",
+        "effects": [
+          { "type": "set_class", "class_id": "warrior" },
+          { "type": "set_flag", "flag_id": "flag_class_selected_warrior", "value": true }
+        ]
+      },
+      { 
+        "label": "Rogue", 
+        "next": "class_confirm",
+        "effects": [
+          { "type": "set_class", "class_id": "rogue" },
+          { "type": "set_flag", "flag_id": "flag_class_selected_rogue", "value": true }
+        ]
+      },
+      { 
+        "label": "Mage", 
+        "next": "class_confirm",
+        "effects": [
+          { "type": "set_class", "class_id": "mage" },
+          { "type": "set_flag", "flag_id": "flag_class_selected_mage", "value": true }
+        ]
+      },
+      { 
+        "label": "Commoner", 
+        "next": "class_confirm",
+        "effects": [
+          { "type": "set_class", "class_id": "commoner" },
+          { "type": "set_flag", "flag_id": "flag_class_selected_commoner", "value": true }
+        ]
+      }
     ]
   },
-  "forest_intro": {
-    "text": "You leave your village behind and set out along the forest road toward the capital. Caravans, scouts, and eager mercenaries share the path -- more traffic than these woods have seen in years.",
-    "next": "forest_scream"
+  "class_confirm": {
+    "text": "A pulse runs through you—recognition, alignment. Your body feels… defined. Solid. Real.\n\nCerel smiles. \"Good. Now let's see if you can use it.\"",
+    "next": "trial_setup"
   },
-  "forest_scream": {
-    "text": "A sudden scream cuts through the trees.",
+  "trial_setup": {
+    "text": "Cerel leads you outside, past the inn's training yard. A small fenced enclosure holds a single restless creature—a shoreline scavenger, teeth bared, eyes wild.\n\n\"Standard trial. One-on-one. I'll observe, but I won't intervene. Defeat it, and we'll talk about what comes next.\"\n\nHe steps back. The gate opens.\n\n\"Your move.\"",
+    "next": "battle_trial_1v1"
+  },
+  "battle_trial_1v1": {
+    "text": "The creature lunges.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "goblin_grunt" }
+    ],
+    "next": "trial_victory_reflect"
+  },
+  "trial_victory_reflect": {
+    "text": "The creature collapses. You're breathing hard, adrenaline fading. Then—\n\n**Level 2.**\n\nThe sensation is immediate: clarity, strength, capacity. Your wounds knit slightly. Your energy stabilizes.\n\nCerel nods. \"There it is. Growth. Each level makes you more resilient, more capable. But the curve flattens quickly—Level 10 takes far longer than Level 2.\"\n\nDana calls from the doorway. \"And your MP resets after every fight. Convenient, right? HP doesn't. Plan accordingly.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_trial_completed", "value": true }
+    ],
+    "next": "party_intro"
+  },
+  "party_intro": {
+    "text": "Cerel gestures you back inside. Two figures wait at your table.\n\nThe first is a young woman with a fire staff slung across her back. She offers a small, confident nod. \"Emma. Mage. I handle crowds and blast the critters from a distance.\"\n\nThe second is a lean man in dark leather, daggers sheathed at his belt. He grins. \"Niale. Rogue. I handle... problems. Quietly.\"\n\nCerel explains: \"Most Floor Zero exits are done in pairs or trios. Parties share rewards, but they also share risk. You'll split experience, but you'll survive encounters that would flatten you solo.\"\n\nDana adds from across the room: \"And someone can watch your back while you drink a potion. Don't underestimate that.\"\n\nEmma and Niale both look at you expectantly.\n\nCerel: \"Your call. Pick one for now. The other will be around if you need them later.\"",
+    "next": "companion_choice"
+  },
+  "companion_choice": {
+    "text": "Emma: \"I can burn groups down fast. Just keep them off me.\"\n\nNiale: \"I'm quick, I hit hard, and I know when to run. Your call.\"\n\nWho do you choose?",
     "choices": [
-      { "label": "Investigate", "next": "emma_encounter" },
-      { "label": "Ignore it (not implemented)", "next": "forest_scream" }
+      {
+        "label": "Go solo (no companions)",
+        "next": "companion_solo"
+      },
+      {
+        "label": "Emma (Mage) only",
+        "next": "companion_emma_join"
+      },
+      {
+        "label": "Niale (Rogue) only",
+        "next": "companion_niale_join"
+      },
+      {
+        "label": "Both Emma and Niale",
+        "next": "companion_both_join"
+      }
     ]
   },
-  "emma_encounter": {
-    "text": "You find a young adventurer backed against a tree. Three goblin corpses lie nearby. One goblin remains, snarling.",
-    "effects": [{ "type": "start_battle", "enemy_id": "goblin_grunt" }],
-    "next": "emma_join"
+  "companion_solo": {
+    "text": "\"I'll handle this alone,\" you say.\n\nEmma shrugs. \"Your call. We'll be around.\"\n\nNiale nods. \"Good luck.\"\n\nCerel frowns slightly. \"Ambitious. Solo runs are riskier, but you'll keep all the rewards. Just remember: parties exist for a reason. You can recruit later if you change your mind.\"\n\nDana calls out: \"And don't forget—knowledge is still valuable even solo. Study your enemies. Learn their patterns.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_companion_none", "value": true }
+    ],
+    "next": "solo_path_skip_party_battle"
   },
-  "emma_join": {
-    "text": "After the fight, she steadies her breathing. \"I had them... until I didn't.\"\n\nShe introduces herself as Emma, also heading to the capital. Traveling together means more eyes on the road -- and fewer ways to die alone.",
+  "solo_path_skip_party_battle": {
+    "text": "Cerel decides to skip the multi-enemy training exercise. \"You've proven you can handle yourself one-on-one. For a solo run, that's the core skill. Multi-enemy encounters will be tougher without backup, but you'll learn through experience.\"\n\nHe gestures toward the inn. \"Let's talk strategy instead.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_party_battle_completed", "value": true }
+    ],
+    "next": "solo_knowledge_intro"
+  },
+  "solo_knowledge_intro": {
+    "text": "Inside, Dana offers some advice.\n\n\"Solo means no Party Talk in combat, but you can still learn. Pay attention to enemy behavior. HP estimates, attack patterns, weaknesses—it all matters. Some enemies telegraph their moves. Use that.\"\n\nCerel nods. \"Knowledge is survival. Even more so when you're alone. Floors have libraries, wandering scholars, other adventurers willing to share intel. Always worth the investment.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_knowledge_intro_seen", "value": true }
+    ],
+    "next": "protoquest_offer"
+  },
+  "companion_emma_join": {
+    "text": "Emma grins. \"Good choice. Let's not die.\"\n\nNiale shrugs. \"Fair. I'll be around if you change your mind.\"\n\nCerel: \"Excellent. Let's test the synergy.\"",
     "effects": [
       { "type": "add_party_member", "member_id": "emma" },
-      { "type": "set_flag", "flag_id": "flag_met_emma", "value": true }
+      { "type": "set_flag", "flag_id": "flag_companion_emma", "value": true }
     ],
-    "next": "forest_ambush"
+    "next": "battle_party_setup"
   },
-  "forest_ambush": {
-    "text": "Rustling. Three goblins step onto the path, fanning out with practiced cruelty.",
-    "effects": [{ "type": "start_battle", "enemy_id": "goblin_pack_3" }],
-    "next": "post_ambush_menu"
-  },
-  "post_ambush_menu": {
-    "text": "Emma leans against a tree, gulping air. \"We should regroup before another patrol shows up.\"",
+  "companion_niale_join": {
+    "text": "Niale nods. \"Smart. I won't slow you down.\"\n\nEmma raises an eyebrow. \"Your funeral. I'll be at the bar if you need a real damage dealer.\"\n\nCerel: \"Alright. Let's see how you work together.\"",
     "effects": [
-      {
-        "type": "enter_game_menu",
-        "message": "You take a moment to rest, patch gear, and talk before pressing on."
-      }
+      { "type": "add_party_member", "member_id": "niale" },
+      { "type": "set_flag", "flag_id": "flag_companion_niale", "value": true }
     ],
-    "next": "forest_aftermath"
+    "next": "battle_party_setup"
   },
-  "forest_aftermath": {
-    "text": "The forest goes quiet again. Emma exhales. \"Okay. Now we're even. But the King's mission won't wait forever.\" The road to the capital remains long, and rumors say the deeper woods are restless.",
+  "companion_both_join": {
+    "text": "\"I'll take you both,\" you say.\n\nEmma and Niale exchange a look.\n\nEmma: \"Alright. More hands, more options.\"\n\nNiale: \"Works for me. Just don't get in each other's way.\"\n\nCerel raises an eyebrow. \"A full party from the start. Ambitious. Rewards split three ways, but your tactical options multiply. Let's see how you coordinate.\"",
     "effects": [
-      {
-        "type": "enter_game_menu",
-        "message": "End of demo slice. Rest at camp, Save, or Travel deeper into the forest before continuing."
-      }
+      { "type": "add_party_member", "member_id": "emma" },
+      { "type": "add_party_member", "member_id": "niale" },
+      { "type": "set_flag", "flag_id": "flag_companion_both", "value": true }
     ],
-    "next": "demo_slice_complete"
+    "next": "battle_party_setup"
   },
-  "demo_slice_complete": {
-    "text": "The road ahead is closed in this vertical slice. Keep sparring with goblins, explore the deep forest clearing, or tackle the ambush again to refine your tactics."
+  "battle_party_setup": {
+    "text": "Cerel leads you back outside. This time, the enclosure holds three scavengers, circling, coordinating.\n\n\"Party combat. Watch the turn order. Communicate. And remember—your companions know things you don't. Ask them.\"\n\nThe gate opens.",
+    "next": "battle_party_pack"
   },
-  "village_return_entry": {
-    "text": "Familiar roofs. Stares. The village elder's shutters quiver as you pass. News of the decree spreads faster than the wagons leaving town.",
+  "battle_party_pack": {
+    "text": "Three creatures. One goal.",
     "effects": [
-      {
-        "type": "enter_game_menu",
-        "message": "Villagers quietly track your every step. What will you do next?"
-      }
-    ]
+      { "type": "start_battle", "enemy_id": "goblin_pack_3" }
+    ],
+    "next": "party_after_battle"
   },
-  "forest_deeper_entry": {
-    "text": "The trees crowd closer and even the eager caravans turn back. Emma rests a hand on her hilt. \"Wildlife's been stirred up. Stay sharp.\"",
-    "next": "forest_deeper_path"
+  "party_after_battle": {
+    "text": "The last creature falls. You're winded, but intact. Your companions catch their breath.\n\nCerel approaches. \"Well done. That's the foundation: solo capability, party coordination, and growth through conflict.\"\n\nDana joins him. \"And if you're smart, you'll use that Party Talk option in fights. Your companions might know enemy weaknesses, behavior patterns, or tactical advice. It's free intel and doesn't cost your turn.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_party_battle_completed", "value": true }
+    ],
+    "next": "knowledge_intro_party_talk"
   },
-  "forest_deeper_path": {
-    "text": "Broken carts, discarded rope, and fresh claw marks line the narrow path. Something large has been herding travelers away from the road.",
-    "next": "forest_deeper_tracks"
+  "knowledge_intro_party_talk": {
+    "text": "One of your companions speaks up:\n\n\"Dana's right. I've fought things like this before. If you're ever unsure in combat, just ask—I'll tell you what I know. No guarantees, but it beats guessing.\"\n\nCerel nods. \"Knowledge is survival here. The more you learn, the better your odds. Some floors have libraries, some have wandering scholars. Always worth the detour.\"\n\nDana smirks. \"Speaking of detours...\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_knowledge_intro_seen", "value": true }
+    ],
+    "next": "protoquest_offer"
   },
-  "forest_deeper_tracks": {
-    "text": "Tufts of fur cling to a fallen log. Heavy hoofprints veer off the main trail while the road ahead twists between thick brush.",
+  "protoquest_offer": {
+    "text": "Dana leans against the doorway. \"There's a rumor. Shoreline ruins, not far from here. Someone said they saw a supply cache—potions, maybe a weapon. Could be worth checking before you head to Floor One.\"\n\nYour companion glances at you. \"Optional. We don't need it, but free loot is free loot.\"\n\nCerel: \"Entirely your call. The Floor One gate is open when you're ready. No rush.\"\n\nDo you pursue the rumor?",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_protoquest_offered", "value": true }
+    ],
     "choices": [
-      { "label": "Follow the clawed tracks", "next": "forest_deeper_follow" },
-      { "label": "Avoid them and keep to the road", "next": "forest_deeper_road" }
+      {
+        "label": "Investigate the ruins (optional)",
+        "next": "protoquest_accept"
+      },
+      {
+        "label": "Head straight to Floor One",
+        "next": "protoquest_decline"
+      }
     ]
   },
-  "forest_deeper_follow": {
-    "text": "You and Emma push through the brush, discovering a den torn open by something desperate and hungry. Yellow eyes blink inside.",
+  "protoquest_accept": {
+    "text": "\"Alright,\" you say. \"Let's check it out.\"\n\nDana nods. \"Smart. I'll mark it on your map. Don't take too long—ruins attract scavengers.\"",
     "effects": [
-      { "type": "start_battle", "enemy_id": "wolf" }
-    ],
-    "next": "forest_deeper_clearing"
-  },
-  "forest_deeper_road": {
-    "text": "You skirt the tracks, but a bandit scout drops from a branch ahead, spear ready. \"Capital tax collectors? Perfect.\"",
-    "effects": [
-      { "type": "start_battle", "enemy_id": "bandit_scout" }
-    ],
-    "next": "forest_deeper_clearing"
-  },
-  "forest_deeper_clearing": {
-    "text": "A mossy clearing offers a rare patch of calm. Smoldering embers and abandoned packs suggest someone else camped here recently. Beyond the trees, the road slopes toward the King's highway.",
-    "effects": [
-      { "type": "set_flag", "flag_id": "flag_cleared_forest_path", "value": true },
+      { "type": "set_flag", "flag_id": "flag_protoquest_accepted", "value": true },
       {
         "type": "enter_game_menu",
-        "message": "You secure the clearing, tend to wounds, and plan the push toward the capital."
+        "message": "The shoreline ruins are now accessible via Travel. Return to Floor One gate when ready."
       }
     ],
-    "next": "demo_slice_complete"
+    "next": "floor1_open_handoff"
+  },
+  "protoquest_decline": {
+    "text": "\"We'll pass,\" you say. \"Let's keep moving.\"\n\nDana shrugs. \"Your call. Floor One's waiting.\"\n\nYour companion nods. \"Fair. Let's go.\"",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Floor One gate is now accessible via Travel. Explore at your own pace."
+      }
+    ],
+    "next": "floor1_open_handoff"
+  },
+  "floor1_open_handoff": {
+    "text": "Cerel walks you to the edge of the settlement. Beyond, a shimmering threshold marks the boundary to Floor One.\n\n\"This is where I leave you,\" he says. \"Floor One is larger, more dangerous, and more rewarding. Towns exist, but they're farther apart. The guardian waits at the far end—defeat it, and Floor Two opens.\"\n\nYour companion adjusts their gear. \"No turning back now. Let's see what this place has.\"",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Chapter 00 complete. Explore Floor One and build your strength."
+      }
+    ],
+    "next": "ch00_complete"
+  },
+  "ch00_complete": {
+    "text": "The tutorial is complete. Floor One awaits. Your journey has just begun."
+  },
+  "protoquest_ruins_entry": {
+    "text": "The shoreline ruins are half-buried in sand, their stones worn by salt and time. Your companion scans the area.\n\n\"Quiet. Too quiet. Stay sharp.\"\n\nA shape moves in the shadows—another scavenger, larger than the trial ones.",
+    "next": "protoquest_battle"
+  },
+  "protoquest_battle": {
+    "text": "The creature attacks.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "goblin_grunt" }
+    ],
+    "next": "protoquest_complete"
+  },
+  "protoquest_complete": {
+    "text": "The scavenger falls. Behind it, a weathered chest. Inside: a small potion and a handful of gold.\n\nYou pocket the loot. \"Not bad. Let's head back.\"\n\nDana will be pleased.",
+    "effects": [
+      { "type": "give_gold", "amount": 10 },
+      { "type": "set_flag", "flag_id": "flag_protoquest_completed", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "Optional objective complete. Return to Floor One gate when ready."
+      }
+    ],
+    "next": "floor1_open_handoff"
   }
 }

@@ -1,0 +1,44 @@
+{
+  "village_return_entry": {
+    "text": "[Legacy redirect: This location is no longer part of the current Chapter 00 tutorial.]",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "This save references legacy content. Redirecting to current chapter end."
+      }
+    ],
+    "next": "ch00_complete"
+  },
+  "forest_deeper_entry": {
+    "text": "[Legacy redirect]",
+    "next": "ch00_complete"
+  },
+  "forest_deeper_path": {
+    "text": "[Legacy redirect]",
+    "next": "ch00_complete"
+  },
+  "forest_deeper_tracks": {
+    "text": "[Legacy redirect]",
+    "choices": [
+      { "label": "Continue", "next": "ch00_complete" }
+    ]
+  },
+  "forest_deeper_follow": {
+    "text": "[Legacy redirect]",
+    "next": "ch00_complete"
+  },
+  "forest_deeper_road": {
+    "text": "[Legacy redirect]",
+    "next": "ch00_complete"
+  },
+  "forest_deeper_clearing": {
+    "text": "[Legacy redirect]",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Legacy content. Returning to current chapter."
+      }
+    ],
+    "next": "ch00_complete"
+  }
+}

@@ -45,16 +45,27 @@ The player navigates story nodes. Nodes display dialogue and provide choices. No
 
 ### Chapter 00 Tutorial beats
 
-1. `intro_decree` – the King’s summons arrives and sets `flag_decree_received`.
-2. `intro_departure` – the player commits to the road (`flag_left_village`).
-3. `class_select` → `forest_intro` → `forest_scream` – establishes the crowded path to the capital before the Emma rescue.
-4. `emma_encounter` → `emma_join` – first battle, Emma joins, and `flag_met_emma` flips on.
-5. `forest_ambush` → `post_ambush_menu` – second battle followed by the first big camp interlude.
-6. `forest_aftermath` – awards a small gold stipend and nudges players to Travel before resuming the main story.
-7. Optional Travel to `forest_deeper` triggers `forest_deeper_entry` → `forest_deeper_path` → `forest_deeper_tracks`, culminating in either a wolf den or bandit ambush fight and the `forest_deeper_clearing` camp (`flag_cleared_forest_path`).
-8. `demo_slice_complete` – reminds players they can keep replaying battles or exploring the deep-forest camp before the next chapter unlocks.
+Chapter 00 is a LitRPG-framed tutorial introducing core systems through story beats:
 
-These steps, plus the deterministic Travel system, give Chapter 00 enough structure to test future quest tracking without introducing new mechanics yet.
+1. **Beach Arrival** (`arrival_beach_wake`, `arrival_beach_rescue`) – Player wakes with fragmented memory, rescued by NPCs, sets `flag_ch00_arrived`.
+2. **Inn Orientation** (`inn_arrival`, `inn_orientation_cerel`, `inn_orientation_dana`) – Cerel and Dana explain Floors, progression, and party trade-offs.
+3. **Class Overview** (`class_overview`) – Cerel explains class permanence before selection.
+4. **Class Selection** (`class_select`) – Player chooses class (Warrior/Rogue/Mage/Commoner), sets class-specific flags.
+5. **Solo Trial** (`trial_setup`, `battle_trial_1v1`) – 1v1 tutorial battle grants enough EXP to reach Level 2.
+6. **Level-Up Reflection** (`trial_victory_reflect`) – Cerel and Dana explain progression curves, MP/HP reset mechanics, sets `flag_trial_completed`.
+7. **Companion Choice** (`party_intro`, `companion_choice`) – Player chooses:
+   - **Go solo** (no companions, skips party battle, narrative knowledge intro only)
+   - **Emma only** (Mage, Level 3)
+   - **Niale only** (Rogue, Level 3)
+   - **Both Emma and Niale** (full party from start, 3-way EXP split)
+8. **Party Battle** (`battle_party_setup`, `battle_party_pack`, `party_after_battle`) – Multi-enemy encounter demonstrating party coordination (skipped if solo path chosen), sets `flag_party_battle_completed`.
+9. **Knowledge Intro** (`knowledge_intro_party_talk` or `solo_knowledge_intro`) – Party Talk or solo knowledge advice explained, sets `flag_knowledge_intro_seen`.
+10. **Proto-Quest Hook** (`protoquest_offer`) – Dana mentions optional shoreline ruins loot, player can accept or decline, sets `flag_protoquest_offered`.
+11. **Floor One Handoff** (`floor1_open_handoff`, `ch00_complete`) – Cerel's farewell, Floor One gate opens.
+
+If proto-quest accepted, player can Travel to **Shoreline Ruins**, trigger `protoquest_ruins_entry` → `protoquest_battle` → `protoquest_complete` (10 gold reward, sets `flag_protoquest_completed`).
+
+Legacy content (old Chapter 00 nodes referencing forest encounters) is preserved in `chapter_00_legacy_redirects.json` for save compatibility but redirects to chapter end cleanly.
 
 Party
 
@@ -141,6 +152,7 @@ Identical enemies in the same encounter are suffixed deterministically (“Gobli
 * The state panel prints once at battle start and once at the beginning of every player-controlled turn; invalid menu input and retries never trigger a full re-render.
 * Player menus (Actions, Skills, Target selection, Party Talk) use boxed panels with numbered entries. Enemy/ally AI turns never show menus.
 * Every actor turn finishes with exactly one boxed RESULTS panel summarising all resolved events for that turn (multi-hit skills print multiple bullet lines). Invalid actions such as insufficient MP are summarised inside the same panel before re-prompting the relevant menu.
+* **Text wrapping**: Long lines in boxed panels (RESULTS, Party Talk knowledge entries, etc.) are word-wrapped at render time to fit within the 56-character inner width, with continuation lines indented for readability. This ensures full knowledge text displays correctly without breaking panel borders or truncating mid-word.
 
 Winning and losing
 Victory

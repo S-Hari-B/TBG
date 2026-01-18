@@ -1,5 +1,6 @@
 {
   "chapters": [
-    "chapter_00_tutorial.json"
+    "chapter_00_tutorial.json",
+    "chapter_00_legacy_redirects.json"
   ]
 }

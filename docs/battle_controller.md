@@ -13,13 +13,11 @@ The battle controller pattern separates state progression (game logic) from rend
 
 ## Structure
 
-```
 services/controllers/
   └── battle_controller.py     # UI-agnostic battle orchestration
 
 presentation/cli/
   └── app.py                    # Rendering + input only
-```
 
 ## Controller Responsibilities
 
@@ -173,7 +171,7 @@ When building a GUI (Tkinter, Pygame, etc.):
 ## Migration Summary
 
 | Before | After |
-|--------|-------|
+| -------- | ------- |
 | `_run_battle_loop` mixed rendering + state progression | `_run_battle_loop` delegates to controller, only renders |
 | `_run_player_turn` called `BattleService` directly | `_run_player_turn` constructs `BattleAction`, submits to controller |
 | Duplicate event formatting in `_summarize_battle_events` and `_render_battle_events` | Single canonical `_format_battle_event_lines` |

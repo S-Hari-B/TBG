@@ -11,5 +11,18 @@
         }
       }
     ]
+  },
+  "niale": {
+    "known_enemies": [
+      {
+        "enemy_tags": ["goblin"],
+        "max_level": 3,
+        "revealed_fields": {
+          "hp_range": [18, 26],
+          "speed_hint": "Average, but quicker than most untrained adventurers.",
+          "behavior": "Often attack in groups and try to overwhelm isolated targets."
+        }
+      }
+    ]
   }
 }

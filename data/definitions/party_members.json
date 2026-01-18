@@ -23,5 +23,26 @@
       "firebolt",
       "fireburst"
     ]
+  },
+  "niale": {
+    "name": "Niale",
+    "role": "rogue",
+    "description": "A quick-footed scout with a wary smile. Prefers first strike and mobility.",
+    "tags": ["human", "rogue", "scout"],
+    "base_stats": {
+      "max_hp": 28,
+      "max_mp": 12,
+      "speed": 7
+    },
+    "equipment": {
+      "weapons": ["iron_dagger", "iron_dagger"],
+      "armour_slots": {
+        "body": "leather_vest",
+        "hands": "leather_gloves",
+        "boots": "leather_boots"
+      }
+    },
+    "starting_level": 3,
+    "starting_abilities": []
   }
 }

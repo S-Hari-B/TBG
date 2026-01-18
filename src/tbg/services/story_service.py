@@ -107,10 +107,10 @@ class StoryService:
             seed=seed,
             rng=rng,
             mode="story",
-            current_node_id="intro_decree",
+            current_node_id="arrival_beach_wake",
         )
         state.player_name = player_name or self._default_player_name
-        self._enter_node(state, "intro_decree", [])
+        self._enter_node(state, "arrival_beach_wake", [])
         return state
 
     def get_current_node_view(self, state: GameState) -> StoryNodeView:

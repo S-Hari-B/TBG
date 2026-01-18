@@ -1,21 +1,51 @@
 {
   "areas": [
     {
-      "id": "village_outskirts",
-      "name": "Village Outskirts",
-      "description": "Where the dirt road meets the edge of the trees and the old watch post still leans.",
-      "tags": ["village", "outskirts"],
+      "id": "threshold_inn",
+      "name": "Threshold Inn",
+      "description": "A sturdy waypoint for arrivals. Warm light, worn tables, and the hum of cautious conversation.",
+      "tags": ["safe", "town", "floor_zero"],
       "connections": [
-        { "to": "village", "label": "Return to the village" },
-        { "to": "forest_deeper", "label": "Head deeper into the forest", "progresses_story": true }
+        { "to": "shoreline_ruins", "label": "Investigate the shoreline ruins (optional)", "progresses_story": false },
+        { "to": "floor_one_gate", "label": "Proceed to Floor One", "progresses_story": true }
+      ],
+      "entry_story_node_id": null
+    },
+    {
+      "id": "shoreline_ruins",
+      "name": "Shoreline Ruins",
+      "description": "Half-buried stones and salt-worn walls. The sound of waves masks quieter movements.",
+      "tags": ["ruins", "optional", "floor_zero"],
+      "connections": [
+        { "to": "threshold_inn", "label": "Return to the inn" }
+      ],
+      "entry_story_node_id": "protoquest_ruins_entry"
+    },
+    {
+      "id": "floor_one_gate",
+      "name": "Floor One Threshold",
+      "description": "A shimmering boundary. Beyond it, the first true floor awaits.",
+      "tags": ["gate", "floor_one"],
+      "connections": [
+        { "to": "threshold_inn", "label": "Return to the inn" }
+      ],
+      "entry_story_node_id": null
+    },
+    {
+      "id": "village_outskirts",
+      "name": "Village Outskirts (Legacy)",
+      "description": "[Legacy location - preserved for save compatibility]",
+      "tags": ["legacy"],
+      "connections": [
+        { "to": "threshold_inn", "label": "Return to Threshold Inn" }
       ],
       "entry_story_node_id": null
     },
     {
       "id": "village",
-      "name": "Village",
-      "description": "Familiar streets wrapped in whispers and guarded glances.",
-      "tags": ["village", "safe"],
+      "name": "Village (Legacy)",
+      "description": "[Legacy location - preserved for save compatibility]",
+      "tags": ["legacy"],
       "connections": [
         { "to": "village_outskirts", "label": "Head back to the outskirts" }
       ],
@@ -23,9 +53,9 @@
     },
     {
       "id": "forest_deeper",
-      "name": "Deep Forest",
-      "description": "The canopy thickens and the road narrows to a cautious footpath.",
-      "tags": ["forest"],
+      "name": "Deep Forest (Legacy)",
+      "description": "[Legacy location - preserved for save compatibility]",
+      "tags": ["legacy"],
       "connections": [
         { "to": "village_outskirts", "label": "Retreat to the outskirts" }
       ],

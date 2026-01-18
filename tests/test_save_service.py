@@ -95,8 +95,8 @@ def test_save_round_trip_preserves_state() -> None:
     state.gold = 77
     state.exp = 42
     state.flags["tutorial_complete"] = True
-    state.pending_story_node_id = "forest_scream"
-    state.pending_narration = [("forest_intro", "Intro text")]
+    state.pending_story_node_id = "trial_setup"
+    state.pending_narration = [("arrival_beach_wake", "Intro text")]
     weapon_id = repos["weapons"].all()[0].id
     armour_id = repos["armour"].all()[0].id
     item_id = repos["items"].all()[0].id
@@ -114,8 +114,8 @@ def test_save_round_trip_preserves_state() -> None:
     state.equipment[state.player.id] = member_equipment
     state.camp_message = "Rest up."
     state.mode = "camp_menu"
-    state.story_checkpoint_node_id = "forest_ambush"
-    state.story_checkpoint_location_id = "village_outskirts"
+    state.story_checkpoint_node_id = "battle_trial_1v1"
+    state.story_checkpoint_location_id = "threshold_inn"
     state.story_checkpoint_thread_id = "main_story"
 
     payload = save_service.serialize(state)
@@ -221,18 +221,18 @@ def test_checkpoint_blocks_story_progress_travel_after_load() -> None:
     ) = _build_test_services()
     state = story_service.start_new_game(seed=555, player_name="Hero")
     area_service.initialize_state(state)
-    state.story_checkpoint_node_id = "forest_ambush"
-    state.story_checkpoint_location_id = "village_outskirts"
+    state.story_checkpoint_node_id = "battle_party_pack"
+    state.story_checkpoint_location_id = "threshold_inn"
     state.story_checkpoint_thread_id = "main_story"
 
     payload = save_service.serialize(state)
     restored = save_service.deserialize(payload)
 
     with pytest.raises(TravelBlockedError):
-        area_service.travel_to(restored, "forest_deeper")
+        area_service.travel_to(restored, "floor_one_gate")
 
     restored.story_checkpoint_node_id = None
     restored.story_checkpoint_location_id = None
     restored.story_checkpoint_thread_id = None
-    area_service.travel_to(restored, "forest_deeper")
+    area_service.travel_to(restored, "floor_one_gate")
 

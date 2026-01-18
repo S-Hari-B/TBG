@@ -12,7 +12,7 @@ Layers:
 * Owns slot-based save file I/O through a tiny adapter (`SaveSlotStore`) that reads/writes `data/saves/slot_X.json`; serialization logic remains in the services layer
 * Never computes combat outcomes or modifies domain objects directly
 * Debug-only instrumentation (seed/node/location headers, Location Debug menu, extra load slot metadata) lives exclusively in this layer so lower layers stay pure
-* Owns the boxed battle renderer: 60-character ASCII panels for turn headers, battlefield snapshots, per-turn results, and player-only menus. Services only expose structured `BattleView` snapshots/events, keeping layout concerns isolated to the CLI.
+  * Owns the boxed battle renderer: 60-character ASCII panels for turn headers, battlefield snapshots, per-turn results, and player-only menus. Services only expose structured `BattleView` snapshots/events, keeping layout concerns isolated to the CLI. Long text in boxed panels (RESULTS, Party Talk) is word-wrapped at render time to preserve readability without breaking the fixed 60-char borders.
 * **Battle rendering is tied to decision points, not input loops**: The state panel renders once per player turn, regardless of invalid input retries. See `battle_controller.md`.
 
 ## services (orchestration)
@@ -39,7 +39,7 @@ Layers:
 * Validates and returns definitions
 * No combat rules, no printing
 * Includes the area map repository (`AreasRepository`) which enforces unique ids, valid travel connections, and entry-story references back into the story definitions
-* `StoryRepository` reads `story/index.json`, loads the referenced chapter files in order, merges every node, and rejects duplicate ids or broken `next`/choice references
+* `StoryRepository` reads `story/index.json`, loads the referenced chapter files in order, merges every node, and rejects duplicate ids or broken `next`/choice references. Legacy content (nodes from old story versions that must remain for save compatibility) is separated into dedicated `_legacy_redirects.json` chapter files to keep the main tutorial chapter clean while ensuring old saves don't crash.
 
 ## core (shared utilities)
 

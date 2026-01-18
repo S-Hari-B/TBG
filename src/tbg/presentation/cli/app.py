@@ -106,10 +106,19 @@ def _battle_box_line(text: str) -> str:
 
 
 def _render_boxed_panel(title: str, lines: Sequence[str]) -> None:
+    """Render a boxed panel with word-wrapped content."""
+    from tbg.presentation.cli.render import wrap_text_for_box
+    
     print(_battle_box_border("-"))
     print(_battle_box_line(title.upper()))
+    
+    # Word-wrap each line to fit within the box
+    box_inner_width = _BATTLE_UI_WIDTH - 4
     for line in lines or [""]:
-        print(_battle_box_line(line))
+        wrapped_lines = wrap_text_for_box(line, box_inner_width, indent_continuation=True)
+        for wrapped in wrapped_lines:
+            print(_battle_box_line(wrapped))
+    
     print(_battle_box_border("-"))
 
 
