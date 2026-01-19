@@ -64,6 +64,8 @@ from tbg.services.battle_service import (
     AttackResolvedEvent,
     BattleEvent,
     BattleExpRewardEvent,
+    BattleGoldRewardEvent,
+    BattleInventoryItem,
     BattleLevelUpEvent,
     BattleResolvedEvent,
     BattleRewardsHeaderEvent,
@@ -71,12 +73,14 @@ from tbg.services.battle_service import (
     BattleStartedEvent,
     BattleView,
     CombatantDefeatedEvent,
+    DebuffAppliedEvent,
+    DebuffExpiredEvent,
     GuardAppliedEvent,
+    ItemUsedEvent,
     LootAcquiredEvent,
     PartyTalkEvent,
     SkillFailedEvent,
     SkillUsedEvent,
-    BattleGoldRewardEvent,
 )
 from tbg.services.inventory_service import (
     ArmourSlotView,
@@ -237,6 +241,10 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
     for enemy in view.enemies:
         marker = ">" if enemy.instance_id == active_id else " "
         status = _format_enemy_hp_display(enemy, debug_enabled=debug_enabled)
+        combatant_ref = _find_combatant(battle_state, enemy.instance_id)
+        badges = _format_enemy_debuff_badges(combatant_ref)
+        if badges:
+            status = f"{status} {badges}"
         display_name = enemy_name_lookup.get(enemy.instance_id, enemy.name)
         order_value = turn_order.get(enemy.instance_id)
         order_prefix = f"{order_value:>2} " if order_value is not None else ""
@@ -263,6 +271,8 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
         right = enemies_lines[index] if index < len(enemies_lines) else ""
         _render_state_row(left, right)
     print(_state_row_border())
+    if debug_enabled:
+        _render_debug_enemy_debuffs(battle_state)
 
 
 def _render_results_panel(lines: Sequence[str]) -> None:
@@ -1876,10 +1886,13 @@ def _run_player_turn(
     """Handle the player-controlled turn. Only re-renders action menu on invalid input, not the state panel."""
     turn_lines: List[str] = []
     actions = controller.get_available_actions(battle_state, state)
+    battle_items: List[BattleInventoryItem] = actions.get("items", [])
 
     while True:
         action_type = _prompt_battle_action(
-            can_talk=actions["can_talk"], can_use_skill=actions["can_use_skill"]
+            can_talk=actions["can_talk"],
+            can_use_skill=actions["can_use_skill"],
+            can_use_item=actions["can_use_item"],
         )
 
         if action_type == "attack":
@@ -1913,6 +1926,18 @@ def _run_player_turn(
                 reason = _format_skill_failure_reason(failure_event.reason)
                 turn_lines.append(f"- Cannot use {skill.name} ({reason}).")
                 continue
+            turn_lines.extend(_format_battle_event_lines(events))
+            return turn_lines
+
+        if action_type == "item":
+            item_entry = _prompt_item_choice(battle_items)
+            if item_entry is None:
+                continue
+            target_id = _prompt_item_target(battle_state, actor_id, item_entry.targeting)
+            if target_id is None:
+                continue
+            action = BattleAction(action_type="item", item_id=item_entry.item_id, target_id=target_id)
+            events = controller.apply_player_action(battle_state, state, action)
             turn_lines.extend(_format_battle_event_lines(events))
             return turn_lines
 
@@ -2041,6 +2066,42 @@ def _format_battle_event_lines(events: List[BattleEvent]) -> List[str]:
             lines.append(f"- {event.combatant_name} braces, reducing the next hit by {event.amount}.")
         elif isinstance(event, SkillFailedEvent):
             lines.append(f"- {event.combatant_name} cannot use that skill ({event.reason}).")
+        elif isinstance(event, ItemUsedEvent):
+            if event.result_text:
+                lines.append(f"- {event.result_text}")
+            else:
+                deltas: List[str] = []
+                if event.hp_delta:
+                    deltas.append(f"+{event.hp_delta} HP")
+                if event.mp_delta:
+                    deltas.append(f"+{event.mp_delta} MP")
+                if event.energy_delta:
+                    deltas.append(f"+{event.energy_delta} Energy")
+                delta_text = ", ".join(deltas) if deltas else "had no effect"
+                lines.append(
+                    f"- {event.user_name} uses {event.item_name} on {event.target_name}: {delta_text}."
+                )
+        elif isinstance(event, DebuffAppliedEvent):
+            if event.debuff_type == "attack_down":
+                detail = f"ATK -{event.amount}"
+            else:
+                detail = f"DEF -{event.amount}"
+            lines.append(f"- {event.target_name} suffers {detail} (until next action).")
+        elif isinstance(event, DebuffExpiredEvent):
+            label = "ATK" if event.debuff_type == "attack_down" else "DEF"
+            lines.append(f"- {event.target_name}'s {label} penalty wore off.")
+        elif isinstance(event, ItemUsedEvent):
+            deltas: List[str] = []
+            if event.hp_delta:
+                deltas.append(f"+{event.hp_delta} HP")
+            if event.mp_delta:
+                deltas.append(f"+{event.mp_delta} MP")
+            if event.energy_delta:
+                deltas.append(f"+{event.energy_delta} Energy")
+            delta_text = ", ".join(deltas) if deltas else "had no effect"
+            lines.append(
+                f"- {event.user_name} uses {event.item_name} on {event.target_name}: {delta_text}."
+            )
         elif isinstance(event, BattleResolvedEvent):
             lines.append(f"- Battle resolved. Victor: {event.victor.title()}")
         elif isinstance(event, BattleGoldRewardEvent):
@@ -2059,10 +2120,12 @@ def _format_battle_event_lines(events: List[BattleEvent]) -> List[str]:
     return lines
 
 
-def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool) -> str:
+def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool, can_use_item: bool) -> str:
     options: List[tuple[str, str]] = [("attack", "Basic Attack")]
     if can_use_skill:
         options.append(("skill", "Use Skill"))
+    if can_use_item:
+        options.append(("item", "Use Item"))
     if can_talk:
         options.append(("talk", "Party Talk"))
     while True:
@@ -2141,6 +2204,79 @@ def _prompt_skill_targets(
         battle_state, skill.max_targets, damage_estimator=damage_estimator,
         state=state, controller=controller
     )
+
+
+def _prompt_item_choice(items: List[BattleInventoryItem]) -> BattleInventoryItem | None:
+    if not items:
+        print("No consumable items are available.")
+        return None
+    while True:
+        lines: List[str] = []
+        for idx, entry in enumerate(items, start=1):
+            targeting_label = _format_item_targeting(entry.targeting)
+            note = ""
+            if entry.targeting not in {"self", "ally", "enemy"}:
+                note = " - Cannot be used in battle yet"
+            lines.append(f"{idx:>2}) {entry.item_name} x{entry.quantity} ({targeting_label}){note}")
+        _render_boxed_panel("Items", lines)
+        raw = input("Select item (blank to cancel): ").strip()
+        if not raw:
+            return None
+        try:
+            index = int(raw) - 1
+        except ValueError:
+            print("Invalid selection.")
+            continue
+        if 0 <= index < len(items):
+            entry = items[index]
+            if entry.targeting not in {"self", "ally", "enemy"}:
+                print(f"{entry.item_name} cannot be used that way yet.")
+                continue
+            return entry
+        print("Invalid selection.")
+
+
+def _prompt_item_target(battle_state: BattleState, actor_id: str, targeting: str) -> str | None:
+    actor = _find_combatant(battle_state, actor_id)
+    if actor is None:
+        return None
+    if targeting == "enemy":
+        target = _prompt_battle_target(battle_state)
+        return target.instance_id
+
+    living_allies = [ally for ally in battle_state.allies if ally.is_alive]
+    selectable = [actor] if targeting == "self" else living_allies
+    if not selectable:
+        print("No valid targets available.")
+        return None
+
+    while True:
+        lines: List[str] = []
+        for idx, ally in enumerate(selectable, start=1):
+            label = "Self" if ally.instance_id == actor_id else ally.display_name
+            lines.append(f"{idx:>2}) {label} ({ally.stats.hp}/{ally.stats.max_hp} HP)")
+        _render_boxed_panel("Item Target", lines)
+        raw = input("Target # (blank to cancel): ").strip()
+        if not raw:
+            return None
+        try:
+            index = int(raw) - 1
+        except ValueError:
+            print("Enter a number.")
+            continue
+        if 0 <= index < len(selectable):
+            return selectable[index].instance_id
+        print("Invalid target.")
+
+
+def _format_item_targeting(targeting: str) -> str:
+    mapping = {
+        "self": "Self",
+        "ally": "Ally",
+        "enemy": "Enemy",
+        "any": "Any Target",
+    }
+    return mapping.get(targeting, targeting.title())
 
 
 def _prompt_multi_enemy_targets(
@@ -2312,6 +2448,35 @@ def _format_enemy_hp_display(enemy: BattleCombatantView, *, debug_enabled: bool)
         return enemy.hp_display
     # Debug mode: show HP and defense (ultra-compact: [15/15|D2])
     return f"{enemy.hp_display}[{enemy.current_hp}/{enemy.max_hp}|D{enemy.defense}]"
+
+
+def _format_enemy_debuff_badges(combatant: Combatant | None) -> str:
+    if combatant is None or not getattr(combatant, "debuffs", None) or not combatant.is_alive:
+        return ""
+    badges: List[str] = []
+    for debuff in combatant.debuffs:
+        label = "ATK" if debuff.debuff_type == "attack_down" else "DEF"
+        badges.append(f"{label}-{debuff.amount}")
+    if not badges:
+        return ""
+    return f"[{'/'.join(badges)}]"
+
+
+def _render_debug_enemy_debuffs(battle_state: BattleState) -> None:
+    if not _debug_enabled():
+        return
+    lines: List[str] = []
+    for enemy in battle_state.enemies:
+        if not enemy.debuffs:
+            continue
+        parts: List[str] = []
+        for debuff in enemy.debuffs:
+            label = "ATK" if debuff.debuff_type == "attack_down" else "DEF"
+            parts.append(f"{label}-{debuff.amount} (round {debuff.expires_at_round})")
+        if parts:
+            lines.append(f"{enemy.display_name}: {', '.join(parts)}")
+    if lines:
+        _render_boxed_panel("Debug Debuffs", lines)
 
 
 def _render_story_if_needed(

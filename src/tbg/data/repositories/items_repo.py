@@ -23,7 +23,14 @@ class ItemsRepository(RepositoryBase[ItemDef]):
             self._assert_allowed_fields(
                 item_data,
                 required={"name", "kind", "value"},
-                optional={"heal_hp", "heal_mp", "restore_energy"},
+                optional={
+                    "heal_hp",
+                    "heal_mp",
+                    "restore_energy",
+                    "targeting",
+                    "debuff_attack_flat",
+                    "debuff_defense_flat",
+                },
                 context=f"item '{raw_id}'",
             )
 
@@ -33,6 +40,14 @@ class ItemsRepository(RepositoryBase[ItemDef]):
             heal_hp = self._require_int(item_data.get("heal_hp", 0), f"item '{raw_id}' heal_hp")
             heal_mp = self._require_int(item_data.get("heal_mp", 0), f"item '{raw_id}' heal_mp")
             restore = self._require_int(item_data.get("restore_energy", 0), f"item '{raw_id}' restore_energy")
+            targeting = self._normalize_targeting(item_data.get("targeting", "self"), raw_id)
+            debuff_attack = self._require_int(
+                item_data.get("debuff_attack_flat", 0), f"item '{raw_id}' debuff_attack_flat"
+            )
+            debuff_defense = self._require_int(
+                item_data.get("debuff_defense_flat", 0), f"item '{raw_id}' debuff_defense_flat"
+            )
+            self._validate_debuff_fields(raw_id, debuff_attack, debuff_defense)
 
             items[raw_id] = ItemDef(
                 id=raw_id,
@@ -42,6 +57,9 @@ class ItemsRepository(RepositoryBase[ItemDef]):
                 heal_hp=heal_hp,
                 heal_mp=heal_mp,
                 restore_energy=restore,
+                targeting=targeting,
+                debuff_attack_flat=debuff_attack,
+                debuff_defense_flat=debuff_defense,
             )
         return items
 
@@ -56,6 +74,26 @@ class ItemsRepository(RepositoryBase[ItemDef]):
         if not isinstance(value, int):
             raise DataValidationError(f"{context} must be an integer.")
         return value
+
+    @staticmethod
+    def _normalize_targeting(value: object, item_id: str) -> str:
+        if not isinstance(value, str):
+            raise DataValidationError(f"item '{item_id}' targeting must be a string.")
+        normalized = value.strip().lower() or "self"
+        if normalized not in {"self", "ally", "enemy", "any"}:
+            raise DataValidationError(
+                f"item '{item_id}' targeting must be one of ['self', 'ally', 'enemy', 'any']."
+            )
+        return normalized
+
+    @staticmethod
+    def _validate_debuff_fields(item_id: str, attack: int, defense: int) -> None:
+        if attack < 0 or defense < 0:
+            raise DataValidationError(f"item '{item_id}' debuff amounts must be non-negative.")
+        if attack and defense:
+            raise DataValidationError(
+                f"item '{item_id}' cannot define both debuff_attack_flat and debuff_defense_flat."
+            )
 
     @staticmethod
     def _assert_allowed_fields(

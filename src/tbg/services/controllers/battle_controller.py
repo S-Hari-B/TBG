@@ -8,10 +8,15 @@ from tbg.core.rng import RNG
 from tbg.domain.battle_models import BattleState, Combatant
 from tbg.domain.defs import SkillDef
 from tbg.domain.state import GameState
-from tbg.services.battle_service import BattleEvent, BattleService, BattleView
+from tbg.services.battle_service import (
+    BattleEvent,
+    BattleInventoryItem,
+    BattleService,
+    BattleView,
+)
 
 
-BattleActionType = Literal["attack", "skill", "talk"]
+BattleActionType = Literal["attack", "skill", "talk", "item"]
 
 
 @dataclass(slots=True)
@@ -23,6 +28,7 @@ class BattleAction:
     target_ids: Sequence[str] | None = None
     skill_id: str | None = None
     speaker_id: str | None = None
+    item_id: str | None = None
 
 
 class BattleController:
@@ -89,24 +95,31 @@ class BattleController:
         Returns a dict with:
         - can_attack: bool
         - can_use_skill: bool
+        - can_use_item: bool
         - can_talk: bool
         - available_skills: List[SkillDef]
+        - items: List[BattleInventoryItem]
         """
         actor_id = battle_state.current_actor_id
         if not actor_id:
             return {
                 "can_attack": False,
                 "can_use_skill": False,
+                "can_use_item": False,
                 "can_talk": False,
                 "available_skills": [],
+                "items": [],
             }
 
         available_skills = self._service.get_available_skills(battle_state, actor_id)
+        battle_items = self._service.get_battle_items(state)
         return {
             "can_attack": True,
             "can_use_skill": bool(available_skills),
+            "can_use_item": bool(battle_items),
             "can_talk": bool(state.party_members),
             "available_skills": available_skills,
+            "items": battle_items,
         }
 
     def apply_player_action(
@@ -135,6 +148,11 @@ class BattleController:
             if not action.speaker_id:
                 raise ValueError("Talk action requires speaker_id.")
             return self._service.party_talk(battle_state, action.speaker_id, state.rng)
+
+        if action.action_type == "item":
+            if not action.item_id or not action.target_id:
+                raise ValueError("Item action requires item_id and target_id.")
+            return self._service.use_item(battle_state, state, actor_id, action.item_id, action.target_id)
 
         raise ValueError(f"Unknown action type: {action.action_type}")
 

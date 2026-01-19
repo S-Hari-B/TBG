@@ -127,7 +127,14 @@ def _validate_items(definitions_dir: Path) -> set[str]:
         _assert_allowed_fields(
             mapping,
             required={"name", "kind", "value"},
-            optional={"heal_hp", "heal_mp", "restore_energy"},
+            optional={
+                "heal_hp",
+                "heal_mp",
+                "restore_energy",
+                "targeting",
+                "debuff_attack_flat",
+                "debuff_defense_flat",
+            },
             context=f"item '{item_id}'",
         )
         _require_str(mapping["name"], f"item '{item_id}' name")
@@ -136,6 +143,14 @@ def _validate_items(definitions_dir: Path) -> set[str]:
         for field in ("heal_hp", "heal_mp", "restore_energy"):
             if field in mapping:
                 _require_int(mapping[field], f"item '{item_id}' {field}")
+        if "targeting" in mapping:
+            targeting = _require_str(mapping["targeting"], f"item '{item_id}' targeting")
+            assert targeting in {"self", "ally", "enemy", "any"}
+        attack_down = _require_int(mapping.get("debuff_attack_flat", 0), f"item '{item_id}' debuff_attack_flat")
+        defense_down = _require_int(mapping.get("debuff_defense_flat", 0), f"item '{item_id}' debuff_defense_flat")
+        assert attack_down >= 0 and defense_down >= 0
+        if attack_down and defense_down:
+            raise AssertionError(f"item '{item_id}' cannot have both attack and defense debuffs")
         ids.add(item_id)
     return ids
 

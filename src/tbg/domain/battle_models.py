@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import List, Literal, Tuple
 
 from tbg.domain.entities import Stats
+from tbg.domain.debuffs import ActiveDebuff
 
 Side = Literal["allies", "enemies"]
 
@@ -21,6 +22,7 @@ class Combatant:
     weapon_tags: Tuple[str, ...] = ()
     guard_reduction: int = 0
     source_id: str | None = None  # original definition id
+    debuffs: List[ActiveDebuff] = field(default_factory=list)
 
     @property
     def is_alive(self) -> bool:
@@ -39,6 +41,8 @@ class BattleState:
     is_over: bool = False
     victor: Side | None = None
     player_id: str | None = None
+    round_index: int = 1
+    round_last_actor_id: str | None = None
 
 
 @dataclass(slots=True)

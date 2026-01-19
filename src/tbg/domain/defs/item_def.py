@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+ItemTargeting = Literal["self", "ally", "enemy", "any"]
 
 
 @dataclass(slots=True)
@@ -15,5 +18,8 @@ class ItemDef:
     heal_hp: int = 0
     heal_mp: int = 0
     restore_energy: int = 0
+    targeting: ItemTargeting = "self"
+    debuff_attack_flat: int = 0
+    debuff_defense_flat: int = 0
 
 

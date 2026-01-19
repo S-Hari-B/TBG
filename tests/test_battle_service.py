@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from tbg.core.rng import RNG
 from tbg.data.repositories import (
     ArmourRepository,
@@ -15,13 +17,17 @@ from tbg.data.repositories import (
     WeaponsRepository,
 )
 from tbg.domain.battle_models import BattleState, Combatant
+from tbg.domain.defs import ItemDef
 from tbg.domain.entities.stats import Stats
 from tbg.domain.state import GameState
 from tbg.services.battle_service import (
     AttackResolvedEvent,
     BattleResolvedEvent,
     BattleService,
+    DebuffAppliedEvent,
+    DebuffExpiredEvent,
     GuardAppliedEvent,
+    ItemUsedEvent,
     LootAcquiredEvent,
     PartyTalkEvent,
     SkillUsedEvent,
@@ -432,6 +438,205 @@ def test_guard_reduces_next_damage_then_expires() -> None:
     attack_events = service.basic_attack(battle_state, enemy_id, state.player.id)
     damage_event = next(evt for evt in attack_events if isinstance(evt, AttackResolvedEvent))
     assert damage_event.damage == 0  # 5 guard absorbs the 5 damage
+
+
+def test_attack_debuff_lasts_until_round_boundary() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    assert state.player is not None
+    player_id = state.player.id
+    enemy = battle_state.enemies[0]
+    enemy.stats.attack = 12
+    state.inventory.add_item("weakening_vial", 1)
+
+    events = service.use_item(battle_state, state, player_id, "weakening_vial", enemy.instance_id)
+    assert any(isinstance(evt, DebuffAppliedEvent) for evt in events)
+    hero = battle_state.allies[0]
+    hero.stats.defense = 5
+
+    expiry_round = enemy.debuffs[0].expires_at_round
+    while battle_state.round_index < expiry_round - 1:
+        round_events = service._start_new_round(battle_state)
+        assert not any(isinstance(evt, DebuffExpiredEvent) for evt in round_events)
+
+    damage, _ = service._resolve_damage(enemy, hero, bonus_power=0, minimum=1)
+    expected_damage = max(1, (enemy.stats.attack - 2) - hero.stats.defense)
+    assert damage == expected_damage
+    assert enemy.debuffs
+
+    expire_events = service._start_new_round(battle_state)
+    assert battle_state.round_index == expiry_round
+    assert any(isinstance(evt, DebuffExpiredEvent) for evt in expire_events)
+    assert not enemy.debuffs
+
+    # Second attack should no longer benefit from the debuff
+    battle_state.current_actor_id = enemy.instance_id
+    second_attack_events = service.run_enemy_turn(battle_state, state.rng)
+    attack_event_two = next(evt for evt in second_attack_events if isinstance(evt, AttackResolvedEvent))
+    assert attack_event_two.damage == max(1, enemy.stats.attack - hero.stats.defense)
+
+
+def test_defense_debuff_persists_until_round_boundary() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    assert state.player is not None
+    enemy = battle_state.enemies[0]
+    hero = next(ally for ally in battle_state.allies if ally.instance_id == state.player.id)
+    hero.stats.attack = 15
+    enemy.stats.defense = 6
+    state.inventory.add_item("armor_sunder_powder", 1)
+
+    service.use_item(battle_state, state, state.player.id, "armor_sunder_powder", enemy.instance_id)
+    assert enemy.debuffs
+
+    expiry_round = enemy.debuffs[0].expires_at_round
+    while battle_state.round_index < expiry_round - 1:
+        round_events = service._start_new_round(battle_state)
+        assert not any(isinstance(evt, DebuffExpiredEvent) for evt in round_events)
+
+    damage, _ = service._resolve_damage(hero, enemy, bonus_power=0, minimum=1)
+    assert damage == max(1, hero.stats.attack - (enemy.stats.defense - 2))
+    assert enemy.debuffs
+
+    expire_events = service._start_new_round(battle_state)
+    assert battle_state.round_index == expiry_round
+    assert any(isinstance(evt, DebuffExpiredEvent) for evt in expire_events)
+    assert not enemy.debuffs
+
+
+def test_reapplying_same_debuff_has_no_effect_but_consumes_item() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    assert state.player is not None
+    player_id = state.player.id
+    enemy = battle_state.enemies[0]
+    initial_qty = state.inventory.items.get("weakening_vial", 0)
+    state.inventory.add_item("weakening_vial", 2)
+
+    first = service.use_item(battle_state, state, player_id, "weakening_vial", enemy.instance_id)
+    assert any(isinstance(evt, DebuffAppliedEvent) for evt in first)
+
+    second = service.use_item(battle_state, state, player_id, "weakening_vial", enemy.instance_id)
+    assert not any(isinstance(evt, DebuffAppliedEvent) for evt in second)
+    assert any(
+        isinstance(evt, ItemUsedEvent) and evt.result_text and "had no effect" in evt.result_text
+        for evt in second
+    )
+    assert state.inventory.items.get("weakening_vial", 0) == initial_qty
+
+
+def test_debuff_expiry_events_suppressed_for_dead_enemies() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    assert state.player is not None
+    player_id = state.player.id
+    enemy = battle_state.enemies[0]
+    state.inventory.add_item("weakening_vial", 1)
+
+    service.use_item(battle_state, state, player_id, "weakening_vial", enemy.instance_id)
+    enemy.stats.hp = 0  # simulate death before expiry
+
+    expire_events = service._start_new_round(battle_state)
+    expire_events.extend(service._start_new_round(battle_state))
+
+    assert not any(isinstance(evt, DebuffExpiredEvent) for evt in expire_events)
+    assert not enemy.debuffs
+
+
+def test_debuffs_cleared_immediately_on_death() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    assert state.player is not None
+
+    enemy = battle_state.enemies[0]
+    state.inventory.add_item("armor_sunder_powder", 1)
+    service.use_item(battle_state, state, state.player.id, "armor_sunder_powder", enemy.instance_id)
+    assert enemy.debuffs
+
+    hero = next(ally for ally in battle_state.allies if ally.instance_id == state.player.id)
+    hero.stats.attack = 999
+    damage, _ = service._resolve_damage(hero, enemy, bonus_power=0, minimum=1)
+    assert damage >= enemy.stats.hp
+    assert not enemy.is_alive
+    assert not enemy.debuffs
+
+def test_use_item_heals_player_and_consumes_inventory() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    state.inventory.add_item("potion_hp_small", 1)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    assert state.player is not None
+    player = next(ally for ally in battle_state.allies if ally.instance_id == state.player.id)
+    player.stats.hp = max(1, player.stats.hp - 12)
+    qty_before = state.inventory.items.get("potion_hp_small", 0)
+
+    events = service.use_item(battle_state, state, player.instance_id, "potion_hp_small", player.instance_id)
+
+    assert state.inventory.items.get("potion_hp_small", 0) == max(0, qty_before - 1)
+    assert player.stats.hp > 0
+    assert any(isinstance(evt, ItemUsedEvent) for evt in events)
+
+
+def test_use_item_consumes_even_without_effect() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    state.inventory.add_item("potion_hp_small", 1)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    assert state.player is not None
+    player = next(ally for ally in battle_state.allies if ally.instance_id == state.player.id)
+    qty_before = state.inventory.items.get("potion_hp_small", 0)
+
+    events = service.use_item(battle_state, state, player.instance_id, "potion_hp_small", player.instance_id)
+    event = next(evt for evt in events if isinstance(evt, ItemUsedEvent))
+
+    assert state.inventory.items.get("potion_hp_small", 0) == max(0, qty_before - 1)
+    assert event.hp_delta == 0
+
+
+def test_use_item_cannot_target_defeated_ally() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    state.inventory.add_item("potion_hp_small", 1)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    ally = next(ally for ally in battle_state.allies if ally.instance_id.startswith("party_"))
+    ally.stats.hp = 0
+    qty_before = state.inventory.items.get("potion_hp_small", 0)
+
+    with pytest.raises(ValueError):
+        service.use_item(battle_state, state, battle_state.allies[0].instance_id, "potion_hp_small", ally.instance_id)
+
+    assert state.inventory.items.get("potion_hp_small", 0) == qty_before
+
+
+def test_enemy_targeting_items_blocked_for_now() -> None:
+    service = _make_battle_service()
+    service._items_repo._ensure_loaded()  # type: ignore[attr-defined]
+    service._items_repo._definitions["bomb_enemy"] = ItemDef(  # type: ignore[attr-defined]
+        id="bomb_enemy",
+        name="Bomb",
+        kind="consumable",
+        value=5,
+        heal_hp=0,
+        heal_mp=0,
+        restore_energy=0,
+        targeting="enemy",
+    )
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    state.inventory.add_item("bomb_enemy", 1)
+    qty_before = state.inventory.items.get("bomb_enemy", 0)
+
+    with pytest.raises(ValueError):
+        service.use_item(
+            battle_state, state, battle_state.allies[0].instance_id, "bomb_enemy", battle_state.enemies[0].instance_id
+        )
+
+    assert state.inventory.items.get("bomb_enemy", 0) == qty_before
 
 
 def test_ai_uses_skill_deterministically_with_seed() -> None:

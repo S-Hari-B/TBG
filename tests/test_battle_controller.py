@@ -6,7 +6,12 @@ from tbg.domain.battle_models import BattleState, Combatant
 from tbg.domain.entities import Stats, Player
 from tbg.domain.state import GameState
 from tbg.services import BattleController, BattleAction
-from tbg.services.battle_service import BattleService, AttackResolvedEvent, BattleResolvedEvent
+from tbg.services.battle_service import (
+    AttackResolvedEvent,
+    BattleResolvedEvent,
+    BattleService,
+    ItemUsedEvent,
+)
 from tbg.data.repositories import (
     ArmourRepository,
     EnemiesRepository,
@@ -101,8 +106,20 @@ def test_controller_provides_available_actions() -> None:
     actions = controller.get_available_actions(battle_state, state)
     assert actions["can_attack"] is True
     assert actions["can_use_skill"] is False
+    assert actions["can_use_item"] is False
     assert actions["can_talk"] is False
     assert isinstance(actions["available_skills"], list)
+    assert actions["items"] == []
+
+
+def test_controller_lists_items_when_available() -> None:
+    controller, state, battle_state = _build_battle_controller()
+    state.inventory.add_item("potion_hp_small", 1)
+
+    actions = controller.get_available_actions(battle_state, state)
+
+    assert actions["can_use_item"] is True
+    assert len(actions["items"]) == 1
 
 
 def test_controller_applies_action_and_returns_events() -> None:
@@ -114,6 +131,18 @@ def test_controller_applies_action_and_returns_events() -> None:
 
     assert len(events) > 0
     assert any(isinstance(evt, AttackResolvedEvent) for evt in events)
+
+
+def test_controller_applies_item_action() -> None:
+    controller, state, battle_state = _build_battle_controller()
+    state.inventory.add_item("potion_hp_small", 1)
+    hero = battle_state.allies[0]
+    hero.stats.hp = max(1, hero.stats.hp - 5)
+
+    action = BattleAction(action_type="item", item_id="potion_hp_small", target_id=hero.instance_id)
+    events = controller.apply_player_action(battle_state, state, action)
+
+    assert any(isinstance(evt, ItemUsedEvent) for evt in events)
 
 
 def test_controller_determines_state_panel_rendering() -> None:

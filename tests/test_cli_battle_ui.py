@@ -9,16 +9,19 @@ from tbg.domain.defs import SkillDef
 from tbg.domain.entities.stats import Stats
 from tbg.domain.state import GameState
 from tbg.presentation.cli import app
+from tbg.domain.debuffs import ActiveDebuff
 from tbg.services.battle_service import (
     AttackResolvedEvent,
     BattleCombatantView,
     BattleExpRewardEvent,
     BattleGoldRewardEvent,
+    BattleInventoryItem,
     BattleLevelUpEvent,
     BattleRewardsHeaderEvent,
     BattleResolvedEvent,
     BattleView,
     CombatantDefeatedEvent,
+    ItemUsedEvent,
     LootAcquiredEvent,
 )
 
@@ -26,9 +29,18 @@ from tbg.services.battle_service import (
 class _FakeBattleService:
     """Deterministic battle stub for CLI rendering tests."""
 
-    def __init__(self, *, player_damage: int = 6, enemy_damage: int = 3) -> None:
+    def __init__(
+        self,
+        *,
+        player_damage: int = 6,
+        enemy_damage: int = 3,
+        items: List[BattleInventoryItem] | None = None,
+        item_event: ItemUsedEvent | None = None,
+    ) -> None:
         self._player_damage = player_damage
         self._enemy_damage = enemy_damage
+        self._items = list(items or [])
+        self._item_event = item_event
 
     def get_battle_view(self, battle_state: BattleState) -> BattleView:
         allies = [
@@ -68,6 +80,10 @@ class _FakeBattleService:
         del battle_state, actor_id
         return []
 
+    def get_battle_items(self, state: GameState) -> List[BattleInventoryItem]:
+        del state
+        return list(self._items)
+
     def estimate_damage_for_ids(self, battle_state, attacker_id, target_id, *, bonus_power=0, minimum=1) -> int:
         del battle_state, attacker_id, target_id, bonus_power, minimum
         return self._player_damage
@@ -96,6 +112,15 @@ class _FakeBattleService:
         else:
             battle_state.current_actor_id = enemy.instance_id
         return events
+
+    def use_item(self, battle_state: BattleState, state: GameState, actor_id: str, item_id: str, target_id: str):
+        del state, actor_id, item_id, target_id
+        battle_state.is_over = True
+        battle_state.victor = "allies"
+        battle_state.current_actor_id = None
+        if self._item_event:
+            return [self._item_event]
+        return []
 
     def run_enemy_turn(self, battle_state: BattleState, rng) -> List[AttackResolvedEvent]:
         del rng
@@ -231,6 +256,86 @@ def test_results_panel_once_per_actor_turn(monkeypatch, capsys) -> None:
     assert out.count("| ACTIONS") == 1
 
 
+def test_use_item_action_flow(monkeypatch, capsys) -> None:
+    state, battle_state = _build_state_and_battle(enemy_hp=6)
+    ally_stats = Stats(max_hp=18, hp=8, max_mp=4, mp=2, attack=3, defense=1, speed=5)
+    ally = Combatant(instance_id="party_emma", display_name="Emma", side="allies", stats=ally_stats)
+    battle_state.allies.append(ally)
+    state.party_members = ["party_emma"]
+    item_entry = BattleInventoryItem(
+        item_id="potion_hp_small",
+        item_name="Small HP Potion",
+        quantity=2,
+        targeting="ally",
+    )
+    item_event = ItemUsedEvent(
+        user_id="hero",
+        user_name="Hero",
+        target_id="party_emma",
+        target_name="Emma",
+        item_id="potion_hp_small",
+        item_name="Small HP Potion",
+        hp_delta=10,
+        mp_delta=0,
+        energy_delta=0,
+    )
+    service = _FakeBattleService(items=[item_entry], item_event=item_event)
+    _set_inputs(monkeypatch, ["2", "1", "2"])
+
+    assert app._run_battle_loop(service, battle_state, state) is True
+    out = capsys.readouterr().out
+    assert "Use Item" in out
+    assert "- Hero uses Small HP Potion on Emma: +10 HP." in out
+
+
+def test_enemy_target_item_blocked_message(monkeypatch, capsys) -> None:
+    state, battle_state = _build_state_and_battle(enemy_hp=6)
+    service = _FakeBattleService(
+        items=[
+            BattleInventoryItem(
+                item_id="bomb",
+                item_name="Bomb",
+                quantity=1,
+                targeting="any",
+            )
+        ]
+    )
+    _set_inputs(monkeypatch, ["2", "1", "", "1", "1"])
+
+    app._run_battle_loop(service, battle_state, state)
+    out = capsys.readouterr().out
+    assert "cannot be used that way yet" in out
+
+
+def test_enemy_target_item_flow(monkeypatch, capsys) -> None:
+    state, battle_state = _build_state_and_battle(enemy_hp=6)
+    item_entry = BattleInventoryItem(
+        item_id="weakening_vial",
+        item_name="Weakening Vial",
+        quantity=1,
+        targeting="enemy",
+    )
+    item_event = ItemUsedEvent(
+        user_id="hero",
+        user_name="Hero",
+        target_id="enemy_1",
+        target_name="Goblin Grunt (1)",
+        item_id="weakening_vial",
+        item_name="Weakening Vial",
+        hp_delta=0,
+        mp_delta=0,
+        energy_delta=0,
+        result_text="Hero uses Weakening Vial on Goblin Grunt (1): ATK -2 (until end of next round).",
+    )
+    service = _FakeBattleService(items=[item_entry], item_event=item_event)
+    _set_inputs(monkeypatch, ["2", "1", "1"])
+
+    assert app._run_battle_loop(service, battle_state, state) is True
+    out = capsys.readouterr().out
+    assert "- Hero uses Weakening Vial on Goblin Grunt (1)" in out
+    assert "until end of next round" in out
+
+
 def _build_panel_view() -> Tuple[BattleView, BattleState]:
     hero_stats = Stats(max_hp=30, hp=20, max_mp=5, mp=3, attack=4, defense=1, speed=8)
     ally_stats = Stats(max_hp=26, hp=12, max_mp=6, mp=2, attack=3, defense=1, speed=6)
@@ -334,6 +439,36 @@ def test_enemy_numbering_and_down_status_debug(monkeypatch, capsys) -> None:
     # Second enemy is DOWN so has room for full name
     assert "Goblin Grunt (2)" in out
     assert "DOWN" in out
+
+
+def test_enemy_debuff_badge_visible_in_normal_mode(monkeypatch, capsys) -> None:
+    view, battle_state = _build_panel_view()
+    monkeypatch.delenv("TBG_DEBUG", raising=False)
+    battle_state.enemies[0].debuffs.append(ActiveDebuff(debuff_type="attack_down", amount=2, expires_at_round=3))
+    app._render_battle_state_panel(view, battle_state, active_id="hero")
+    out = capsys.readouterr().out
+    assert "[ATK-2]" in out
+
+
+def test_enemy_debuff_badge_hidden_for_down_enemy(monkeypatch, capsys) -> None:
+    view, battle_state = _build_panel_view()
+    monkeypatch.delenv("TBG_DEBUG", raising=False)
+    down_enemy = battle_state.enemies[1]
+    down_enemy.stats.hp = 0
+    down_enemy.debuffs.append(ActiveDebuff(debuff_type="defense_down", amount=3, expires_at_round=4))
+    app._render_battle_state_panel(view, battle_state, active_id="hero")
+    out = capsys.readouterr().out
+    assert "[DEF-3]" not in out
+
+
+def test_enemy_debuff_debug_panel(monkeypatch, capsys) -> None:
+    view, battle_state = _build_panel_view()
+    monkeypatch.setenv("TBG_DEBUG", "1")
+    battle_state.enemies[0].debuffs.append(ActiveDebuff(debuff_type="defense_down", amount=3, expires_at_round=4))
+    app._render_battle_state_panel(view, battle_state, active_id="hero")
+    out = capsys.readouterr().out
+    assert "DEBUG DEBUFFS" in out
+    assert "DEF-3 (round" in out
 
 
 def test_state_panel_hides_enemy_hp_without_debug(monkeypatch, capsys) -> None:

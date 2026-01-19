@@ -160,11 +160,29 @@ Fields (v1):
 * item_type: string (v1: "consumable")
 * value_gold: int
 * effects: list[effect]
+* targeting: string (optional, defaults to `"self"`)
+* debuff_attack_flat: int (optional; mutually exclusive with `debuff_defense_flat`)
+* debuff_defense_flat: int (optional; mutually exclusive with `debuff_attack_flat`)
 
 Effect object fields (v1):
 
 * type: string ("heal_hp" | "restore_energy")
 * amount: int
+
+Targeting controls who can be chosen when the item is used during battle. Supported values:
+
+* `self` – item may only be used on the acting character.
+* `ally` – any living party member (including the player) can be targeted.
+* `enemy` – currently used by debuff consumables; applying one targets a single living enemy.
+* `any` – future-proofing for items that can target either side; currently blocked.
+
+Existing data omitting this field automatically defaults to `self` for save compatibility.
+
+Debuff fields are optional and only valid for enemy-targeting consumables. Exactly one of `debuff_attack_flat`
+or `debuff_defense_flat` may be provided, and values are clamped to non-negative integers. Attack and defense debuffs
+reduce the target's effective stats by a flat amount for the remainder of the current round and the entirety of the
+next round, expiring automatically at the start of the following round with a visible battle event (suppressed when the
+enemy is already defeated).
 
 Example:
 

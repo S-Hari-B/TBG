@@ -4,7 +4,8 @@
     "kind": "consumable",
     "value": 10,
     "heal_hp": 25,
-    "restore_energy": 0
+    "restore_energy": 0,
+    "targeting": "ally"
   },
   "potion_energy_small": {
     "name": "Small Energy Potion",
@@ -12,7 +13,22 @@
     "value": 12,
     "heal_hp": 0,
     "heal_mp": 15,
-    "restore_energy": 15
+    "restore_energy": 15,
+    "targeting": "ally"
+  },
+  "weakening_vial": {
+    "name": "Weakening Vial",
+    "kind": "consumable",
+    "value": 30,
+    "targeting": "enemy",
+    "debuff_attack_flat": 2
+  },
+  "armor_sunder_powder": {
+    "name": "Armor Sunder Powder",
+    "kind": "consumable",
+    "value": 30,
+    "targeting": "enemy",
+    "debuff_defense_flat": 2
   },
   "goblin_horn": {
     "name": "Goblin Horn",

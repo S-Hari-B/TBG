@@ -16,7 +16,14 @@ from tbg.data.repositories import (
     WeaponsRepository,
 )
 from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
-from tbg.domain.defs import KnowledgeEntry, LootTableDef, SkillDef
+from tbg.domain.defs import ItemDef, KnowledgeEntry, LootTableDef, SkillDef
+from tbg.domain.debuffs import (
+    ActiveDebuff,
+    apply_debuff_no_stack,
+    compute_effective_attack,
+    compute_effective_defense,
+)
+from tbg.domain.item_effects import apply_item_effects
 from tbg.domain.entities import Stats
 from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment
 from tbg.domain.state import GameState
@@ -33,6 +40,16 @@ class BattleView:
     allies: List[BattleCombatantView]
     enemies: List[BattleCombatantView]
     current_actor_id: str | None
+
+
+@dataclass(slots=True)
+class BattleInventoryItem:
+    """Lightweight view of a consumable item available during battle."""
+
+    item_id: str
+    item_name: str
+    quantity: int
+    targeting: str
 
 
 @dataclass(slots=True)
@@ -98,6 +115,35 @@ class SkillFailedEvent(BattleEvent):
     combatant_id: str
     combatant_name: str
     reason: str
+
+
+@dataclass(slots=True)
+class ItemUsedEvent(BattleEvent):
+    user_id: str
+    user_name: str
+    target_id: str
+    target_name: str
+    item_id: str
+    item_name: str
+    hp_delta: int
+    mp_delta: int
+    energy_delta: int
+    result_text: str | None = None
+
+
+@dataclass(slots=True)
+class DebuffAppliedEvent(BattleEvent):
+    target_id: str
+    target_name: str
+    debuff_type: str
+    amount: int
+
+
+@dataclass(slots=True)
+class DebuffExpiredEvent(BattleEvent):
+    target_id: str
+    target_name: str
+    debuff_type: str
 
 
 @dataclass(slots=True)
@@ -201,6 +247,9 @@ class BattleService:
         self._rebuild_turn_queue(battle_state)
         if battle_state.turn_queue:
             battle_state.current_actor_id = battle_state.turn_queue[0]
+            battle_state.round_last_actor_id = battle_state.turn_queue[-1]
+        else:
+            battle_state.round_last_actor_id = None
 
         events = [BattleStartedEvent(battle_id=battle_id, enemy_names=[enemy.display_name for enemy in enemies])]
         return battle_state, events
@@ -214,13 +263,35 @@ class BattleService:
             current_actor_id=battle_state.current_actor_id,
         )
 
+    def get_battle_items(self, state: GameState) -> List[BattleInventoryItem]:
+        """List consumable inventory entries available for battle."""
+        entries: List[BattleInventoryItem] = []
+        for item_id, quantity in sorted(state.inventory.items.items()):
+            if quantity <= 0:
+                continue
+            try:
+                item_def = self._items_repo.get(item_id)
+            except KeyError:
+                continue
+            if item_def.kind != "consumable":
+                continue
+            entries.append(
+                BattleInventoryItem(
+                    item_id=item_id,
+                    item_name=item_def.name,
+                    quantity=quantity,
+                    targeting=item_def.targeting,
+                )
+            )
+        return entries
+
     # -----------------------
     # Player Actions
     # -----------------------
     def basic_attack(self, battle_state: BattleState, attacker_id: str, target_id: str) -> List[BattleEvent]:
         attacker = self._get_combatant(battle_state, attacker_id)
         target = self._get_combatant(battle_state, target_id)
-        damage = self._resolve_damage(attacker, target, bonus_power=0, minimum=1)
+        damage, debuff_events = self._resolve_damage(attacker, target, bonus_power=0, minimum=1)
 
         events: List[BattleEvent] = [
             AttackResolvedEvent(
@@ -232,6 +303,7 @@ class BattleService:
                 target_hp=target.stats.hp,
             )
         ]
+        events.extend(debuff_events)
         if not target.is_alive:
             events.append(CombatantDefeatedEvent(combatant_id=target.instance_id, combatant_name=target.display_name))
 
@@ -244,7 +316,8 @@ class BattleService:
         if maybe_resolved:
             events.append(maybe_resolved)
         else:
-            self._advance_turn(battle_state, attacker.instance_id)
+            round_events = self._advance_turn(battle_state, attacker.instance_id)
+            events.extend(round_events)
         return events
 
     def get_available_skills(self, battle_state: BattleState, combatant_id: str) -> List[SkillDef]:
@@ -278,7 +351,9 @@ class BattleService:
 
         if skill.effect_type == "damage":
             for target in resolved_targets:
-                damage = self._resolve_damage(attacker, target, bonus_power=skill.base_power, minimum=1)
+                damage, debuff_events = self._resolve_damage(
+                    attacker, target, bonus_power=skill.base_power, minimum=1
+                )
                 events.append(
                     SkillUsedEvent(
                         attacker_id=attacker.instance_id,
@@ -291,6 +366,7 @@ class BattleService:
                         target_hp=target.stats.hp,
                     )
                 )
+                events.extend(debuff_events)
                 if not target.is_alive:
                     events.append(
                         CombatantDefeatedEvent(combatant_id=target.instance_id, combatant_name=target.display_name)
@@ -313,7 +389,8 @@ class BattleService:
         if maybe_resolved:
             events.append(maybe_resolved)
         else:
-            self._advance_turn(battle_state, attacker.instance_id)
+            round_events = self._advance_turn(battle_state, attacker.instance_id)
+            events.extend(round_events)
         return events
 
     def party_talk(self, battle_state: BattleState, speaker_id: str, rng: RNG) -> List[BattleEvent]:
@@ -321,7 +398,126 @@ class BattleService:
         source_id = speaker.source_id or speaker.instance_id
         text = self._build_party_talk_text(source_id, speaker.display_name, battle_state, rng)
         events = [PartyTalkEvent(speaker_id=speaker.instance_id, speaker_name=speaker.display_name, text=text)]
-        self._advance_turn(battle_state, speaker.instance_id)
+        events.extend(self._advance_turn(battle_state, speaker.instance_id))
+        return events
+    def _apply_debuff_item(
+        self,
+        *,
+        battle_state: BattleState,
+        actor: Combatant,
+        target: Combatant,
+        item_def: ItemDef,
+    ) -> List[BattleEvent]:
+        if target.side != "enemies":
+            raise ValueError("target_not_enemy")
+
+        debuff_type = "attack_down" if item_def.debuff_attack_flat > 0 else "defense_down"
+        amount = item_def.debuff_attack_flat or item_def.debuff_defense_flat
+        expires_at_round = battle_state.round_index + 2
+        applied = apply_debuff_no_stack(
+            target.debuffs,
+            debuff_type=debuff_type,
+            amount=amount,
+            expires_at_round=expires_at_round,
+        )
+
+        description = self._describe_debuff_text(debuff_type, amount)
+        events: List[BattleEvent] = [
+            ItemUsedEvent(
+                user_id=actor.instance_id,
+                user_name=actor.display_name,
+                target_id=target.instance_id,
+                target_name=target.display_name,
+                item_id=item_def.id,
+                item_name=item_def.name,
+                hp_delta=0,
+                mp_delta=0,
+                energy_delta=0,
+                result_text=(
+                    f"{actor.display_name} uses {item_def.name} on {target.display_name}: {description}"
+                    if applied
+                    else f"{actor.display_name} uses {item_def.name} on {target.display_name}: had no effect."
+                ),
+            )
+        ]
+
+        if applied:
+            events.append(
+                DebuffAppliedEvent(
+                    target_id=target.instance_id,
+                    target_name=target.display_name,
+                    debuff_type=debuff_type,
+                    amount=amount,
+                )
+            )
+        return events
+
+    def use_item(
+        self,
+        battle_state: BattleState,
+        state: GameState,
+        actor_id: str,
+        item_id: str,
+        target_id: str,
+    ) -> List[BattleEvent]:
+        actor = self._get_combatant(battle_state, actor_id)
+        target = self._get_combatant(battle_state, target_id)
+        if not target.is_alive:
+            raise ValueError("target_not_alive")
+
+        try:
+            item_def = self._items_repo.get(item_id)
+        except KeyError as exc:
+            raise ValueError("unknown_item") from exc
+
+        if item_def.kind != "consumable":
+            raise ValueError("item_not_consumable")
+
+        targeting = item_def.targeting
+        is_debuff_item = item_def.debuff_attack_flat > 0 or item_def.debuff_defense_flat > 0
+        if targeting == "enemy" and not is_debuff_item:
+            raise ValueError("targeting_not_supported")
+
+        if targeting == "self" and actor.instance_id != target.instance_id:
+            raise ValueError("target_not_allowed")
+        if targeting == "ally" and target.side != actor.side:
+            raise ValueError("invalid_target_side")
+        if targeting == "enemy" and target.side != "enemies":
+            raise ValueError("invalid_target_side")
+        if targeting not in {"self", "ally", "enemy"}:
+            raise ValueError("targeting_not_supported")
+
+        if not state.inventory.remove_item(item_id, 1):
+            raise ValueError("item_not_available")
+
+        events: List[BattleEvent] = []
+
+        if is_debuff_item:
+            events.extend(
+                self._apply_debuff_item(
+                    battle_state=battle_state,
+                    actor=actor,
+                    target=target,
+                    item_def=item_def,
+                )
+            )
+        else:
+            effect = apply_item_effects(target.stats, item_def)
+            events.append(
+                ItemUsedEvent(
+                    user_id=actor.instance_id,
+                    user_name=actor.display_name,
+                    target_id=target.instance_id,
+                    target_name=target.display_name,
+                    item_id=item_def.id,
+                    item_name=item_def.name,
+                    hp_delta=effect.hp_delta,
+                    mp_delta=effect.mp_delta,
+                    energy_delta=effect.energy_delta,
+                )
+            )
+
+        self._advance_turn(battle_state, actor.instance_id)
         return events
 
     # -----------------------
@@ -440,17 +636,43 @@ class BattleService:
         if not living:
             battle_state.current_actor_id = None
 
-    def _advance_turn(self, battle_state: BattleState, last_actor_id: str) -> None:
+    def _advance_turn(self, battle_state: BattleState, last_actor_id: str) -> List[BattleEvent]:
         self._rebuild_turn_queue(battle_state)
         queue = battle_state.turn_queue
+        events: List[BattleEvent] = []
         if not queue:
             battle_state.current_actor_id = None
-            return
+            return events
+
+        round_last_actor = battle_state.round_last_actor_id
+        wrapped = False
+        if round_last_actor and round_last_actor not in queue:
+            wrapped = True
+
         if last_actor_id in queue:
             idx = queue.index(last_actor_id)
-            battle_state.current_actor_id = queue[(idx + 1) % len(queue)]
+            next_index = (idx + 1) % len(queue)
+            if next_index == 0:
+                wrapped = True
+            next_actor_id = queue[next_index]
         else:
-            battle_state.current_actor_id = queue[0]
+            next_actor_id = queue[0]
+
+        if wrapped:
+            events.extend(self._start_new_round(battle_state))
+            queue = battle_state.turn_queue
+            if not queue:
+                battle_state.current_actor_id = None
+                return events
+            if last_actor_id in queue:
+                idx = queue.index(last_actor_id)
+                next_index = (idx + 1) % len(queue)
+                next_actor_id = queue[next_index]
+            else:
+                next_actor_id = queue[0]
+
+        battle_state.current_actor_id = next_actor_id
+        return events
 
     def _update_victory(self, battle_state: BattleState) -> BattleResolvedEvent | None:
         if all(not enemy.is_alive for enemy in battle_state.enemies):
@@ -614,12 +836,26 @@ class BattleService:
             total += armour_def.defense
         return total if total > 0 else max(0, fallback)
 
+    def _start_new_round(self, battle_state: BattleState) -> List[BattleEvent]:
+        battle_state.round_index += 1
+        events = self._expire_enemy_debuffs(battle_state)
+        self._set_round_last_actor_id(battle_state)
+        return events
+
+    def _set_round_last_actor_id(self, battle_state: BattleState) -> None:
+        if battle_state.turn_queue:
+            battle_state.round_last_actor_id = battle_state.turn_queue[-1]
+        else:
+            battle_state.round_last_actor_id = None
+
     @staticmethod
     def estimate_damage(
         attacker: Combatant, target: Combatant, *, bonus_power: int = 0, minimum: int = 1
     ) -> int:
         """Estimate damage without mutating combatants or guard values."""
-        base_damage = max(minimum, attacker.stats.attack + bonus_power - target.stats.defense)
+        effective_attack = compute_effective_attack(attacker.stats, attacker.debuffs)
+        effective_defense = compute_effective_defense(target.stats, target.debuffs)
+        base_damage = max(minimum, effective_attack + bonus_power - effective_defense)
         return max(0, base_damage)
 
     def estimate_damage_for_ids(
@@ -635,8 +871,12 @@ class BattleService:
         target = self._get_combatant(battle_state, target_id)
         return self.estimate_damage(attacker, target, bonus_power=bonus_power, minimum=minimum)
 
-    def _resolve_damage(self, attacker: Combatant, target: Combatant, *, bonus_power: int, minimum: int) -> int:
-        base_damage = max(minimum, attacker.stats.attack + bonus_power - target.stats.defense)
+    def _resolve_damage(
+        self, attacker: Combatant, target: Combatant, *, bonus_power: int, minimum: int
+    ) -> tuple[int, List[BattleEvent]]:
+        effective_attack = compute_effective_attack(attacker.stats, attacker.debuffs)
+        effective_defense = compute_effective_defense(target.stats, target.debuffs)
+        base_damage = max(minimum, effective_attack + bonus_power - effective_defense)
         damage = base_damage
         if target.guard_reduction > 0:
             absorbed = min(damage, target.guard_reduction)
@@ -644,7 +884,11 @@ class BattleService:
             target.guard_reduction = 0
         damage = max(0, damage)
         target.stats.hp = max(0, target.stats.hp - damage)
-        return damage
+        debuff_events: List[BattleEvent] = []
+        if not target.is_alive and target.debuffs:
+            target.debuffs = []
+
+        return damage, debuff_events
 
     def _resolve_skill_targets(
         self,
@@ -935,5 +1179,31 @@ class BattleService:
                 state.player.stats.hp = state.player.stats.max_hp
             if restore_mp:
                 state.player.stats.mp = state.player.stats.max_mp
+
+    @staticmethod
+    def _describe_debuff_text(debuff_type: str, amount: int) -> str:
+        label = "ATK" if debuff_type == "attack_down" else "DEF"
+        return f"{label} -{amount} (until end of next round)."
+
+    def _expire_enemy_debuffs(self, battle_state: BattleState) -> List[BattleEvent]:
+        events: List[BattleEvent] = []
+        for enemy in battle_state.enemies:
+            if not enemy.debuffs:
+                continue
+            remaining: List[ActiveDebuff] = []
+            for debuff in enemy.debuffs:
+                if debuff.expires_at_round <= battle_state.round_index:
+                    if enemy.is_alive:
+                        events.append(
+                            DebuffExpiredEvent(
+                                target_id=enemy.instance_id,
+                                target_name=enemy.display_name,
+                                debuff_type=debuff.debuff_type,
+                            )
+                        )
+                else:
+                    remaining.append(debuff)
+            enemy.debuffs = remaining
+        return events
 
 

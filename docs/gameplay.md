@@ -169,10 +169,20 @@ Tie-break roll is a d20 by default
 ### Party Talk in combat
 
 * Available whenever at least one party member is present (Emma in Slice A).
-* Consumes the acting character’s turn.
+* Consumes the acting character's turn.
 * Prints deterministic intel lines from `knowledge.json`. Enemy HP stays hidden (`???`) in normal play; when `TBG_DEBUG=1` is set the actual HP is displayed alongside the enemy list rather than inside the combat log.
 
 Item (later, ability to use items)
+### Use Item (v1)
+
+* The battle menu now exposes **Use Item** whenever the shared inventory holds at least one consumable.
+* Selecting the action shows a deterministic list using `items.json` definitions (quantity and targeting are rendered so players know why something may be blocked).
+* Targets always include Self plus any living party members. Consumables that specify `targeting: "enemy"` can be used on a single living foe; `targeting: "any"` remains blocked and prints a clear diagnostic instead of wasting the turn.
+* Consumables always consume the player's turn and the inventory stack, even if all affected stats were already at their maximum. In those cases the battle log explicitly reports "had no effect" to keep the flow readable.
+* Enemy debuff items are flat, deterministic modifiers. `Weakening Vial` applies `ATK -2` while `Armor Sunder Powder` applies `DEF -2`. Both last for the remainder of the current round and all of the next round, expiring automatically at the start of the following round, and they cannot stack. Reapplying while the debuff is active still consumes the item and prints "had no effect."
+* Active debuffs are visible directly inside the enemy column as compact tags (e.g., `[ATK-2]`). When `TBG_DEBUG=1`, an additional boxed panel lists exact magnitudes and the round index when the penalty will wear off. Expiry events ("Goblin Grunt's ATK penalty wore off.") fire before the first action of the round in which the debuff ends, but are suppressed for enemies that are already downed.
+* Every starting class now begins with one Weakening Vial and one Armor Sunder Powder so players can immediately test the debuff flow.
+
 
 Flee (A chance to flee battle. If success, no rewards gained but retreats back to previous state before battle started. If failed will result in player and all party member turns skipped and enemy gets to complete their turn)
 

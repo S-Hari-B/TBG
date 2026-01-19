@@ -23,12 +23,21 @@ def test_items_repo_loads_two_items(tmp_path: Path) -> None:
                 "kind": "consumable",
                 "value": 5,
                 "heal_hp": 10,
+                "targeting": "ally",
             },
             "mp_potion": {
                 "name": "MP Potion",
                 "kind": "consumable",
                 "value": 6,
                 "heal_mp": 7,
+                "targeting": "self",
+            },
+            "enemy_dust": {
+                "name": "Enemy Dust",
+                "kind": "consumable",
+                "value": 9,
+                "targeting": "enemy",
+                "debuff_defense_flat": 2,
             },
         },
     )
