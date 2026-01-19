@@ -15,6 +15,7 @@ from .quest_def import (
     QuestRewardItemDef,
     QuestTurnInDef,
 )
+from .shop_def import ShopDef, ShopStockEntryDef, ShopType
 from .story_def import StoryChoiceDef, StoryEffectDef, StoryNodeDef
 from .party_member_def import PartyMemberDef
 from .knowledge_def import KnowledgeEntry
@@ -40,6 +41,9 @@ __all__ = [
     "QuestRewardDef",
     "QuestRewardItemDef",
     "QuestTurnInDef",
+    "ShopDef",
+    "ShopStockEntryDef",
+    "ShopType",
     "StoryChoiceDef",
     "StoryNodeDef",
     "StoryEffectDef",

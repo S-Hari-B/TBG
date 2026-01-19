@@ -13,18 +13,25 @@ Quit
 
 Game Menu
 
-The game menu appears after `enter_game_menu` story effects. Non-hub areas show the Camp Menu; hub areas (`hub` tag) show the Town Menu.
+The game menu appears after `enter_game_menu` story effects. Non-town areas show the Camp Menu; town areas (`town` tag) show the Town Menu.
 
 - Continue / Continue story – resumes the pending story node that triggered the interlude. If no pending node exists (e.g. after exhausting the current slice) the option remains but prints a reminder to explore via Travel instead.
 - Travel – opens the area map defined in `data/definitions/areas.json`. The screen shows the current location’s name/description, lists every connected destination using the JSON `"label"` fields, and lets the player pick a destination. Travelling emits deterministic events (`Traveled from …`, `Arrived at …`) and renders a fresh “Location” block with the new area description. Areas can optionally declare `entry_story_node_id`; those nodes fire exactly once per save file when the player first enters that area and can show short flavour beats before returning to camp. When a required battle checkpoint is active, any connection flagged as `progresses_story: true` is temporarily locked with the message “You can’t push onward yet…” until the battle is cleared, but backtracking routes remain available.
 - Converse (Town Menu only) – lists NPCs defined in the current hub’s `npcs_present` block and routes into their conversation entry story node.
 - Quests (Town Menu only) – shows active objectives and available turn-ins; selecting a turn-in routes into its story node so narrative remains authoritative.
-- Shops (Town Menu only) – stub placeholder for future shop UX.
+- Shops (Town Menu only) – opens the deterministic shop flow (item, weapon, and armour vendors) with buy/sell actions.
 - Location Debug (DEBUG) – only in debug builds (`TBG_DEBUG=1`). Opens a debug submenu with quest, conversation, and definition integrity snapshots. Does not mutate state.
 - Inventory / Equipment – opens the shared inventory where you can inspect party members, equip/unequip weapons and armour, and view remaining supplies. Accessible during camp interludes and future out-of-combat scenes.
 - Party Talk – appears whenever at least one companion has joined. Surfaces deterministic banter lines.
 - Save Game – only available from interludes. Writes the current runtime state (story position, party, inventory, equipment, flags, RNG state, and the new location trackers) to a chosen slot under `data/saves/slot_{1-3}.json`.
 - Quit to main menu
+
+### Shops
+
+* Town shops are deterministic: each shop has a fixed stock pool and a stock size (default 10). The current stock page is selected by `location_visits[location_id] % num_pages`, where `num_pages` is derived from the stock pool length.
+* Stock is finite per visit; buying consumes remaining quantities. Reopening the shop does not refill. Leaving and returning increments the visit count, rotating the stock page and resetting quantities for the new visit.
+* Buy/Sell inputs accept comma-separated indices (e.g. `1,3,5`). Duplicates are ignored, and each selection buys/sells exactly one item.
+* Buy price is the item’s `value` from the relevant definition file (`items.json`, `weapons.json`, `armour.json`). Sell price is `floor(value * 0.5)`.
 
 ## Manual Save/Load
 
@@ -44,6 +51,7 @@ The game menu appears after `enter_game_menu` story effects. Non-hub areas show 
 ### Debug-mode UI helpers
 
 Setting `TBG_DEBUG=1` adds a small status line to Camp and Travel menus (`DEBUG: <context> seed=… node=… location=… mode=…`), exposes the Location Debug submenu described above (quest + conversation snapshots), and augments the Save/Load slot picker with the stored seed + current location id so testers can verify persistence quickly. Combat still hides HP in normal play; debug mode continues to show explicit HP readings next to the `???` placeholder for enemies, including defense values in an ultra-compact format (e.g., `???[22/22|D2]`). Debug mode also prints the battle ID heading (`=== Battle battle_XXXX ===`) at the start of encounters for reproducibility testing and shows turn-order numbers in the battle state panel.
+Shop screens include a `Give Gold (DEBUG)` option while debug mode is enabled, allowing testers to inject gold instantly for purchase checks.
 
 ### Battle damage previews
 
@@ -117,7 +125,7 @@ Economy
 
 gold exists in v1
 
-gold is stored on Player
+gold is stored on `GameState`
 
 Equipment and derived stats
 

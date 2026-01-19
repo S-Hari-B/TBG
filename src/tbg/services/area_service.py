@@ -100,6 +100,7 @@ class AreaService:
             state.visited_locations.append(area_def.id)
         if area_def.id not in state.location_entry_seen:
             state.location_entry_seen[area_def.id] = area_def.entry_story_node_id is None
+        state.location_visits.setdefault(area_def.id, 0)
 
     def get_current_location_view(self, state: GameState) -> LocationView:
         """Return the view for the player's current location."""
@@ -136,6 +137,7 @@ class AreaService:
             raise TravelBlockedError(TRAVEL_BLOCKED_MESSAGE)
         destination_def = self._areas_repo.get(destination_id)
         state.current_location_id = destination_def.id
+        state.location_visits[destination_def.id] = state.location_visits.get(destination_def.id, 0) + 1
         if destination_def.id not in state.visited_locations:
             state.visited_locations.append(destination_def.id)
         entry_story_node_id = None

@@ -382,7 +382,7 @@ Repositories validate that:
 * Connection targets reference existing areas.
 * `entry_story_node_id` values exist in the story definitions (see below).
 
-At runtime the single `AreaService` loads these definitions, keeps `GameState.current_location_id` synchronized, and tracks `visited_locations` (ordered list) plus a `location_entry_seen` map used to guard entry hooks.
+At runtime the single `AreaService` loads these definitions, keeps `GameState.current_location_id` synchronized, and tracks `visited_locations` (ordered list) plus a `location_entry_seen` map used to guard entry hooks. `location_visits` stores deterministic visit counts per location for systems like shop stock rotation.
 
 ---
 
@@ -403,6 +403,21 @@ At runtime the single `AreaService` loads these definitions, keeps `GameState.cu
 * `complete_flags`: optional list of legacy flags to set when the quest objectives are completed
 
 Repositories validate referenced item ids, area ids, and turn-in story node ids so quests remain data-driven and deterministic.
+
+---
+
+## Shops (`shops.json`)
+
+`shops.json` stores deterministic shop definitions as a JSON object with a single `shops` map. Each shop entry includes:
+
+* `id`: string (must match the map key)
+* `name`: string
+* `shop_type`: `"item" | "weapon" | "armour"`
+* `tags`: list[string] – shop is available when the current location tags intersect this list
+* `stock_pool`: list of `{ "id": string, "qty": int }` entries – ids and per-visit stock quantities
+* `stock_size`: optional int (default 10)
+
+Stock selection is deterministic: each shop uses `location_visits[location_id] % num_pages` to pick the stock page from `stock_pool`. Each entry’s `qty` sets the finite supply for the current visit; quantities reset when the player leaves and returns. Repositories validate stock ids against the relevant definition file (`items.json`, `weapons.json`, `armour.json`).
 
 ---
 
@@ -499,7 +514,7 @@ Manual saves are plain JSON written to `data/saves/slot_1.json` through `slot_3.
 * `save_version`: integer schema version (v1 = `1`). Loaders refuse mismatched versions.
 * `metadata`: presentation summary used when rendering the slot picker (player name, current node id, current location id, mode, gold, seed, ISO timestamp).
 * `rng`: deterministic RNG snapshot (`{"version": 3, "state": [...], "gauss": null}`).
-* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, checkpoint metadata, quest progress, and the player object).
+* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, visit counts, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, checkpoint metadata, quest progress, and the player object).
 
 Example (trimmed):
 
@@ -548,6 +563,13 @@ Example (trimmed):
     "camp_message": "You take a moment to rest, patch gear, and talk before pressing on.",
     "visited_locations": ["village_outskirts"],
     "location_entry_seen": {"village_outskirts": true},
+    "location_visits": {"village_outskirts": 0},
+    "shop_stock_remaining": {
+      "village_outskirts": {
+        "threshold_inn_item_shop": {"potion_hp_small": 7}
+      }
+    },
+    "shop_stock_visit_index": {"village_outskirts": {"threshold_inn_item_shop": 0}},
     "story_checkpoint_node_id": "forest_ambush",
     "story_checkpoint_location_id": "village_outskirts",
     "story_checkpoint_thread_id": "main_story",
@@ -586,6 +608,9 @@ Additional state fields:
 * `story_checkpoint_node_id`: string | null — the most recent story node that should be replayed if the player was defeated. When non-null, Camp Menu’s “Continue story” rewinds to that node instead of skipping ahead.
 * `story_checkpoint_location_id`: string | null — the area id the player must return to before replaying the checkpoint encounter. Continue auto-warps to this location when needed.
 * `story_checkpoint_thread_id`: string | null — identifier describing which checkpoint thread is active (`"main_story"` today; quests can introduce additional threads later). Thread ids keep different checkpoint categories from interfering with one another.
+* `location_visits`: map of area id → int — deterministic visit counts used for systems like shop stock rotation.
+* `shop_stock_remaining`: map of location id → shop id → item id → remaining qty for the current visit.
+* `shop_stock_visit_index`: map of location id → shop id → visit count used to determine when to restock.
 * `quests_active`: map of quest id → `{ "objectives": [ { "current": int, "completed": bool } ] }`
 * `quests_completed`: list[string] — quest ids that have completed objectives
 * `quests_turned_in`: list[string] — quest ids that have been turned in for rewards

@@ -38,6 +38,9 @@ class GameState:
     current_location_id: str = ""
     visited_locations: List[str] = field(default_factory=list)
     location_entry_seen: Dict[str, bool] = field(default_factory=dict)
+    location_visits: Dict[str, int] = field(default_factory=dict)
+    shop_stock_remaining: Dict[str, Dict[str, Dict[str, int]]] = field(default_factory=dict)
+    shop_stock_visit_index: Dict[str, Dict[str, int]] = field(default_factory=dict)
     quests_active: Dict[str, QuestProgress] = field(default_factory=dict)
     quests_completed: List[str] = field(default_factory=list)
     quests_turned_in: List[str] = field(default_factory=list)

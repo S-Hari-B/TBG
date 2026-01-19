@@ -29,6 +29,7 @@ def definitions_dir() -> Path:
         "loot_tables.json",
         "areas.json",
         "quests.json",
+        "shops.json",
     ],
 )
 def test_definition_files_are_valid_json(definitions_dir: Path, filename: str) -> None:
@@ -53,6 +54,7 @@ def test_definition_integrity_and_references(definitions_dir: Path) -> None:
     _validate_loot_tables(definitions_dir, items)
     story_node_ids = _validate_story(definitions_dir, classes, enemies)
     _validate_abilities(definitions_dir)
+    _validate_shops(definitions_dir, items, weapons, armour)
     quest_ids = _validate_quests(definitions_dir, item_ids=items, area_ids=set(), story_node_ids=story_node_ids)
     area_ids = _validate_areas(definitions_dir, story_node_ids, quest_ids=quest_ids)
     _validate_quests(definitions_dir, item_ids=items, area_ids=area_ids, story_node_ids=story_node_ids)
@@ -172,6 +174,58 @@ def _validate_skills(definitions_dir: Path) -> set[str]:
         _require_int(mapping["base_power"], f"skill '{skill_id}' base_power")
         _require_int(mapping["gold_value"], f"skill '{skill_id}' gold_value")
         ids.add(skill_id)
+    return ids
+
+
+def _validate_shops(
+    definitions_dir: Path,
+    item_ids: set[str],
+    weapon_ids: set[str],
+    armour_ids: set[str],
+) -> set[str]:
+    data = _load_required_dict(definitions_dir, "shops.json")
+    container = _require_mapping(data.get("shops"), "shops.json.shops")
+    ids: set[str] = set()
+    for shop_id, payload in container.items():
+        _require_str(shop_id, "shop id")
+        mapping = _require_mapping(payload, f"shop '{shop_id}'")
+        _assert_allowed_fields(
+            mapping,
+            required={"id", "name", "shop_type", "tags", "stock_pool"},
+            optional={"stock_size"},
+            context=f"shop '{shop_id}'",
+        )
+        shop_id_value = _require_str(mapping["id"], f"shop '{shop_id}' id")
+        assert shop_id_value == shop_id, f"shop '{shop_id}' id must match key"
+        _require_str(mapping["name"], f"shop '{shop_id}' name")
+        shop_type = _require_str(mapping["shop_type"], f"shop '{shop_id}' shop_type")
+        assert shop_type in {"item", "weapon", "armour"}
+        _require_str_list(mapping["tags"], f"shop '{shop_id}' tags")
+        stock_pool = _require_list(mapping["stock_pool"], f"shop '{shop_id}' stock_pool")
+        seen_ids: set[str] = set()
+        if "stock_size" in mapping:
+            stock_size = _require_int(mapping["stock_size"], f"shop '{shop_id}' stock_size")
+            assert stock_size > 0
+        for index, entry in enumerate(stock_pool):
+            entry_map = _require_mapping(entry, f"shop '{shop_id}' stock_pool[{index}]")
+            _assert_allowed_fields(
+                entry_map,
+                required={"id", "qty"},
+                optional=set(),
+                context=f"shop '{shop_id}' stock_pool[{index}]",
+            )
+            entry_id = _require_str(entry_map["id"], f"shop '{shop_id}' stock_pool[{index}].id")
+            qty = _require_int(entry_map["qty"], f"shop '{shop_id}' stock_pool[{index}].qty")
+            assert qty > 0
+            assert entry_id not in seen_ids, f"shop '{shop_id}' stock_pool contains duplicates"
+            seen_ids.add(entry_id)
+            if shop_type == "item":
+                assert entry_id in item_ids
+            elif shop_type == "weapon":
+                assert entry_id in weapon_ids
+            elif shop_type == "armour":
+                assert entry_id in armour_ids
+        ids.add(shop_id)
     return ids
 
 

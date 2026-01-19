@@ -16,6 +16,7 @@ from tbg.data.repositories import (
     StoryRepository,
     SkillsRepository,
     WeaponsRepository,
+    ShopsRepository,
 )
 from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
 from tbg.domain.inventory import ARMOUR_SLOTS
@@ -49,6 +50,16 @@ from tbg.services import (
 )
 from tbg.services.quest_service import QuestJournalView, QuestTurnInView
 from tbg.services.area_service import TRAVEL_BLOCKED_MESSAGE
+from tbg.services.shop_service import (
+    ShopActionFailedEvent,
+    ShopDebugGoldGrantedEvent,
+    ShopBatchResult,
+    ShopPurchaseEvent,
+    ShopSaleEvent,
+    ShopService,
+    ShopSummaryView,
+    ShopView,
+)
 from tbg.services.battle_service import (
     AttackResolvedEvent,
     BattleEvent,
@@ -309,7 +320,7 @@ def _build_town_menu_entries(state: GameState) -> List[tuple[str, str]]:
         entries.append(("Location Debug (DEBUG)", "location_debug"))
     entries.append(("Converse", "converse"))
     entries.append(("Quests", "quests"))
-    entries.append(("Shops (Coming Soon)", "shops"))
+    entries.append(("Shops", "shops"))
     entries.append(("Inventory / Equipment", "inventory"))
     if state.party_members:
         entries.append(("Party Talk", "talk"))
@@ -370,6 +381,7 @@ def main() -> None:
         save_service,
         area_service,
         quest_service,
+        shop_service,
     ) = _build_services()
     slot_store = SaveSlotStore()
     print("=== Text Based Game (To be renamed) ===")
@@ -392,6 +404,7 @@ def main() -> None:
             battle_service,
             inventory_service,
             quest_service,
+            shop_service,
             game_state,
             save_service,
             slot_store,
@@ -422,7 +435,13 @@ def _main_menu_loop() -> MenuAction:
 
 
 def _build_services() -> tuple[
-    StoryService, BattleService, InventoryService, SaveService, AreaService, QuestService
+    StoryService,
+    BattleService,
+    InventoryService,
+    SaveService,
+    AreaService,
+    QuestService,
+    ShopService,
 ]:
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
@@ -444,6 +463,11 @@ def _build_services() -> tuple[
         items_repo=items_repo,
         areas_repo=areas_repo,
         story_repo=story_repo,
+    )
+    shops_repo = ShopsRepository(
+        items_repo=items_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
     )
     quest_service = QuestService(
         quests_repo=quests_repo,
@@ -472,6 +496,12 @@ def _build_services() -> tuple[
         quest_service=quest_service,
     )
     area_service = AreaService(areas_repo=areas_repo, quest_service=quest_service)
+    shop_service = ShopService(
+        shops_repo=shops_repo,
+        items_repo=items_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+    )
     save_service = SaveService(
         story_repo=story_repo,
         classes_repo=classes_repo,
@@ -482,7 +512,15 @@ def _build_services() -> tuple[
         areas_repo=areas_repo,
         quests_repo=quests_repo,
     )
-    return story_service, battle_service, inventory_service, save_service, area_service, quest_service
+    return (
+        story_service,
+        battle_service,
+        inventory_service,
+        save_service,
+        area_service,
+        quest_service,
+        shop_service,
+    )
 
 
 def _start_new_game(story_service: StoryService, area_service: AreaService) -> GameState:
@@ -546,6 +584,7 @@ def _run_story_loop(
     battle_service: BattleService,
     inventory_service: InventoryService,
     quest_service: QuestService,
+    shop_service: ShopService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -562,6 +601,7 @@ def _run_story_loop(
                 story_service,
                 inventory_service,
                 quest_service,
+                shop_service,
                 state,
                 save_service,
                 slot_store,
@@ -576,6 +616,7 @@ def _run_story_loop(
                 story_service,
                 inventory_service,
                 quest_service,
+                shop_service,
                 state,
                 save_service,
                 slot_store,
@@ -598,6 +639,7 @@ def _run_story_loop(
                         story_service,
                         inventory_service,
                         quest_service,
+                        shop_service,
                         state,
                         save_service,
                         slot_store,
@@ -616,6 +658,7 @@ def _run_story_loop(
             story_service,
             inventory_service,
             quest_service,
+            shop_service,
             state,
             save_service,
             slot_store,
@@ -648,6 +691,7 @@ def _process_story_events(
     story_service: StoryService,
     inventory_service: InventoryService,
     quest_service: QuestService,
+    shop_service: ShopService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -659,6 +703,7 @@ def _process_story_events(
         story_service,
         inventory_service,
         quest_service,
+        shop_service,
         state,
         save_service,
         slot_store,
@@ -673,6 +718,7 @@ def _handle_story_events(
     story_service: StoryService,
     inventory_service: InventoryService,
     quest_service: QuestService,
+    shop_service: ShopService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -702,6 +748,7 @@ def _handle_story_events(
                     story_service,
                     inventory_service,
                     quest_service,
+                    shop_service,
                     state,
                     save_service,
                     slot_store,
@@ -718,6 +765,7 @@ def _handle_story_events(
                 story_service,
                 inventory_service,
                 quest_service,
+                shop_service,
                 state,
                 save_service,
                 slot_store,
@@ -759,6 +807,7 @@ def _handle_story_events(
                 story_service,
                 inventory_service,
                 quest_service,
+                shop_service,
                 state,
                 save_service,
                 slot_store,
@@ -773,6 +822,7 @@ def _handle_story_events(
                 story_service,
                 inventory_service,
                 quest_service,
+                shop_service,
                 state,
                 save_service,
                 slot_store,
@@ -792,6 +842,7 @@ def _run_post_battle_interlude(
     story_service: StoryService,
     inventory_service: InventoryService,
     quest_service: QuestService,
+    shop_service: ShopService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -809,6 +860,7 @@ def _run_post_battle_interlude(
                 story_service,
                 inventory_service,
                 quest_service,
+                shop_service,
                 state,
                 save_service,
                 slot_store,
@@ -882,6 +934,7 @@ def _run_town_menu(
     story_service: StoryService,
     inventory_service: InventoryService,
     quest_service: QuestService,
+    shop_service: ShopService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -924,7 +977,7 @@ def _run_town_menu(
                 return quest_follow_up
             continue
         if action == "shops":
-            print("Shops are coming soon.")
+            _handle_shop_menu(shop_service, area_service, state)
             continue
         if action == "inventory":
             _run_inventory_flow(inventory_service, state)
@@ -943,6 +996,7 @@ def _handle_defeat_flow(
     story_service: StoryService,
     inventory_service: InventoryService,
     quest_service: QuestService,
+    shop_service: ShopService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -965,6 +1019,7 @@ def _handle_defeat_flow(
         story_service,
         inventory_service,
         quest_service,
+        shop_service,
         state,
         save_service,
         slot_store,
@@ -1088,6 +1143,193 @@ def _handle_quests_menu(
             return None
         selected = turn_ins[choice]
         return _play_node_with_auto_resume(story_service, state, selected.node_id)
+
+
+def _handle_shop_menu(shop_service: ShopService, area_service: AreaService, state: GameState) -> None:
+    location_view = area_service.get_current_location_view(state)
+    shops = shop_service.list_shops_for_location(location_view.tags)
+    if not shops:
+        print("No shops are available here.")
+        return
+    while True:
+        options = [f"{shop.name} ({shop.shop_type.title()})" for shop in shops]
+        options.append("Back")
+        render_menu("Shops", options)
+        choice = _prompt_menu_index(len(options))
+        if choice == len(shops):
+            return
+        _run_shop_menu(shop_service, state, location_view.id, shops[choice])
+
+
+def _run_shop_menu(
+    shop_service: ShopService,
+    state: GameState,
+    location_id: str,
+    shop: ShopSummaryView,
+) -> None:
+    while True:
+        shop_view = shop_service.build_shop_view(state, location_id, shop.shop_id)
+        render_heading(shop_view.name)
+        _render_shop_stock(shop_view)
+        options = ["Buy", "Sell", "Back"]
+        if _debug_enabled():
+            options.append("Give Gold (DEBUG)")
+        render_menu("Shop Options", options)
+        choice = _prompt_menu_index(len(options))
+        if choice == 0:
+            _run_shop_buy_menu(shop_service, state, location_id, shop_view)
+            continue
+        if choice == 1:
+            _run_shop_sell_menu(shop_service, state, shop_view)
+            continue
+        if choice == 2:
+            return
+        if _debug_enabled() and choice == 3:
+            amount = _prompt_non_negative_int("Gold to add: ")
+            events = shop_service.grant_debug_gold(state, amount)
+            _render_shop_events(events)
+            continue
+        return
+
+
+def _run_shop_buy_menu(
+    shop_service: ShopService,
+    state: GameState,
+    location_id: str,
+    shop_view: ShopView,
+) -> None:
+    while True:
+        refreshed = shop_service.build_shop_view(state, location_id, shop_view.shop_id)
+        if not refreshed.entries:
+            print("No stock is available right now.")
+            return
+        options = [
+            f"{entry.name} - {entry.price}g (Stock: {entry.stock}, Owned: {entry.owned})"
+            for entry in refreshed.entries
+        ]
+        options.append("Back")
+        render_menu("Buy", options)
+        selections = _prompt_index_batch(len(options), "Select items (comma-separated): ")
+        if selections is None:
+            continue
+        if len(selections) == 1 and selections[0] == len(options):
+            return
+        if len(selections) > 1 and len(options) in selections:
+            print("Back cannot be combined with other selections.")
+            continue
+        item_ids = [refreshed.entries[index - 1].item_id for index in selections]
+        result = shop_service.buy_many(state, location_id, shop_view.shop_id, item_ids)
+        _render_shop_events(result.events)
+        _render_shop_batch_summary(result, action="Bought")
+
+
+def _run_shop_sell_menu(
+    shop_service: ShopService,
+    state: GameState,
+    shop_view: ShopView,
+) -> None:
+    while True:
+        refreshed = shop_service.build_sell_view(state, shop_view.shop_id)
+        if not refreshed.entries:
+            print("Nothing to sell right now.")
+            return
+        options = [
+            f"{entry.name} - {entry.price}g (Owned: {entry.owned})" for entry in refreshed.entries
+        ]
+        options.append("Back")
+        render_menu("Sell", options)
+        selections = _prompt_index_batch(len(options), "Select items (comma-separated): ")
+        if selections is None:
+            continue
+        if len(selections) == 1 and selections[0] == len(options):
+            return
+        if len(selections) > 1 and len(options) in selections:
+            print("Back cannot be combined with other selections.")
+            continue
+        item_ids = [refreshed.entries[index - 1].item_id for index in selections]
+        result = shop_service.sell_many(state, shop_view.shop_id, item_ids)
+        _render_shop_events(result.events)
+        _render_shop_batch_summary(result, action="Sold")
+
+
+def _render_shop_stock(shop_view: ShopView) -> None:
+    print(f"Gold: {shop_view.gold}")
+    if not shop_view.entries:
+        print("Stock: (none)")
+        return
+    print("Stock:")
+    for entry in shop_view.entries:
+        print(
+            f"- {entry.name} ({entry.price}g, Stock: {entry.stock}, Owned: {entry.owned})"
+        )
+
+
+def _render_shop_events(events: List[object]) -> None:
+    for event in events:
+        if isinstance(event, ShopPurchaseEvent):
+            print(
+                f"- Bought {event.item_name} x{event.quantity} for {event.total_cost}g "
+                f"(Gold: {event.total_gold})."
+            )
+        elif isinstance(event, ShopSaleEvent):
+            print(
+                f"- Sold {event.item_name} x{event.quantity} for {event.total_gain}g "
+                f"(Gold: {event.total_gold})."
+            )
+        elif isinstance(event, ShopDebugGoldGrantedEvent):
+            print(f"- Added {event.amount} gold (Gold: {event.total_gold}).")
+        elif isinstance(event, ShopActionFailedEvent):
+            print(f"- {event.message}")
+
+
+def _render_shop_batch_summary(result: ShopBatchResult, *, action: str) -> None:
+    total = result.success_count + result.failure_count
+    if total <= 1:
+        return
+    print(f"- {action} {result.success_count} items. {result.failure_count} failed.")
+
+
+def _prompt_non_negative_int(label: str) -> int:
+    while True:
+        raw = input(label).strip()
+        try:
+            value = int(raw)
+        except ValueError:
+            print("Please enter a valid integer.")
+            continue
+        if value < 0:
+            print("Please enter zero or a positive number.")
+            continue
+        return value
+
+
+def _prompt_index_batch(max_index: int, label: str) -> List[int] | None:
+    raw = input(label).strip()
+    if not raw:
+        print("Please enter at least one selection.")
+        return None
+    tokens = [token.strip() for token in raw.split(",")]
+    if any(token == "" for token in tokens):
+        print("Selections cannot be empty.")
+        return None
+    selections: List[int] = []
+    seen: set[int] = set()
+    for token in tokens:
+        try:
+            value = int(token)
+        except ValueError:
+            print("Selections must be numbers.")
+            return None
+        if value <= 0:
+            print("Selections must be positive.")
+            return None
+        if value > max_index:
+            print("Selection out of range.")
+            return None
+        if value not in seen:
+            selections.append(value)
+            seen.add(value)
+    return selections
 
 
 def _play_node_with_auto_resume(

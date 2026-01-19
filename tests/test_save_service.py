@@ -133,6 +133,11 @@ def test_save_round_trip_preserves_state() -> None:
     state.story_checkpoint_node_id = "battle_trial_1v1"
     state.story_checkpoint_location_id = "threshold_inn"
     state.story_checkpoint_thread_id = "main_story"
+    state.location_visits = {"threshold_inn": 2, "open_plains": 1}
+    state.shop_stock_remaining = {
+        "threshold_inn": {"threshold_inn_item_shop": {"potion_hp_small": 3}}
+    }
+    state.shop_stock_visit_index = {"threshold_inn": {"threshold_inn_item_shop": 2}}
     state.quests_active["cerel_kill_hunt"] = QuestProgress(
         quest_id="cerel_kill_hunt",
         objectives=[
@@ -159,6 +164,9 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.current_location_id == state.current_location_id
     assert restored.visited_locations == state.visited_locations
     assert restored.location_entry_seen == state.location_entry_seen
+    assert restored.location_visits == state.location_visits
+    assert restored.shop_stock_remaining == state.shop_stock_remaining
+    assert restored.shop_stock_visit_index == state.shop_stock_visit_index
     assert restored.story_checkpoint_node_id == state.story_checkpoint_node_id
     assert restored.story_checkpoint_location_id == state.story_checkpoint_location_id
     assert restored.story_checkpoint_thread_id == state.story_checkpoint_thread_id

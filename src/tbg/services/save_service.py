@@ -131,6 +131,15 @@ class SaveService:
         state.location_entry_seen = self._coerce_location_entry_flags(
             state_payload.get("location_entry_seen"), current_location_id
         )
+        state.location_visits = self._coerce_location_visits(
+            state_payload.get("location_visits"), current_location_id
+        )
+        state.shop_stock_remaining = self._coerce_shop_stock_remaining(
+            state_payload.get("shop_stock_remaining")
+        )
+        state.shop_stock_visit_index = self._coerce_shop_stock_visit_index(
+            state_payload.get("shop_stock_visit_index")
+        )
         state.quests_active = self._coerce_quests_active(state_payload.get("quests_active"))
         state.quests_completed = self._coerce_str_list(
             state_payload.get("quests_completed"), "state.quests_completed"
@@ -196,6 +205,9 @@ class SaveService:
             "player": self._serialize_player(state.player) if state.player else None,
             "visited_locations": list(state.visited_locations),
             "location_entry_seen": dict(state.location_entry_seen),
+            "location_visits": dict(state.location_visits),
+            "shop_stock_remaining": dict(state.shop_stock_remaining),
+            "shop_stock_visit_index": dict(state.shop_stock_visit_index),
             "story_checkpoint_node_id": state.story_checkpoint_node_id,
             "story_checkpoint_location_id": state.story_checkpoint_location_id,
             "story_checkpoint_thread_id": state.story_checkpoint_thread_id,
@@ -331,6 +343,77 @@ class SaveService:
         if current_location_id not in result:
             result[current_location_id] = True
         return result
+
+    def _coerce_location_visits(
+        self, value: Any, current_location_id: str
+    ) -> Dict[str, int]:
+        if value is None:
+            return {current_location_id: 0}
+        mapping = self._require_dict(value, "state.location_visits")
+        result: Dict[str, int] = {}
+        for key, entry in mapping.items():
+            location_id = self._require_str(key, "state.location_visits key")
+            self._validate_area_id(location_id)
+            count = self._require_int(entry, f"state.location_visits[{location_id}]")
+            if count < 0:
+                raise SaveLoadError("state.location_visits values must be non-negative.")
+            result[location_id] = count
+        if current_location_id not in result:
+            result[current_location_id] = 0
+        return result
+
+    def _coerce_shop_stock_remaining(
+        self, value: Any
+    ) -> Dict[str, Dict[str, Dict[str, int]]]:
+        if value is None:
+            return {}
+        mapping = self._require_dict(value, "state.shop_stock_remaining")
+        output: Dict[str, Dict[str, Dict[str, int]]] = {}
+        for location_id, shop_map in mapping.items():
+            location_key = self._require_str(location_id, "state.shop_stock_remaining key")
+            shop_mapping = self._require_dict(shop_map, f"state.shop_stock_remaining[{location_key}]")
+            output[location_key] = {}
+            for shop_id, stock_map in shop_mapping.items():
+                shop_key = self._require_str(shop_id, f"state.shop_stock_remaining[{location_key}] shop key")
+                item_mapping = self._require_dict(
+                    stock_map, f"state.shop_stock_remaining[{location_key}][{shop_key}]"
+                )
+                output[location_key][shop_key] = {}
+                for item_id, remaining in item_mapping.items():
+                    item_key = self._require_str(
+                        item_id,
+                        f"state.shop_stock_remaining[{location_key}][{shop_key}] item key",
+                    )
+                    qty = self._require_int(
+                        remaining,
+                        f"state.shop_stock_remaining[{location_key}][{shop_key}][{item_key}]",
+                    )
+                    if qty < 0:
+                        raise SaveLoadError("shop_stock_remaining quantities must be non-negative.")
+                    output[location_key][shop_key][item_key] = qty
+        return output
+
+    def _coerce_shop_stock_visit_index(
+        self, value: Any
+    ) -> Dict[str, Dict[str, int]]:
+        if value is None:
+            return {}
+        mapping = self._require_dict(value, "state.shop_stock_visit_index")
+        output: Dict[str, Dict[str, int]] = {}
+        for location_id, shop_map in mapping.items():
+            location_key = self._require_str(location_id, "state.shop_stock_visit_index key")
+            shop_mapping = self._require_dict(shop_map, f"state.shop_stock_visit_index[{location_key}]")
+            output[location_key] = {}
+            for shop_id, visit in shop_mapping.items():
+                shop_key = self._require_str(shop_id, f"state.shop_stock_visit_index[{location_key}] shop key")
+                visit_value = self._require_int(
+                    visit,
+                    f"state.shop_stock_visit_index[{location_key}][{shop_key}]",
+                )
+                if visit_value < 0:
+                    raise SaveLoadError("shop_stock_visit_index values must be non-negative.")
+                output[location_key][shop_key] = visit_value
+        return output
 
     def _coerce_narration(self, value: Any) -> List[tuple[str, str]]:
         if not isinstance(value, list):

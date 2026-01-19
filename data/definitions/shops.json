@@ -1,0 +1,53 @@
+{
+  "shops": {
+    "threshold_inn_item_shop": {
+      "id": "threshold_inn_item_shop",
+      "name": "Threshold Inn Supplies",
+      "shop_type": "item",
+      "tags": ["town", "floor_zero"],
+      "stock_pool": [
+        { "id": "potion_hp_small", "qty": 10 },
+        { "id": "potion_energy_small", "qty": 8 },
+        { "id": "goblin_horn", "qty": 5 },
+        { "id": "wolf_tooth", "qty": 5 }
+      ],
+      "stock_size": 10
+    },
+    "threshold_inn_weapon_shop": {
+      "id": "threshold_inn_weapon_shop",
+      "name": "Threshold Inn Arms",
+      "shop_type": "weapon",
+      "tags": ["town", "floor_zero"],
+      "stock_pool": [
+        { "id": "wooden_club", "qty": 1 },
+        { "id": "iron_dagger", "qty": 1 },
+        { "id": "iron_sword", "qty": 1 },
+        { "id": "wooden_shield", "qty": 1 },
+        { "id": "shortbow", "qty": 1 },
+        { "id": "wooden_spear", "qty": 1 },
+        { "id": "goblin_dagger", "qty": 1 },
+        { "id": "fire_staff", "qty": 1 }
+      ],
+      "stock_size": 10
+    },
+    "threshold_inn_armour_shop": {
+      "id": "threshold_inn_armour_shop",
+      "name": "Threshold Inn Armoury",
+      "shop_type": "armour",
+      "tags": ["town", "floor_zero"],
+      "stock_pool": [
+        { "id": "light_cloth_armour_common", "qty": 1 },
+        { "id": "medium_leather_armour_common", "qty": 1 },
+        { "id": "heavy_iron_armour_common", "qty": 1 },
+        { "id": "leather_cap", "qty": 1 },
+        { "id": "iron_war_helm", "qty": 1 },
+        { "id": "leather_gloves", "qty": 1 },
+        { "id": "iron_gauntlets", "qty": 1 },
+        { "id": "leather_boots", "qty": 1 },
+        { "id": "iron_greaves", "qty": 1 },
+        { "id": "goblin_rags", "qty": 1 }
+      ],
+      "stock_size": 10
+    }
+  }
+}

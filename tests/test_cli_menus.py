@@ -6,9 +6,12 @@ from tbg.presentation.cli.app import (
     _build_camp_menu_entries,
     _build_town_menu_entries,
     _main_menu_options,
+    _prompt_index_batch,
     _play_node_with_auto_resume,
+    _run_shop_menu,
     _warp_to_checkpoint_location,
 )
+from tbg.services.shop_service import ShopSummaryView, ShopView
 from tbg.services.area_service import AreaService
 from tbg.data.repositories import AreasRepository
 from tbg.services.story_service import GameMenuEnteredEvent
@@ -33,7 +36,7 @@ def test_town_menu_includes_converse_and_quests() -> None:
     labels = [label for label, _ in entries]
     assert "Converse" in labels
     assert "Quests" in labels
-    assert "Shops (Coming Soon)" in labels
+    assert "Shops" in labels
 
 
 def test_main_menu_includes_load_but_not_save() -> None:
@@ -103,6 +106,7 @@ def test_interlude_reselects_menu_after_travel(monkeypatch) -> None:
         story_service=object(),
         inventory_service=object(),
         quest_service=object(),
+        shop_service=object(),
         state=state,
         save_service=object(),
         slot_store=object(),
@@ -111,6 +115,86 @@ def test_interlude_reselects_menu_after_travel(monkeypatch) -> None:
     )
 
     assert follow_up == []
+
+
+def test_town_menu_shops_dispatch(monkeypatch) -> None:
+    state = _camp_state()
+    calls = {"count": 0}
+
+    def fake_handle_shop_menu(shop_service, area_service, state_arg):
+        del shop_service, area_service, state_arg
+        calls["count"] += 1
+
+    def fake_menu_entries(_state):
+        return [("Shops", "shops"), ("Quit to Main Menu", "quit")]
+
+    choices = iter([0, 1])
+
+    monkeypatch.setattr(app, "_handle_shop_menu", fake_handle_shop_menu)
+    monkeypatch.setattr(app, "_build_town_menu_entries", fake_menu_entries)
+    monkeypatch.setattr(app, "_prompt_menu_index", lambda _count: next(choices))
+    monkeypatch.setattr(app, "render_menu", lambda *args, **kwargs: None)
+
+    result = app._run_town_menu(
+        story_service=object(),
+        inventory_service=object(),
+        quest_service=object(),
+        shop_service=object(),
+        state=state,
+        save_service=object(),
+        slot_store=object(),
+        battle_service=object(),
+        area_service=object(),
+    )
+
+    assert result is None
+    assert calls["count"] == 1
+
+
+def test_shop_menu_debug_option_visibility(monkeypatch) -> None:
+    state = _camp_state()
+    shop_summary = ShopSummaryView(shop_id="shop", name="Shop", shop_type="item")
+    shop_view = ShopView(shop_id="shop", name="Shop", shop_type="item", gold=10, entries=[])
+    captured = {"options": []}
+
+    def fake_build_shop_view(_state, _location_id, _shop_id):
+        return shop_view
+
+    def fake_render_menu(_title, options):
+        captured["options"] = options
+
+    class _StubShopService:
+        def build_shop_view(self, state, location_id, shop_id):
+            return fake_build_shop_view(state, location_id, shop_id)
+
+    monkeypatch.setattr(app, "render_heading", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "render_menu", fake_render_menu)
+    monkeypatch.setattr(app, "_prompt_menu_index", lambda _count: 2)
+    monkeypatch.delenv("TBG_DEBUG", raising=False)
+
+    _run_shop_menu(_StubShopService(), state, "threshold_inn", shop_summary)
+    assert "Give Gold (DEBUG)" not in captured["options"]
+
+    monkeypatch.setenv("TBG_DEBUG", "1")
+    _run_shop_menu(_StubShopService(), state, "threshold_inn", shop_summary)
+    assert "Give Gold (DEBUG)" in captured["options"]
+
+
+def test_prompt_index_batch_parses_and_dedupes(monkeypatch) -> None:
+    monkeypatch.setattr("builtins.input", lambda _prompt: "1, 3, 1,5")
+    assert _prompt_index_batch(5, "Select: ") == [1, 3, 5]
+
+
+def test_prompt_index_batch_rejects_invalid(monkeypatch, capsys) -> None:
+    monkeypatch.setattr("builtins.input", lambda _prompt: "1,,2")
+    assert _prompt_index_batch(5, "Select: ") is None
+    assert "Selections cannot be empty." in capsys.readouterr().out
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: "a,2")
+    assert _prompt_index_batch(5, "Select: ") is None
+
+    monkeypatch.setattr("builtins.input", lambda _prompt: "0")
+    assert _prompt_index_batch(5, "Select: ") is None
 
 
 def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> None:
@@ -126,12 +210,14 @@ def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> Non
         story_service,
         inventory_service,
         quest_service_arg,
+        shop_service_arg,
         state_arg,
         save_service,
         slot_store,
         battle_service,
         area_service_arg,
     ):
+        del shop_service_arg
         captured["area_service"] = area_service_arg
         captured["quest_service"] = quest_service_arg
         return [object()]
@@ -146,6 +232,7 @@ def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> Non
         story_service=object(),
         inventory_service=object(),
         quest_service=quest_service,
+        shop_service=object(),
         state=state,
         save_service=object(),
         slot_store=object(),
@@ -246,6 +333,7 @@ def test_turn_in_check_nodes_do_not_end_demo(monkeypatch, capsys) -> None:
         save_service,
         area_service,
         quest_service,
+        shop_service,
     ) = app._build_services()
     for node_id in ("dana_turn_in_check", "dana_protoquest_turn_in_check", "cerel_turn_in_check"):
         state = story_service.start_new_game(seed=101, player_name="Hero")
@@ -267,6 +355,7 @@ def test_turn_in_check_nodes_do_not_end_demo(monkeypatch, capsys) -> None:
                 battle_service,
                 inventory_service,
                 quest_service,
+                shop_service,
                 state,
                 save_service,
                 app.SaveSlotStore(),
