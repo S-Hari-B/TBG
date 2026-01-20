@@ -382,28 +382,6 @@ Party members define recruitable allies such as Emma. Fields mirror the class de
 
 ---
 
-## Areas (`areas.json`) — deprecated
-
-`areas.json` drives the overworld “Travel” interface. The file stores an object with a single `"areas"` array. Each entry declares:
-
-* `id`: string — lowercase unique id (e.g. `village_outskirts`)
-* `name`: string
-* `description`: string
-* `tags`: list[string] — lowercase tags such as `village`, `outskirts`, `forest`, `safe`. These tags allow future encounter gating/balance rules.
-* `connections`: list of `{ "to": "<area_id>", "label": "<menu label>", "progresses_story": bool, "requires_quest_active"?: string, "hide_if_quest_completed"?: string, "hide_if_quest_turned_in"?: string, "show_if_flag_true"?: string, "hide_if_flag_true"?: string }`. `progresses_story` is optional and defaults to `false`. Connections are directional; add reciprocal entries explicitly. Optional gating fields filter travel destinations based on quest state and flags.
-* `entry_story_node_id`: optional string referencing a node in `story.json`. If present, that node auto-plays exactly once the first time the player arrives at the area.
-* `npcs_present`: optional list of `{ "npc_id": string, "talk_node_id": string, "quest_hub_node_id"?: string }`. These are used by the Town Menu for Converse and quest turn-ins.
-
-Repositories validate that:
-
-* Area ids are unique.
-* Connection targets reference existing areas.
-* `entry_story_node_id` values exist in the story definitions (see below).
-
-`areas.json` is retained for backward compatibility but is no longer used by the runtime after the Area v2 switch. The live travel system now reads `floors.json` + `locations.json`.
-
----
-
 ## Floors (`floors.json`)
 
 `floors.json` defines floor metadata for AreaServiceV2.

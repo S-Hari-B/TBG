@@ -23,7 +23,7 @@ Layers:
 * Owns GameState (overall runtime state)
 * Returns structured results and events for presentation to render
 * Implements persistence orchestration (`SaveService`) to serialize/deserialize `GameState` + RNG snapshots, validate ids against current definitions, and guard against schema/version drift
-* Maintains auxiliary services such as `AreaServiceV2` (floor-based location state, travel events, entry-story hooks; active), `AreaService` (v1 legacy/deprecated), `QuestService` (quest acceptance/progress/turn-in), `ShopService` (deterministic shop stock + transactions), and `SaveService` (v2 save format validated against `locations.json`) so the CLI stays declarative and story remains data-driven
+* Maintains auxiliary services such as `AreaServiceV2` (floor-based location state, travel events, entry-story hooks), `QuestService` (quest acceptance/progress/turn-in), `ShopService` (deterministic shop stock + transactions), and `SaveService` (v2 save format validated against `locations.json`) so the CLI stays declarative and story remains data-driven
 * **Controllers**: UI-agnostic orchestration layer (e.g., `BattleController`) that wraps services and exposes structured state + actions. Controllers do NOT print, format, or prompt—they only progress state and return events. See `battle_controller.md` for details.
 
 ## domain (game rules)
@@ -38,7 +38,7 @@ Layers:
 * JSON loaders and repositories
 * Validates and returns definitions
 * No combat rules, no printing
-* Includes the area map repository (`AreasRepository`) which enforces unique ids, valid travel connections, and entry-story references back into the story definitions
+* Includes the location repositories (`FloorsRepository`, `LocationsRepository`) which enforce unique ids, valid travel connections, and entry-story references back into the story definitions
 * `StoryRepository` reads `story/index.json`, loads the referenced chapter files in order, merges every node, and rejects duplicate ids or broken `next`/choice references. Legacy content (nodes from old story versions that must remain for save compatibility) is separated into dedicated `_legacy_redirects.json` chapter files to keep the main tutorial chapter clean while ensuring old saves don't crash.
 
 ## core (shared utilities)

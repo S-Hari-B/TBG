@@ -17,14 +17,13 @@ from .story_service import (
     StoryNodeView,
     StoryService,
 )
-from .area_service import (
-    AreaService,
+from .area_service_v2 import AreaServiceV2
+from .area_service_v2 import (
     LocationEnteredEvent,
     LocationView,
     TravelPerformedEvent,
     TravelResult,
 )
-from .area_service_v2 import AreaServiceV2
 from .battle_service import BattleService
 from .quest_service import QuestService
 from .shop_service import ShopService
@@ -49,7 +48,6 @@ __all__ = [
     "QuestTurnedInEvent",
     "StoryNodeView",
     "StoryService",
-    "AreaService",
     "AreaServiceV2",
     "LocationEnteredEvent",
     "LocationView",

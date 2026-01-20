@@ -5,7 +5,6 @@ from io import StringIO
 
 from tbg.services.battle_service import BattleService
 from tbg.services.story_service import StoryService
-from tbg.services.area_service import AreaService
 from tbg.data.repositories.classes_repo import ClassesRepository
 from tbg.data.repositories.enemies_repo import EnemiesRepository
 from tbg.data.repositories.items_repo import ItemsRepository
@@ -16,7 +15,6 @@ from tbg.data.repositories.story_repo import StoryRepository
 from tbg.data.repositories.weapons_repo import WeaponsRepository
 from tbg.data.repositories.armour_repo import ArmourRepository
 from tbg.data.repositories.knowledge_repo import KnowledgeRepository
-from tbg.data.repositories.areas_repo import AreasRepository
 from tbg.domain.state import GameState
 from tbg.presentation.cli.app import _render_boxed_panel
 

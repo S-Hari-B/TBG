@@ -21,7 +21,7 @@ from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment, PartyInventory
 from tbg.domain.quest_state import QuestObjectiveProgress, QuestProgress
 from tbg.domain.state import GameState
 from tbg.services.errors import SaveLoadError
-from tbg.services.area_service import DEFAULT_STARTING_AREA_ID
+DEFAULT_STARTING_LOCATION_ID = "threshold_inn"
 
 
 SavePayload = Dict[str, Any]
@@ -88,7 +88,7 @@ class SaveService:
         self._validate_story_node(current_node_id)
         current_location_id_raw = state_payload.get("current_location_id")
         if current_location_id_raw is None:
-            current_location_id = DEFAULT_STARTING_AREA_ID
+            current_location_id = DEFAULT_STARTING_LOCATION_ID
         else:
             current_location_id = self._require_str(
                 current_location_id_raw, "state.current_location_id"

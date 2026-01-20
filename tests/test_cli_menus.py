@@ -12,8 +12,8 @@ from tbg.presentation.cli.app import (
     _warp_to_checkpoint_location,
 )
 from tbg.services.shop_service import ShopSummaryView, ShopView
-from tbg.services.area_service import AreaService
-from tbg.data.repositories import AreasRepository
+from tbg.services.area_service_v2 import AreaServiceV2
+from tbg.data.repositories import FloorsRepository, LocationsRepository
 from tbg.services.story_service import GameMenuEnteredEvent
 
 
@@ -199,7 +199,9 @@ def test_prompt_index_batch_rejects_invalid(monkeypatch, capsys) -> None:
 
 def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> None:
     state = _camp_state()
-    area_service = AreaService(AreasRepository())
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
+    area_service = AreaServiceV2(floors_repo=floors_repo, locations_repo=locations_repo)
     area_service.initialize_state(state)
     quest_service = object()
 
@@ -247,7 +249,9 @@ def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> Non
 
 def test_warp_to_checkpoint_location_emits_message(monkeypatch, capsys) -> None:
     monkeypatch.setenv("TBG_DEBUG", "1")
-    area_service = AreaService(AreasRepository())
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
+    area_service = AreaServiceV2(floors_repo=floors_repo, locations_repo=locations_repo)
     state = _camp_state()
     area_service.initialize_state(state)
     area_service.force_set_location(state, "village")
@@ -263,7 +267,9 @@ def test_warp_to_checkpoint_location_emits_message(monkeypatch, capsys) -> None:
 
 
 def test_warp_to_checkpoint_skips_when_already_at_location(capsys) -> None:
-    area_service = AreaService(AreasRepository())
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
+    area_service = AreaServiceV2(floors_repo=floors_repo, locations_repo=locations_repo)
     state = _camp_state()
     area_service.initialize_state(state)
     state.story_checkpoint_location_id = state.current_location_id

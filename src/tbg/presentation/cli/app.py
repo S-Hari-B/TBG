@@ -5,7 +5,6 @@ from typing import Callable, List, Literal, Sequence
 
 from tbg.data.repositories import (
     ArmourRepository,
-    AreasRepository,
     ClassesRepository,
     EnemiesRepository,
     FloorsRepository,
@@ -51,7 +50,7 @@ from tbg.services import (
     TravelPerformedEvent,
 )
 from tbg.services.quest_service import QuestJournalView, QuestTurnInView
-from tbg.services.area_service import TRAVEL_BLOCKED_MESSAGE
+from tbg.services.area_service_v2 import TRAVEL_BLOCKED_MESSAGE
 from tbg.services.shop_service import (
     ShopActionFailedEvent,
     ShopDebugGoldGrantedEvent,
@@ -470,7 +469,6 @@ def _build_services() -> tuple[
     skills_repo = SkillsRepository()
     items_repo = ItemsRepository()
     loot_repo = LootTablesRepository()
-    areas_repo = AreasRepository()
     floors_repo = FloorsRepository()
     locations_repo = LocationsRepository(floors_repo=floors_repo)
     quests_repo = QuestsRepository(
@@ -486,7 +484,7 @@ def _build_services() -> tuple[
     quest_service = QuestService(
         quests_repo=quests_repo,
         items_repo=items_repo,
-        areas_repo=locations_repo,
+        locations_repo=locations_repo,
         party_members_repo=party_repo,
     )
     story_service = StoryService(

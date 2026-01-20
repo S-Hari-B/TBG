@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Sequence
 
 from tbg.data.repositories import (
-    AreasRepository,
     ItemsRepository,
     LocationsRepository,
     PartyMembersRepository,
@@ -83,12 +82,11 @@ class QuestService:
         *,
         quests_repo: QuestsRepository,
         items_repo: ItemsRepository,
-        areas_repo: AreasRepository | LocationsRepository | None = None,
+        locations_repo: LocationsRepository,
         party_members_repo: PartyMembersRepository,
     ) -> None:
         self._quests_repo = quests_repo
         self._items_repo = items_repo
-        self._areas_repo = areas_repo
         self._party_members_repo = party_members_repo
 
     def accept_quest(self, state: GameState, quest_id: str) -> QuestUpdate | None:

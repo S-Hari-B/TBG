@@ -4,8 +4,7 @@ from tbg.core.rng import RNG
 from tbg.data.repositories import FloorsRepository, LocationsRepository
 from tbg.domain.quest_state import QuestObjectiveProgress, QuestProgress
 from tbg.domain.state import GameState
-from tbg.services.area_service import TRAVEL_BLOCKED_MESSAGE
-from tbg.services.area_service_v2 import AreaServiceV2
+from tbg.services.area_service_v2 import AreaServiceV2, TRAVEL_BLOCKED_MESSAGE
 
 
 def test_area_service_v2_blocks_progress_when_checkpoint_active() -> None:

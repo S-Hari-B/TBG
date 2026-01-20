@@ -7,18 +7,80 @@ from typing import List, Tuple
 from tbg.data.repositories import FloorsRepository, LocationsRepository
 from tbg.domain.defs import LocationConnectionDef, LocationDef
 from tbg.domain.state import GameState
-from tbg.services.area_service import (
-    LocationDebugView,
-    LocationEnteredEvent,
-    LocationView,
-    NpcPresenceView,
-    TravelOptionView,
-    TravelPerformedEvent,
-    TravelResult,
-    TRAVEL_BLOCKED_MESSAGE,
-)
 from tbg.services.errors import TravelBlockedError
 from tbg.services.quest_service import QuestService
+
+TRAVEL_BLOCKED_MESSAGE = "You can't push onward yet. Something unresolved still blocks your path."
+
+
+@dataclass(slots=True)
+class TravelOptionView:
+    """Renderable connection to another area."""
+
+    destination_id: str
+    label: str
+    progresses_story: bool
+
+
+@dataclass(slots=True)
+class NpcPresenceView:
+    npc_id: str
+    talk_node_id: str
+    quest_hub_node_id: str | None
+
+
+@dataclass(slots=True)
+class LocationView:
+    """Presentation data for the player's current area."""
+
+    id: str
+    name: str
+    description: str
+    tags: Tuple[str, ...]
+    connections: Tuple[TravelOptionView, ...]
+    entry_story_node_id: str | None
+    entry_seen: bool
+    npcs_present: Tuple[NpcPresenceView, ...]
+
+
+@dataclass(slots=True)
+class LocationDebugView:
+    """Extra debug information for location state."""
+
+    location: LocationView
+    visited_locations: Tuple[str, ...]
+    entry_seen_flags: Tuple[Tuple[str, bool], ...]
+
+
+@dataclass(slots=True)
+class TravelEvent:
+    """Base class for travel-related events."""
+
+
+@dataclass(slots=True)
+class TravelPerformedEvent(TravelEvent):
+    """Emitted when the party moves between areas."""
+
+    from_location_id: str
+    from_location_name: str
+    to_location_id: str
+    to_location_name: str
+
+
+@dataclass(slots=True)
+class LocationEnteredEvent(TravelEvent):
+    """Emitted after the player arrives at an area."""
+
+    location: LocationView
+
+
+@dataclass(slots=True)
+class TravelResult:
+    """Return payload from a travel action."""
+
+    events: List[TravelEvent]
+    location_view: LocationView
+    entry_story_node_id: str | None
 
 
 @dataclass(slots=True)

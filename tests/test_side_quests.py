@@ -3,14 +3,15 @@ from tbg.data.repositories import (
     ArmourRepository,
     ClassesRepository,
     EnemiesRepository,
+    FloorsRepository,
     ItemsRepository,
     KnowledgeRepository,
+    LocationsRepository,
     LootTablesRepository,
     PartyMembersRepository,
     SkillsRepository,
     StoryRepository,
     WeaponsRepository,
-    AreasRepository,
     QuestsRepository,
 )
 from tbg.services.battle_service import BattleService
@@ -29,17 +30,18 @@ def _build_services() -> tuple[StoryService, BattleService, QuestService]:
         party_members_repo=party_repo,
     )
     items_repo = ItemsRepository()
-    areas_repo = AreasRepository()
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
     story_repo = StoryRepository()
     quests_repo = QuestsRepository(
         items_repo=items_repo,
-        areas_repo=areas_repo,
+        locations_repo=locations_repo,
         story_repo=story_repo,
     )
     quest_service = QuestService(
         quests_repo=quests_repo,
         items_repo=items_repo,
-        areas_repo=areas_repo,
+        locations_repo=locations_repo,
         party_members_repo=party_repo,
     )
     story_service = StoryService(

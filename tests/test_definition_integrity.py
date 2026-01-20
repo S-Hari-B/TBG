@@ -27,7 +27,6 @@ def definitions_dir() -> Path:
         "abilities.json",
         "skills.json",
         "loot_tables.json",
-        "areas.json",
         "floors.json",
         "locations.json",
         "quests.json",
@@ -57,9 +56,7 @@ def test_definition_integrity_and_references(definitions_dir: Path) -> None:
     story_node_ids = _validate_story(definitions_dir, classes, enemies)
     _validate_abilities(definitions_dir)
     _validate_shops(definitions_dir, items, weapons, armour)
-    quest_ids = _validate_quests(definitions_dir, item_ids=items, area_ids=set(), story_node_ids=story_node_ids)
-    area_ids = _validate_areas(definitions_dir, story_node_ids, quest_ids=quest_ids)
-    _validate_quests(definitions_dir, item_ids=items, area_ids=area_ids, story_node_ids=story_node_ids)
+    _validate_quests(definitions_dir, item_ids=items, area_ids=set(), story_node_ids=story_node_ids)
     assert skills  # ensure skills file not empty
 
 
@@ -557,107 +554,6 @@ def _validate_abilities(definitions_dir: Path) -> None:
         if "power" in effect:
             _require_number(effect["power"], f"ability '{ability_id}' effect.power")
 
-
-def _validate_areas(
-    definitions_dir: Path, story_node_ids: set[str], *, quest_ids: set[str] | None = None
-) -> set[str]:
-    path = definitions_dir / "areas.json"
-    assert path.exists(), "areas.json is missing."
-    data = load_json(path)
-    assert isinstance(data, dict), "areas.json must contain an object."
-    entries = data.get("areas")
-    assert isinstance(entries, list), "areas.json.areas must be a list."
-    staged: dict[str, dict[str, object]] = {}
-    for entry in entries:
-        mapping = _require_mapping(entry, "area entry")
-        area_id = _require_str(mapping.get("id"), "area id")
-        assert area_id not in staged, f"Duplicate area id '{area_id}'."
-        staged[area_id] = mapping
-    for area_id, mapping in staged.items():
-        _require_str(mapping.get("name"), f"area '{area_id}' name")
-        _require_str(mapping.get("description"), f"area '{area_id}' description")
-        tags = _require_str_list(mapping.get("tags"), f"area '{area_id}' tags")
-        assert tags, f"area '{area_id}' must declare at least one tag."
-        assert all(tag == tag.lower() for tag in tags), f"area '{area_id}' tags must be lowercase."
-        connections = mapping.get("connections")
-        assert isinstance(connections, list), f"area '{area_id}' connections must be a list."
-        for index, connection in enumerate(connections):
-            conn_map = _require_mapping(connection, f"area '{area_id}' connections[{index}]")
-            to_id = _require_str(conn_map.get("to"), f"area '{area_id}' connections[{index}].to")
-            assert to_id in staged, f"area '{area_id}' references unknown destination '{to_id}'."
-            _require_str(conn_map.get("label"), f"area '{area_id}' connections[{index}].label")
-            requires_quest_active = conn_map.get("requires_quest_active")
-            if requires_quest_active is not None:
-                _require_str(
-                    requires_quest_active,
-                    f"area '{area_id}' connections[{index}].requires_quest_active",
-                )
-                if quest_ids is not None:
-                    assert requires_quest_active in quest_ids, (
-                        f"area '{area_id}' requires unknown quest '{requires_quest_active}'"
-                    )
-            hide_if_quest_completed = conn_map.get("hide_if_quest_completed")
-            if hide_if_quest_completed is not None:
-                _require_str(
-                    hide_if_quest_completed,
-                    f"area '{area_id}' connections[{index}].hide_if_quest_completed",
-                )
-                if quest_ids is not None:
-                    assert hide_if_quest_completed in quest_ids, (
-                        f"area '{area_id}' hide_if_quest_completed unknown quest '{hide_if_quest_completed}'"
-                    )
-            hide_if_quest_turned_in = conn_map.get("hide_if_quest_turned_in")
-            if hide_if_quest_turned_in is not None:
-                _require_str(
-                    hide_if_quest_turned_in,
-                    f"area '{area_id}' connections[{index}].hide_if_quest_turned_in",
-                )
-                if quest_ids is not None:
-                    assert hide_if_quest_turned_in in quest_ids, (
-                        f"area '{area_id}' hide_if_quest_turned_in unknown quest '{hide_if_quest_turned_in}'"
-                    )
-            show_if_flag_true = conn_map.get("show_if_flag_true")
-            if show_if_flag_true is not None:
-                _require_str(
-                    show_if_flag_true,
-                    f"area '{area_id}' connections[{index}].show_if_flag_true",
-                )
-            hide_if_flag_true = conn_map.get("hide_if_flag_true")
-            if hide_if_flag_true is not None:
-                _require_str(
-                    hide_if_flag_true,
-                    f"area '{area_id}' connections[{index}].hide_if_flag_true",
-                )
-        entry_story = mapping.get("entry_story_node_id")
-        if entry_story is not None:
-            entry_story_id = _require_str(entry_story, f"area '{area_id}' entry_story_node_id")
-            assert entry_story_id in story_node_ids, (
-                f"area '{area_id}' entry_story_node_id '{entry_story_id}' not found in story definitions"
-            )
-        npcs = mapping.get("npcs_present", [])
-        if npcs:
-            assert isinstance(npcs, list), f"area '{area_id}' npcs_present must be a list."
-            for index, npc in enumerate(npcs):
-                npc_map = _require_mapping(npc, f"area '{area_id}' npcs_present[{index}]")
-                npc_id = _require_str(npc_map.get("npc_id"), f"area '{area_id}' npc_id")
-                assert npc_id, f"area '{area_id}' npc_id must not be empty."
-                talk_node_id = _require_str(
-                    npc_map.get("talk_node_id"),
-                    f"area '{area_id}' npcs_present[{index}].talk_node_id",
-                )
-                assert talk_node_id in story_node_ids, (
-                    f"area '{area_id}' npcs_present[{index}].talk_node_id '{talk_node_id}' missing"
-                )
-                quest_hub_node_id = npc_map.get("quest_hub_node_id")
-                if quest_hub_node_id is not None:
-                    quest_id = _require_str(
-                        quest_hub_node_id,
-                        f"area '{area_id}' npcs_present[{index}].quest_hub_node_id",
-                    )
-                    assert quest_id in story_node_ids, (
-                        f"area '{area_id}' npcs_present[{index}].quest_hub_node_id '{quest_id}' missing"
-                    )
-    return set(staged.keys())
 
 
 def _validate_quests(

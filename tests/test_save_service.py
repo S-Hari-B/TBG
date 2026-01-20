@@ -13,7 +13,6 @@ from tbg.services.area_service_v2 import AreaServiceV2
 from tbg.services.errors import TravelBlockedError
 from tbg.data.repositories import (
     ArmourRepository,
-    AreasRepository,
     ClassesRepository,
     EnemiesRepository,
     FloorsRepository,
@@ -42,7 +41,6 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         party_members_repo=party_repo,
     )
     items_repo = ItemsRepository()
-    areas_repo = AreasRepository()
     floors_repo = FloorsRepository()
     locations_repo = LocationsRepository(floors_repo=floors_repo)
     quests_repo = QuestsRepository(
@@ -53,7 +51,7 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
     quest_service = QuestService(
         quests_repo=quests_repo,
         items_repo=items_repo,
-        areas_repo=locations_repo,
+        locations_repo=locations_repo,
         party_members_repo=party_repo,
     )
     story_service = StoryService(

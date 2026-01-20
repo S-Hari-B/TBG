@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from tbg.core.rng import RNG
 from tbg.data.repositories import (
-    AreasRepository,
     ArmourRepository,
     ClassesRepository,
+    FloorsRepository,
     ItemsRepository,
+    LocationsRepository,
     PartyMembersRepository,
     QuestsRepository,
     StoryRepository,
@@ -18,18 +19,19 @@ from tbg.services.quest_service import QuestService
 
 def _build_quest_service() -> QuestService:
     items_repo = ItemsRepository()
-    areas_repo = AreasRepository()
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
     story_repo = StoryRepository()
     quests_repo = QuestsRepository(
         items_repo=items_repo,
-        areas_repo=areas_repo,
+        locations_repo=locations_repo,
         story_repo=story_repo,
     )
     party_repo = PartyMembersRepository()
     return QuestService(
         quests_repo=quests_repo,
         items_repo=items_repo,
-        areas_repo=areas_repo,
+        locations_repo=locations_repo,
         party_members_repo=party_repo,
     )
 

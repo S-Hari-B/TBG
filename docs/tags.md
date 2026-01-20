@@ -52,7 +52,7 @@ Secondary tags (e.g., `slash`, `blunt`, `fire`) can be combined with the primary
 
 * `required_weapon_tags` in `skills.json` must match the tags supplied by equipped weapons/shields. The warrior starter kit exposes both `sword` and `shield`, while the mage’s staff exposes `staff`.
 * Knowledge entries reference enemy tags so Party Talk can return deterministic intel lines.
-* Area tags feed future Travel gating/balance logic; keep them lowercase and document any new tags added to `areas.json`.
+* Location tags feed future Travel gating/balance logic; keep them lowercase and document any new tags added to `locations.json`.
 * Shop availability is matched against area tags; shop definitions declare their own tags and are offered when they intersect the current location tags.
 * Keep tags data-driven—introduce new tags by documenting them here first so all data files stay aligned.
 
