@@ -8,9 +8,9 @@ from tbg.core.rng import RNG, RNGStatePayload
 from tbg.core.types import GameMode
 from tbg.data.repositories import (
     ArmourRepository,
-    AreasRepository,
     ClassesRepository,
     ItemsRepository,
+    LocationsRepository,
     PartyMembersRepository,
     QuestsRepository,
     StoryRepository,
@@ -31,7 +31,7 @@ _VALID_MODES: tuple[GameMode, ...] = ("main_menu", "story", "camp_menu", "battle
 class SaveService:
     """Converts runtime state to/from a validated, versioned payload."""
 
-    SAVE_VERSION = 1
+    SAVE_VERSION = 2
 
     def __init__(
         self,
@@ -42,7 +42,7 @@ class SaveService:
         armour_repo: ArmourRepository,
         items_repo: ItemsRepository,
         party_members_repo: PartyMembersRepository,
-        areas_repo: AreasRepository,
+        locations_repo: LocationsRepository,
         quests_repo: QuestsRepository | None = None,
     ) -> None:
         self._story_repo = story_repo
@@ -51,7 +51,7 @@ class SaveService:
         self._armour_repo = armour_repo
         self._items_repo = items_repo
         self._party_members_repo = party_members_repo
-        self._areas_repo = areas_repo
+        self._locations_repo = locations_repo
         self._quests_repo = quests_repo
 
     def serialize(self, state: GameState) -> SavePayload:
@@ -70,7 +70,7 @@ class SaveService:
             raise SaveLoadError("Save data must be a JSON object.")
         version = payload.get("save_version")
         if version != self.SAVE_VERSION:
-            raise SaveLoadError(f"Unsupported save version: {version}")
+            raise SaveLoadError("Save format changed (alpha). Please start a new game.")
         rng_payload = payload.get("rng")
         state_payload = payload.get("state")
         if not isinstance(rng_payload, Mapping) or not isinstance(state_payload, Mapping):
@@ -93,7 +93,7 @@ class SaveService:
             current_location_id = self._require_str(
                 current_location_id_raw, "state.current_location_id"
             )
-        self._validate_area_id(current_location_id)
+        self._validate_location_id(current_location_id)
 
         state = GameState(seed=seed, rng=rng, mode=mode, current_node_id=current_node_id)
         state.player_name = self._require_str(state_payload.get("player_name"), "state.player_name")
@@ -318,7 +318,7 @@ class SaveService:
         visited: List[str] = []
         for entry in value:
             location_id = self._require_str(entry, "state.visited_locations[]")
-            self._validate_area_id(location_id)
+            self._validate_location_id(location_id)
             if location_id not in visited:
                 visited.append(location_id)
         if not visited:
@@ -336,7 +336,7 @@ class SaveService:
         result: Dict[str, bool] = {}
         for key, entry in mapping.items():
             location_id = self._require_str(key, "state.location_entry_seen key")
-            self._validate_area_id(location_id)
+            self._validate_location_id(location_id)
             if not isinstance(entry, bool):
                 raise SaveLoadError(f"state.location_entry_seen[{location_id}] must be a boolean.")
             result[location_id] = entry
@@ -353,7 +353,7 @@ class SaveService:
         result: Dict[str, int] = {}
         for key, entry in mapping.items():
             location_id = self._require_str(key, "state.location_visits key")
-            self._validate_area_id(location_id)
+            self._validate_location_id(location_id)
             count = self._require_int(entry, f"state.location_visits[{location_id}]")
             if count < 0:
                 raise SaveLoadError("state.location_visits values must be non-negative.")
@@ -616,12 +616,12 @@ class SaveService:
                 f"Save incompatible with current definitions: quest '{quest_id}' missing."
             ) from exc
 
-    def _validate_area_id(self, area_id: str) -> None:
+    def _validate_location_id(self, location_id: str) -> None:
         try:
-            self._areas_repo.get(area_id)
+            self._locations_repo.get(location_id)
         except KeyError as exc:
             raise SaveLoadError(
-                f"Save incompatible with current definitions: area '{area_id}' missing."
+                f"Save references unknown location: {location_id}"
             ) from exc
 
     @staticmethod

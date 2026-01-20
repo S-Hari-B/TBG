@@ -7,6 +7,7 @@ from tbg.data.errors import DataReferenceError, DataValidationError
 from tbg.data.repositories.base import RepositoryBase
 from tbg.data.repositories.items_repo import ItemsRepository
 from tbg.data.repositories.areas_repo import AreasRepository
+from tbg.data.repositories.locations_repo import LocationsRepository
 from tbg.data.repositories.story_repo import StoryRepository
 from tbg.domain.defs import (
     QuestDef,
@@ -25,13 +26,15 @@ class QuestsRepository(RepositoryBase[QuestDef]):
         self,
         *,
         items_repo: ItemsRepository,
-        areas_repo: AreasRepository,
+        areas_repo: AreasRepository | None = None,
+        locations_repo: LocationsRepository | None = None,
         story_repo: StoryRepository,
         base_path=None,
     ) -> None:
         super().__init__("quests.json", base_path)
         self._items_repo = items_repo
         self._areas_repo = areas_repo
+        self._locations_repo = locations_repo
         self._story_repo = story_repo
 
     def _build(self, raw: dict[str, object]) -> Dict[str, QuestDef]:
@@ -180,6 +183,18 @@ class QuestsRepository(RepositoryBase[QuestDef]):
             raise DataReferenceError(f"{context} references unknown item '{item_id}'.") from exc
 
     def _validate_area_id(self, area_id: str, context: str) -> None:
+        if self._locations_repo is not None:
+            try:
+                self._locations_repo.get(area_id)
+                return
+            except KeyError as exc:
+                raise DataReferenceError(
+                    f"{context} references unknown location '{area_id}'."
+                ) from exc
+        if self._areas_repo is None:
+            raise DataReferenceError(
+                f"{context} references unknown area '{area_id}'."
+            )
         try:
             self._areas_repo.get(area_id)
         except KeyError as exc:

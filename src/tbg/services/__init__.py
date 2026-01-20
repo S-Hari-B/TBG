@@ -24,6 +24,7 @@ from .area_service import (
     TravelPerformedEvent,
     TravelResult,
 )
+from .area_service_v2 import AreaServiceV2
 from .battle_service import BattleService
 from .quest_service import QuestService
 from .shop_service import ShopService
@@ -49,6 +50,7 @@ __all__ = [
     "StoryNodeView",
     "StoryService",
     "AreaService",
+    "AreaServiceV2",
     "LocationEnteredEvent",
     "LocationView",
     "TravelPerformedEvent",

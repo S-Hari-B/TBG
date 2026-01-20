@@ -9,15 +9,17 @@ from tbg.services.inventory_service import InventoryService
 from tbg.services.save_service import SaveService
 from tbg.services.story_service import StoryService
 from tbg.services.errors import SaveLoadError
-from tbg.services.area_service import AreaService
+from tbg.services.area_service_v2 import AreaServiceV2
 from tbg.services.errors import TravelBlockedError
 from tbg.data.repositories import (
     ArmourRepository,
     AreasRepository,
     ClassesRepository,
     EnemiesRepository,
+    FloorsRepository,
     ItemsRepository,
     KnowledgeRepository,
+    LocationsRepository,
     LootTablesRepository,
     PartyMembersRepository,
     QuestsRepository,
@@ -28,7 +30,7 @@ from tbg.data.repositories import (
 from tbg.services.quest_service import QuestService
 
 
-def _build_test_services() -> tuple[StoryService, BattleService, InventoryService, SaveService, AreaService, dict]:
+def _build_test_services() -> tuple[StoryService, BattleService, InventoryService, SaveService, AreaServiceV2, dict]:
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
     story_repo = StoryRepository()
@@ -41,15 +43,17 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
     )
     items_repo = ItemsRepository()
     areas_repo = AreasRepository()
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
     quests_repo = QuestsRepository(
         items_repo=items_repo,
-        areas_repo=areas_repo,
+        locations_repo=locations_repo,
         story_repo=story_repo,
     )
     quest_service = QuestService(
         quests_repo=quests_repo,
         items_repo=items_repo,
-        areas_repo=areas_repo,
+        areas_repo=locations_repo,
         party_members_repo=party_repo,
     )
     story_service = StoryService(
@@ -75,7 +79,9 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         items_repo=items_repo,
         loot_tables_repo=loot_repo,
     )
-    area_service = AreaService(areas_repo=areas_repo, quest_service=quest_service)
+    area_service = AreaServiceV2(
+        floors_repo=floors_repo, locations_repo=locations_repo, quest_service=quest_service
+    )
     save_service = SaveService(
         story_repo=story_repo,
         classes_repo=classes_repo,
@@ -83,7 +89,7 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         armour_repo=armour_repo,
         items_repo=items_repo,
         party_members_repo=party_repo,
-        areas_repo=areas_repo,
+        locations_repo=locations_repo,
         quests_repo=quests_repo,
     )
     repos = {
@@ -219,6 +225,27 @@ def test_deserialize_rejects_unsupported_version() -> None:
     payload = save_service.serialize(state)
     payload["save_version"] = 99
     with pytest.raises(SaveLoadError):
+        save_service.deserialize(payload)
+
+
+def test_deserialize_rejects_legacy_payload() -> None:
+    story_service, _, _, save_service, area_service, _ = _build_test_services()
+    state = story_service.start_new_game(seed=1, player_name="Hero")
+    area_service.initialize_state(state)
+    payload = save_service.serialize(state)
+    payload.pop("save_version", None)
+    with pytest.raises(SaveLoadError, match="Save format changed"):
+        save_service.deserialize(payload)
+
+
+def test_deserialize_rejects_unknown_location() -> None:
+    story_service, _, _, save_service, area_service, _ = _build_test_services()
+    state = story_service.start_new_game(seed=1, player_name="Hero")
+    area_service.initialize_state(state)
+    payload = save_service.serialize(state)
+    payload["state"]["current_location_id"] = "missing_location"
+    payload["save_version"] = 2
+    with pytest.raises(SaveLoadError, match="unknown location"):
         save_service.deserialize(payload)
 
 

@@ -23,7 +23,7 @@ Layers:
 * Owns GameState (overall runtime state)
 * Returns structured results and events for presentation to render
 * Implements persistence orchestration (`SaveService`) to serialize/deserialize `GameState` + RNG snapshots, validate ids against current definitions, and guard against schema/version drift
-* Maintains auxiliary services such as `AreaService` (location state, travel events, entry-story hooks), `QuestService` (quest acceptance/progress/turn-in), and `ShopService` (deterministic shop stock + transactions) so the CLI stays declarative and story remains data-driven
+* Maintains auxiliary services such as `AreaServiceV2` (floor-based location state, travel events, entry-story hooks; active), `AreaService` (v1 legacy/deprecated), `QuestService` (quest acceptance/progress/turn-in), `ShopService` (deterministic shop stock + transactions), and `SaveService` (v2 save format validated against `locations.json`) so the CLI stays declarative and story remains data-driven
 * **Controllers**: UI-agnostic orchestration layer (e.g., `BattleController`) that wraps services and exposes structured state + actions. Controllers do NOT print, format, or prompt—they only progress state and return events. See `battle_controller.md` for details.
 
 ## domain (game rules)
@@ -78,6 +78,10 @@ Example combat events:
 * ActorDefeated(actor_id)
 
 ---
+
+## Save Format (V2)
+
+Save files now use `save_version: 2` and are validated against `locations.json`. Older save formats are intentionally unsupported during the alpha refactor; load attempts should surface a short “Save format changed (alpha)” message in the CLI.
 
 ## Party and Equipment
 

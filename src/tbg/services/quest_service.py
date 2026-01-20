@@ -4,7 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Sequence
 
-from tbg.data.repositories import AreasRepository, ItemsRepository, PartyMembersRepository, QuestsRepository
+from tbg.data.repositories import (
+    AreasRepository,
+    ItemsRepository,
+    LocationsRepository,
+    PartyMembersRepository,
+    QuestsRepository,
+)
 from tbg.domain.defs import QuestDef, QuestObjectiveDef, QuestRewardItemDef
 from tbg.domain.quest_state import QuestObjectiveProgress, QuestProgress
 from tbg.domain.state import GameState
@@ -77,7 +83,7 @@ class QuestService:
         *,
         quests_repo: QuestsRepository,
         items_repo: ItemsRepository,
-        areas_repo: AreasRepository,
+        areas_repo: AreasRepository | LocationsRepository | None = None,
         party_members_repo: PartyMembersRepository,
     ) -> None:
         self._quests_repo = quests_repo

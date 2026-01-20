@@ -8,8 +8,10 @@ from tbg.data.repositories import (
     AreasRepository,
     ClassesRepository,
     EnemiesRepository,
+    FloorsRepository,
     ItemsRepository,
     KnowledgeRepository,
+    LocationsRepository,
     LootTablesRepository,
     PartyMembersRepository,
     QuestsRepository,
@@ -23,7 +25,7 @@ from tbg.domain.inventory import ARMOUR_SLOTS
 from tbg.domain.defs import SkillDef
 from tbg.domain.state import GameState
 from tbg.services import (
-    AreaService,
+    AreaServiceV2,
     BattleAction,
     BattleController,
     BattleRequestedEvent,
@@ -361,7 +363,7 @@ def _format_slot_label(meta: SlotMetadata) -> str:
     return summary
 
 
-def _warp_to_checkpoint_location(area_service: AreaService, state: GameState) -> bool:
+def _warp_to_checkpoint_location(area_service: AreaServiceV2, state: GameState) -> bool:
     checkpoint_location_id = state.story_checkpoint_location_id
     if not checkpoint_location_id:
         return False
@@ -449,7 +451,7 @@ def _build_services() -> tuple[
     BattleService,
     InventoryService,
     SaveService,
-    AreaService,
+    AreaServiceV2,
     QuestService,
     ShopService,
 ]:
@@ -469,9 +471,11 @@ def _build_services() -> tuple[
     items_repo = ItemsRepository()
     loot_repo = LootTablesRepository()
     areas_repo = AreasRepository()
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
     quests_repo = QuestsRepository(
         items_repo=items_repo,
-        areas_repo=areas_repo,
+        locations_repo=locations_repo,
         story_repo=story_repo,
     )
     shops_repo = ShopsRepository(
@@ -482,7 +486,7 @@ def _build_services() -> tuple[
     quest_service = QuestService(
         quests_repo=quests_repo,
         items_repo=items_repo,
-        areas_repo=areas_repo,
+        areas_repo=locations_repo,
         party_members_repo=party_repo,
     )
     story_service = StoryService(
@@ -505,7 +509,9 @@ def _build_services() -> tuple[
         loot_tables_repo=loot_repo,
         quest_service=quest_service,
     )
-    area_service = AreaService(areas_repo=areas_repo, quest_service=quest_service)
+    area_service = AreaServiceV2(
+        floors_repo=floors_repo, locations_repo=locations_repo, quest_service=quest_service
+    )
     shop_service = ShopService(
         shops_repo=shops_repo,
         items_repo=items_repo,
@@ -519,7 +525,7 @@ def _build_services() -> tuple[
         armour_repo=armour_repo,
         items_repo=items_repo,
         party_members_repo=party_repo,
-        areas_repo=areas_repo,
+        locations_repo=locations_repo,
         quests_repo=quests_repo,
     )
     return (
@@ -533,7 +539,7 @@ def _build_services() -> tuple[
     )
 
 
-def _start_new_game(story_service: StoryService, area_service: AreaService) -> GameState:
+def _start_new_game(story_service: StoryService, area_service: AreaServiceV2) -> GameState:
     seed = _prompt_seed()
     player_name = _prompt_player_name()
     state = story_service.start_new_game(seed=seed, player_name=player_name)
@@ -598,7 +604,7 @@ def _run_story_loop(
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
-    area_service: AreaService,
+    area_service: AreaServiceV2,
     *,
     from_load: bool,
 ) -> bool:
@@ -705,7 +711,7 @@ def _process_story_events(
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
-    area_service: AreaService,
+    area_service: AreaServiceV2,
 ) -> bool:
     return _handle_story_events(
         result.events,
@@ -732,7 +738,7 @@ def _handle_story_events(
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
-    area_service: AreaService,
+    area_service: AreaServiceV2,
     *,
     print_header: bool,
 ) -> bool:
@@ -857,7 +863,7 @@ def _run_post_battle_interlude(
     save_service: SaveService,
     slot_store: SaveSlotStore,
     battle_service: BattleService,
-    area_service: AreaService,
+    area_service: AreaServiceV2,
 ) -> List[object] | None:
     render_heading("Camp Interlude")
     if message:
@@ -901,7 +907,7 @@ def _run_camp_menu(
     save_service: SaveService,
     slot_store: SaveSlotStore,
     battle_service: BattleService,
-    area_service: AreaService,
+    area_service: AreaServiceV2,
 ) -> List[object] | None:
     del battle_service  # Camp menu does not expose battle-specific flows.
     while True:
@@ -949,7 +955,7 @@ def _run_town_menu(
     save_service: SaveService,
     slot_store: SaveSlotStore,
     battle_service: BattleService,
-    area_service: AreaService,
+    area_service: AreaServiceV2,
 ) -> List[object] | None:
     del battle_service
     while True:
@@ -1010,7 +1016,7 @@ def _handle_defeat_flow(
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
-    area_service: AreaService,
+    area_service: AreaServiceV2,
 ) -> bool:
     lost_gold = _apply_defeat_gold_loss(state)
     open_area_battle = _is_open_area_location(area_service, state)
@@ -1067,7 +1073,7 @@ def _restore_minimum_resources(state: GameState) -> None:
     state.player.stats.mp = max(1, state.player.stats.mp)
 
 
-def _is_open_area_location(area_service: AreaService, state: GameState) -> bool:
+def _is_open_area_location(area_service: AreaServiceV2, state: GameState) -> bool:
     try:
         location = area_service.get_current_location_view(state)
     except Exception:
@@ -1076,7 +1082,7 @@ def _is_open_area_location(area_service: AreaService, state: GameState) -> bool:
 
 
 def _handle_travel_menu(
-    area_service: AreaService, story_service: StoryService, state: GameState
+    area_service: AreaServiceV2, story_service: StoryService, state: GameState
 ) -> List[object] | None:
     while True:
         location_view = area_service.get_current_location_view(state)
@@ -1111,7 +1117,7 @@ def _handle_travel_menu(
 
 
 def _handle_converse_menu(
-    area_service: AreaService, story_service: StoryService, state: GameState
+    area_service: AreaServiceV2, story_service: StoryService, state: GameState
 ) -> List[object] | None:
     location_view = area_service.get_current_location_view(state)
     npcs = list(location_view.npcs_present)
@@ -1130,7 +1136,7 @@ def _handle_converse_menu(
 
 def _handle_quests_menu(
     quest_service: QuestService,
-    area_service: AreaService,
+    area_service: AreaServiceV2,
     story_service: StoryService,
     state: GameState,
 ) -> List[object] | None:
@@ -1155,7 +1161,7 @@ def _handle_quests_menu(
         return _play_node_with_auto_resume(story_service, state, selected.node_id)
 
 
-def _handle_shop_menu(shop_service: ShopService, area_service: AreaService, state: GameState) -> None:
+def _handle_shop_menu(shop_service: ShopService, area_service: AreaServiceV2, state: GameState) -> None:
     location_view = area_service.get_current_location_view(state)
     shops = shop_service.list_shops_for_location(location_view.tags)
     if not shops:
@@ -1443,7 +1449,7 @@ def _render_location_arrival(location_view: LocationView) -> None:
 
 
 def _render_location_debug_snapshot(
-    area_service: AreaService,
+    area_service: AreaServiceV2,
     quest_service: QuestService,
     story_service: StoryService,
     state: GameState,
@@ -1492,7 +1498,7 @@ def _render_quest_debug(quest_service: QuestService, state: GameState) -> None:
 
 
 def _render_conversation_debug(
-    area_service: AreaService, story_service: StoryService, state: GameState
+    area_service: AreaServiceV2, story_service: StoryService, state: GameState
 ) -> None:
     debug_view = area_service.build_debug_view(state)
     location = debug_view.location
@@ -1515,7 +1521,7 @@ def _render_conversation_debug(
 
 
 def _render_definition_integrity(
-    area_service: AreaService,
+    area_service: AreaServiceV2,
     quest_service: QuestService,
     story_service: StoryService,
     state: GameState,

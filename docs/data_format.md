@@ -382,7 +382,7 @@ Party members define recruitable allies such as Emma. Fields mirror the class de
 
 ---
 
-## Areas (`areas.json`)
+## Areas (`areas.json`) — deprecated
 
 `areas.json` drives the overworld “Travel” interface. The file stores an object with a single `"areas"` array. Each entry declares:
 
@@ -400,7 +400,46 @@ Repositories validate that:
 * Connection targets reference existing areas.
 * `entry_story_node_id` values exist in the story definitions (see below).
 
-At runtime the single `AreaService` loads these definitions, keeps `GameState.current_location_id` synchronized, and tracks `visited_locations` (ordered list) plus a `location_entry_seen` map used to guard entry hooks. `location_visits` stores deterministic visit counts per location for systems like shop stock rotation.
+`areas.json` is retained for backward compatibility but is no longer used by the runtime after the Area v2 switch. The live travel system now reads `floors.json` + `locations.json`.
+
+---
+
+## Floors (`floors.json`)
+
+`floors.json` defines floor metadata for AreaServiceV2.
+
+Top-level layout: object keyed by floor id.
+
+Fields per floor:
+
+* `name`: string
+* `level`: int (>= 0)
+* `starting_location_id`: string (must exist in `locations.json`)
+* `boss_location_id`: optional string
+* `next_floor_id`: optional string
+* `notes`: optional string (designer-facing)
+
+---
+
+## Locations (`locations.json`)
+
+`locations.json` defines floor-based locations for AreaServiceV2 and is the runtime source of truth for travel.
+
+Top-level layout: object keyed by location id.
+
+Fields per location:
+
+* `name`: string
+* `description`: string (required, may be empty)
+* `floor_id`: string (must exist in `floors.json`)
+* `type`: string enum (`town`, `open`, `side`, `story`, `secret`, `boss`, `gate`)
+* `area_level`: optional int (>= 0). If omitted, the service derives it from the floor level.
+* `tags`: list[string] — lowercase, non-empty
+* `entry_story_node_id`: string or null
+* `npcs_present`: optional list of `{ "npc_id": string, "talk_node_id": string|null, "quest_hub_node_id": string|null }`
+* `connections`: list of `{ "to": "<location_id>", "label": "<menu label>", "progresses_story": bool, "requires_quest_active"?: string, "hide_if_quest_completed"?: string, "hide_if_quest_turned_in"?: string, "show_if_flag_true"?: string, "hide_if_flag_true"?: string }`. `progresses_story` defaults to `false`.
+
+The connection gating fields mirror the v1 area rules and are enforced by AreaServiceV2.
 
 ---
 

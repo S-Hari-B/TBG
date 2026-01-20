@@ -6,6 +6,12 @@ from .class_def import ClassDef
 from .effect_def import EffectDef
 from .enemy_def import EnemyDef
 from .item_def import ItemDef
+from .floor_def import FloorDef
+from .location_def import (
+    LocationConnectionDef,
+    LocationDef,
+    LocationNpcPresenceDef,
+)
 from .loot_def import LootDropDef, LootTableDef
 from .quest_def import (
     QuestDef,
@@ -30,7 +36,11 @@ __all__ = [
     "ClassDef",
     "EffectDef",
     "EnemyDef",
+    "FloorDef",
     "ItemDef",
+    "LocationConnectionDef",
+    "LocationDef",
+    "LocationNpcPresenceDef",
     "LootDropDef",
     "LootTableDef",
     "PartyMemberDef",

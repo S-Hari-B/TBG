@@ -16,14 +16,14 @@ Game Menu
 The game menu appears after `enter_game_menu` story effects. Non-town areas show the Camp Menu; town areas (`town` tag) show the Town Menu.
 
 - Continue / Continue story – resumes the pending story node that triggered the interlude. If no pending node exists (e.g. after exhausting the current slice) the option remains but prints a reminder to explore via Travel instead.
-- Travel – opens the area map defined in `data/definitions/areas.json`. The screen shows the current location’s name/description, lists every connected destination using the JSON `"label"` fields, and lets the player pick a destination. Travelling emits deterministic events (`Traveled from …`, `Arrived at …`) and renders a fresh “Location” block with the new area description. Areas can optionally declare `entry_story_node_id`; those nodes fire exactly once per save file when the player first enters that area and can show short flavour beats before returning to camp. When a required battle checkpoint is active, any connection flagged as `progresses_story: true` is temporarily locked with the message “You can’t push onward yet…” until the battle is cleared, but backtracking routes remain available.
+- Travel – opens the area map defined in `data/definitions/locations.json`. The screen shows the current location’s name/description, lists every connected destination using the JSON `"label"` fields, and lets the player pick a destination. Travelling emits deterministic events (`Traveled from …`, `Arrived at …`) and renders a fresh “Location” block with the new area description. Locations can optionally declare `entry_story_node_id`; those nodes fire exactly once per save file when the player first enters that location and can show short flavour beats before returning to camp. When a required battle checkpoint is active, any connection flagged as `progresses_story: true` is temporarily locked with the message “You can’t push onward yet…” until the battle is cleared, but backtracking routes remain available.
 - Converse (Town Menu only) – lists NPCs defined in the current hub’s `npcs_present` block and routes into their conversation entry story node.
 - Quests (Town Menu only) – shows active objectives and available turn-ins; selecting a turn-in routes into its story node so narrative remains authoritative.
 - Shops (Town Menu only) – opens the deterministic shop flow (item, weapon, and armour vendors) with buy/sell actions.
 - Location Debug (DEBUG) – only in debug builds (`TBG_DEBUG=1`). Opens a debug submenu with quest, conversation, and definition integrity snapshots. Does not mutate state.
 - Inventory / Equipment – opens the shared inventory where you can inspect party members, equip/unequip weapons and armour, and view remaining supplies. Accessible during camp interludes and future out-of-combat scenes.
 - Party Talk – appears whenever at least one companion has joined. Surfaces deterministic banter lines.
-- Save Game – only available from interludes. Writes the current runtime state (story position, party, inventory, equipment, flags, RNG state, and the new location trackers) to a chosen slot under `data/saves/slot_{1-3}.json`.
+- Save Game – available from interludes to persist the current runtime state to a slot under `data/saves/slot_{1-3}.json`.
 - Quit to main menu
 
 ### Shops

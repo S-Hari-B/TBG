@@ -28,6 +28,8 @@ def definitions_dir() -> Path:
         "skills.json",
         "loot_tables.json",
         "areas.json",
+        "floors.json",
+        "locations.json",
         "quests.json",
         "shops.json",
     ],

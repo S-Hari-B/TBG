@@ -11,6 +11,8 @@ from .knowledge_repo import KnowledgeRepository
 from .skills_repo import SkillsRepository
 from .loot_tables_repo import LootTablesRepository
 from .areas_repo import AreasRepository
+from .floors_repo import FloorsRepository
+from .locations_repo import LocationsRepository
 from .quests_repo import QuestsRepository
 from .shops_repo import ShopsRepository
 
@@ -26,6 +28,8 @@ __all__ = [
     "SkillsRepository",
     "LootTablesRepository",
     "AreasRepository",
+    "FloorsRepository",
+    "LocationsRepository",
     "QuestsRepository",
     "ShopsRepository",
 ]
