@@ -76,6 +76,8 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
         skills_repo=skills_repo,
         items_repo=items_repo,
         loot_tables_repo=loot_repo,
+        floors_repo=floors_repo,
+        locations_repo=locations_repo,
     )
     area_service = AreaServiceV2(
         floors_repo=floors_repo, locations_repo=locations_repo, quest_service=quest_service
@@ -124,6 +126,8 @@ def test_save_round_trip_preserves_state() -> None:
     state.inventory.armour[armour_id] = 2
     state.inventory.items[item_id] = 3
     state.party_members.append(repos["party"].all()[0].id)
+    member_def = repos["party"].all()[0]
+    state.party_member_attributes[member_def.id] = member_def.starting_attributes
     state.member_levels[state.player.id] = 2
     state.member_exp[state.player.id] = 150
     state.member_levels[state.party_members[0]] = 3
@@ -132,6 +136,7 @@ def test_save_round_trip_preserves_state() -> None:
     member_equipment.weapon_slots = [weapon_id, None]
     member_equipment.armour_slots["body"] = armour_id
     state.equipment[state.player.id] = member_equipment
+    battle_service._recalculate_player_stats(state)
     state.camp_message = "Rest up."
     state.mode = "camp_menu"
     state.story_checkpoint_node_id = "battle_trial_1v1"
@@ -158,6 +163,7 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.mode == state.mode
     assert restored.current_node_id == state.current_node_id
     assert restored.player == state.player
+    assert restored.player.attributes == state.player.attributes
     assert restored.inventory.weapons == state.inventory.weapons
     assert restored.inventory.armour == state.inventory.armour
     assert restored.inventory.items == state.inventory.items
@@ -174,6 +180,7 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.story_checkpoint_node_id == state.story_checkpoint_node_id
     assert restored.story_checkpoint_location_id == state.story_checkpoint_location_id
     assert restored.story_checkpoint_thread_id == state.story_checkpoint_thread_id
+    assert restored.party_member_attributes == state.party_member_attributes
     assert "cerel_kill_hunt" in restored.quests_active
     assert restored.quests_completed == state.quests_completed
 
@@ -213,6 +220,41 @@ def test_rng_determinism_survives_save_round_trip() -> None:
     ] == [
         event.enemy_names for event in battle_events_post_save if hasattr(event, "enemy_names")
     ]
+
+
+def test_missing_attributes_default_from_definitions() -> None:
+    (
+        story_service,
+        _,
+        _,
+        save_service,
+        area_service,
+        repos,
+    ) = _build_test_services()
+    state = story_service.start_new_game(seed=321, player_name="Hero")
+    area_service.initialize_state(state)
+    area_service.initialize_state(state)
+    story_service.choose(state, 0)
+    party_member_id = repos["party"].all()[0].id
+    state.party_members.append(party_member_id)
+
+    payload = save_service.serialize(state)
+    payload["state"].pop("player_attributes", None)
+    payload["state"].pop("party_member_attributes", None)
+    restored = save_service.deserialize(payload)
+
+    class_def = story_service._classes_repo.get(restored.player.class_id)
+    assert restored.player.attributes == class_def.starting_attributes
+    member_def = repos["party"].get(party_member_id)
+    assert restored.party_member_attributes[party_member_id] == member_def.starting_attributes
+    expected_max_hp = class_def.base_hp + restored.player.attributes.VIT * 3
+    expected_max_mp = class_def.base_mp + restored.player.attributes.INT * 2
+    expected_attack = restored.player.base_stats.attack + restored.player.attributes.STR
+    expected_speed = class_def.speed + restored.player.attributes.DEX
+    assert restored.player.stats.max_hp == expected_max_hp
+    assert restored.player.stats.max_mp == expected_max_mp
+    assert restored.player.stats.attack == expected_attack
+    assert restored.player.stats.speed == expected_speed
 
 
 def test_deserialize_rejects_unsupported_version() -> None:

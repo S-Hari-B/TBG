@@ -31,6 +31,38 @@
     "tags": ["light_armour"],
     "hp_bonus": 0
   },
+  "goblin_patchwork_vest": {
+    "name": "Goblin Patchwork Vest",
+    "slot": "body",
+    "defense": 2,
+    "value": 8,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
+  "goblin_bone_cap": {
+    "name": "Goblin Bone Cap",
+    "slot": "head",
+    "defense": 1,
+    "value": 6,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
+  "goblin_bracers": {
+    "name": "Goblin Bracers",
+    "slot": "hands",
+    "defense": 1,
+    "value": 6,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
+  "goblin_boots": {
+    "name": "Goblin Boots",
+    "slot": "boots",
+    "defense": 1,
+    "value": 6,
+    "tags": ["light_armour"],
+    "hp_bonus": 0
+  },
   "iron_war_helm": {
     "name": "Iron War Helm",
     "slot": "head",
@@ -158,6 +190,70 @@
     "value": 70,
     "tags": ["medium_armour"],
     "hp_bonus": 3
+  },
+  "bandit_patch_vest": {
+    "name": "Bandit Patch Vest",
+    "slot": "body",
+    "defense": 3,
+    "value": 30,
+    "tags": ["medium_armour"],
+    "hp_bonus": 1
+  },
+  "bandit_cap": {
+    "name": "Bandit Cap",
+    "slot": "head",
+    "defense": 1,
+    "value": 18,
+    "tags": ["medium_armour"],
+    "hp_bonus": 0
+  },
+  "bandit_wraps": {
+    "name": "Bandit Wraps",
+    "slot": "hands",
+    "defense": 1,
+    "value": 15,
+    "tags": ["medium_armour"],
+    "hp_bonus": 0
+  },
+  "bandit_boots_light": {
+    "name": "Bandit Boots (Light)",
+    "slot": "boots",
+    "defense": 1,
+    "value": 15,
+    "tags": ["medium_armour"],
+    "hp_bonus": 0
+  },
+  "orc_scrap_helm": {
+    "name": "Orc Scrap Helm",
+    "slot": "head",
+    "defense": 1,
+    "value": 22,
+    "tags": ["heavy_armour"],
+    "hp_bonus": 1
+  },
+  "orc_scrap_mail": {
+    "name": "Orc Scrap Mail",
+    "slot": "body",
+    "defense": 3,
+    "value": 35,
+    "tags": ["heavy_armour"],
+    "hp_bonus": 2
+  },
+  "orc_scrap_gauntlets": {
+    "name": "Orc Scrap Gauntlets",
+    "slot": "hands",
+    "defense": 1,
+    "value": 18,
+    "tags": ["heavy_armour"],
+    "hp_bonus": 0
+  },
+  "orc_scrap_greaves": {
+    "name": "Orc Scrap Greaves",
+    "slot": "boots",
+    "defense": 1,
+    "value": 18,
+    "tags": ["heavy_armour"],
+    "hp_bonus": 0
   },
   "bandit_bracers": {
     "name": "Bandit Bracers",

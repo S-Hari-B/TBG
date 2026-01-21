@@ -5,7 +5,9 @@ from dataclasses import dataclass
 from typing import Dict, List, Literal, Sequence
 
 from tbg.data.repositories import ArmourRepository, PartyMembersRepository, WeaponsRepository
+from tbg.domain.attribute_scaling import apply_attribute_scaling, build_attribute_scaling_breakdown
 from tbg.domain.defs import ClassDef, PartyMemberDef
+from tbg.domain.entities import Attributes, BaseStats, Stats
 from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment
 from tbg.domain.state import GameState
 
@@ -155,6 +157,16 @@ class InventoryService:
             items=items_summary,
         )
 
+    def build_attribute_breakdown(self, state: GameState, member_id: str):
+        base_stats, current_hp, current_mp = self._build_member_base_stats(state, member_id)
+        attributes = self._resolve_member_attributes(state, member_id)
+        return build_attribute_scaling_breakdown(
+            base_stats,
+            attributes,
+            current_hp=current_hp,
+            current_mp=current_mp,
+        )
+
     # ----------------------------------------------------------- Initialization
     def initialize_player_loadout(self, state: GameState, player_id: str, class_def: ClassDef) -> None:
         equipment = self._reset_member_equipment(state, player_id)
@@ -250,6 +262,8 @@ class InventoryService:
                     message="Unable to equip weapon.",
                 )
             ]
+        if success and state.player and member_id == state.player.id:
+            self._refresh_player_base_stats(state)
         return events
 
     def unequip_weapon_slot(self, state: GameState, member_id: str, slot_index: int) -> List[InventoryEvent]:
@@ -292,6 +306,8 @@ class InventoryService:
                 category="weapon",
             )
         )
+        if state.player and member_id == state.player.id:
+            self._refresh_player_base_stats(state)
         return events
 
     # ----------------------------------------------------------- Armour actions
@@ -320,6 +336,8 @@ class InventoryService:
                     message="Unable to equip armour.",
                 )
             ]
+        if success and state.player and member_id == state.player.id:
+            self._refresh_player_base_stats(state)
         return events
 
     def unequip_armour_slot(self, state: GameState, member_id: str, slot: str) -> List[InventoryEvent]:
@@ -358,6 +376,8 @@ class InventoryService:
                 category="armour",
             )
         )
+        if state.player and member_id == state.player.id:
+            self._refresh_player_base_stats(state)
         return events
 
     # ------------------------------------------------------------ Internal impl
@@ -564,6 +584,94 @@ class InventoryService:
     def _reset_member_equipment(self, state: GameState, member_id: str) -> MemberEquipment:
         state.equipment[member_id] = MemberEquipment()
         return state.equipment[member_id]
+
+    def _build_member_base_stats(self, state: GameState, member_id: str) -> tuple[BaseStats, int, int]:
+        equipment = self._ensure_member_equipment(state, member_id)
+        weapon_ids = [weapon_id for weapon_id in equipment.weapon_slots if weapon_id]
+        armour_ids = [equipment.armour_slots.get(slot) for slot in ARMOUR_SLOTS]
+        armour_ids = [armour_id for armour_id in armour_ids if armour_id]
+        if state.player and member_id == state.player.id:
+            base_stats = state.player.base_stats
+            attack = self._calculate_attack(weapon_ids, base_stats.attack)
+            defense = self._calculate_defense(armour_ids, base_stats.defense)
+            return (
+                BaseStats(
+                    max_hp=base_stats.max_hp,
+                    max_mp=base_stats.max_mp,
+                    attack=attack,
+                    defense=defense,
+                    speed=base_stats.speed,
+                ),
+                state.player.stats.hp,
+                state.player.stats.mp,
+            )
+        member_def = self._party_members_repo.get(member_id)
+        base_attack = 1
+        if member_def.weapon_ids:
+            try:
+                base_attack = self._weapons_repo.get(member_def.weapon_ids[0]).attack
+            except KeyError:
+                base_attack = 1
+        attack = self._calculate_attack(weapon_ids, base_attack)
+        defense = self._calculate_defense(armour_ids, 0)
+        base_stats = BaseStats(
+            max_hp=member_def.base_hp,
+            max_mp=member_def.base_mp,
+            attack=attack,
+            defense=defense,
+            speed=member_def.speed,
+        )
+        return base_stats, base_stats.max_hp, base_stats.max_mp
+
+    def _resolve_member_attributes(self, state: GameState, member_id: str) -> Attributes:
+        if state.player and member_id == state.player.id and state.player:
+            return state.player.attributes
+        return state.party_member_attributes.get(
+            member_id,
+            Attributes(STR=0, DEX=0, INT=0, VIT=0, BOND=0),
+        )
+
+    def _calculate_attack(self, weapon_ids: Sequence[str], fallback: int) -> int:
+        for weapon_id in weapon_ids:
+            try:
+                weapon_def = self._weapons_repo.get(weapon_id)
+            except KeyError:
+                continue
+            return max(1, weapon_def.attack)
+        return max(1, fallback)
+
+    def _calculate_defense(self, armour_ids: Sequence[str], fallback: int) -> int:
+        total = 0
+        for armour_id in armour_ids:
+            try:
+                armour_def = self._armour_repo.get(armour_id)
+            except KeyError:
+                continue
+            total += armour_def.defense
+        return total if total > 0 else max(0, fallback)
+
+    def _refresh_player_base_stats(self, state: GameState) -> None:
+        if not state.player:
+            return
+        equipment = self._ensure_member_equipment(state, state.player.id)
+        weapon_ids = [weapon_id for weapon_id in equipment.weapon_slots if weapon_id]
+        armour_ids = [equipment.armour_slots.get(slot) for slot in ARMOUR_SLOTS]
+        armour_ids = [armour_id for armour_id in armour_ids if armour_id]
+        attack = self._calculate_attack(weapon_ids, state.player.base_stats.attack)
+        defense = self._calculate_defense(armour_ids, state.player.base_stats.defense)
+        state.player.base_stats = BaseStats(
+            max_hp=state.player.base_stats.max_hp,
+            max_mp=state.player.base_stats.max_mp,
+            attack=attack,
+            defense=defense,
+            speed=state.player.base_stats.speed,
+        )
+        state.player.stats = apply_attribute_scaling(
+            state.player.base_stats,
+            state.player.attributes,
+            current_hp=state.player.stats.hp,
+            current_mp=state.player.stats.mp,
+        )
 
     def _determine_required_slots(
         self,

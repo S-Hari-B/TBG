@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Tuple
 
+from tbg.domain.entities import Attributes
 
 @dataclass(slots=True)
 class ClassDef:
@@ -14,6 +15,7 @@ class ClassDef:
     base_hp: int
     base_mp: int
     speed: int
+    starting_attributes: Attributes
     starting_weapon_id: str
     starting_armour_id: str
     starting_weapons: Tuple[str, ...] = ()

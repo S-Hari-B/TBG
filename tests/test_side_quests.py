@@ -62,6 +62,8 @@ def _build_services() -> tuple[StoryService, BattleService, QuestService]:
         skills_repo=SkillsRepository(),
         items_repo=items_repo,
         loot_tables_repo=LootTablesRepository(),
+        floors_repo=floors_repo,
+        locations_repo=locations_repo,
         quest_service=quest_service,
     )
     return story_service, battle_service, quest_service

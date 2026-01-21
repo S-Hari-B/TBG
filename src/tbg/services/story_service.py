@@ -275,6 +275,7 @@ class StoryService:
                         self._inventory_service.initialize_party_member_loadout(state, member_id, member_def)
                         state.member_levels[member_id] = member_def.starting_level
                         state.member_exp[member_id] = 0
+                        state.party_member_attributes[member_id] = member_def.starting_attributes
                     except KeyError:
                         pass
                 emitted.append(PartyMemberJoinedEvent(member_id=member_id))

@@ -18,6 +18,7 @@ class Combatant:
     display_name: str
     side: Side
     stats: Stats
+    base_stats: Stats | None = None
     tags: Tuple[str, ...] = ()
     weapon_tags: Tuple[str, ...] = ()
     guard_reduction: int = 0

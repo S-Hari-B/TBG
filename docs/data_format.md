@@ -324,6 +324,7 @@ Example:
 ## Classes (`classes.json`)
 
 Classes determine starting loadouts and initial inventory. No long-term class lock-in.
+Attributes now feed derived combat stats (see docs/gameplay.md).
 
 Fields:
 
@@ -331,6 +332,7 @@ Fields:
 * `base_hp`: int
 * `base_mp`: int
 * `speed`: int
+* `starting_attributes`: object with `STR`, `DEX`, `INT`, `VIT`, `BOND` (ints, non-negative)
 * `starting_weapon`: string (primary weapon id)
 * `starting_weapons`: list[string] – ordered list of weapons to attempt to equip. Two-handed items consume both slots; extra items that cannot be equipped are added to the shared inventory.
 * `starting_armour`: object mapping slot (`head`, `body`, `hands`, `boots`) to armour ids
@@ -346,6 +348,13 @@ Example:
   "base_hp": 40,
   "base_mp": 6,
   "speed": 4,
+  "starting_attributes": {
+    "STR": 8,
+    "DEX": 4,
+    "INT": 2,
+    "VIT": 6,
+    "BOND": 0
+  },
   "starting_weapon": "iron_sword",
   "starting_weapons": ["iron_sword", "wooden_shield"],
   "starting_armour": {
@@ -367,11 +376,13 @@ Example:
 ## Party Members (`party_members.json`)
 
 Party members define recruitable allies such as Emma. Fields mirror the class definition but also declare the exact level a recruit joins at:
+Attributes now feed derived combat stats (see docs/gameplay.md).
 
 * `name`: string
 * `starting_level`: int (Emma is 3)
 * `tags`: list[string]
 * `base_stats`: { `max_hp`, `max_mp`, `speed` }
+* `starting_attributes`: object with `STR`, `DEX`, `INT`, `VIT`, `BOND` (ints, non-negative)
 * `equipment`: { `weapons`: list[string], `armour_slots`: { slot: armour_id } }
 
 ---
@@ -411,7 +422,7 @@ Fields per location:
 * `description`: string (required, may be empty)
 * `floor_id`: string (must exist in `floors.json`)
 * `type`: string enum (`town`, `open`, `side`, `story`, `secret`, `boss`, `gate`)
-* `area_level`: optional int (>= 0). If omitted, the service derives it from the floor level.
+* `area_level`: optional int (>= 0). When present, overrides the floor’s level for enemy stat scaling.
 * `tags`: list[string] — lowercase, non-empty
 * `entry_story_node_id`: string or null
 * `npcs_present`: optional list of `{ "npc_id": string, "talk_node_id": string|null, "quest_hub_node_id": string|null }`
@@ -549,7 +560,7 @@ Manual saves are plain JSON written to `data/saves/slot_1.json` through `slot_3.
 * `save_version`: integer schema version (v1 = `1`). Loaders refuse mismatched versions.
 * `metadata`: presentation summary used when rendering the slot picker (player name, current node id, current location id, mode, gold, seed, ISO timestamp).
 * `rng`: deterministic RNG snapshot (`{"version": 3, "state": [...], "gauss": null}`).
-* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, visit counts, pending narration, party roster, inventory/equipment, member levels/exp, flags, camp message, checkpoint metadata, quest progress, and the player object).
+* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, visit counts, pending narration, party roster, inventory/equipment, member levels/exp, base attributes, flags, camp message, checkpoint metadata, quest progress, and the player object).
 
 Example (trimmed):
 
@@ -580,6 +591,8 @@ Example (trimmed):
     "exp": 18,
     "flags": {"tutorial_complete": true, "flag_last_battle_defeat": false},
     "party_members": ["emma"],
+    "player_attributes": {"STR": 8, "DEX": 4, "INT": 2, "VIT": 6, "BOND": 0},
+    "party_member_attributes": {"emma": {"STR": 2, "DEX": 4, "INT": 10, "VIT": 4, "BOND": 0}},
     "pending_story_node_id": "forest_aftermath",
     "pending_narration": [{"node_id": "post_ambush_menu", "text": "..."}],
     "inventory": {

@@ -4,6 +4,13 @@
     "base_hp": 40,
     "base_mp": 6,
     "speed": 4,
+    "starting_attributes": {
+      "STR": 8,
+      "DEX": 4,
+      "INT": 2,
+      "VIT": 6,
+      "BOND": 0
+    },
     "starting_weapon": "iron_sword",
     "starting_weapons": ["iron_sword", "wooden_shield"],
     "starting_armour": {
@@ -25,6 +32,13 @@
     "base_hp": 32,
     "base_mp": 8,
     "speed": 7,
+    "starting_attributes": {
+      "STR": 4,
+      "DEX": 8,
+      "INT": 4,
+      "VIT": 4,
+      "BOND": 0
+    },
     "starting_weapon": "iron_dagger",
     "starting_weapons": ["iron_dagger", "iron_dagger", "shortbow"],
     "starting_armour": {
@@ -46,6 +60,13 @@
     "base_hp": 26,
     "base_mp": 18,
     "speed": 5,
+    "starting_attributes": {
+      "STR": 2,
+      "DEX": 4,
+      "INT": 10,
+      "VIT": 4,
+      "BOND": 0
+    },
     "starting_weapon": "fire_staff",
     "starting_weapons": ["fire_staff"],
     "starting_armour": {
@@ -68,6 +89,13 @@
     "base_hp": 24,
     "base_mp": 4,
     "speed": 4,
+    "starting_attributes": {
+      "STR": 5,
+      "DEX": 5,
+      "INT": 5,
+      "VIT": 5,
+      "BOND": 0
+    },
     "starting_weapon": "wooden_club",
     "starting_weapons": ["wooden_club"],
     "starting_armour": {

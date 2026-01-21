@@ -16,7 +16,8 @@ from tbg.data.repositories import (
     StoryRepository,
     WeaponsRepository,
 )
-from tbg.domain.entities import Player, Stats
+from tbg.domain.attribute_scaling import apply_attribute_scaling
+from tbg.domain.entities import Attributes, BaseStats, Player, Stats
 from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment, PartyInventory
 from tbg.domain.quest_state import QuestObjectiveProgress, QuestProgress
 from tbg.domain.state import GameState
@@ -101,6 +102,9 @@ class SaveService:
         state.exp = self._require_int(state_payload.get("exp"), "state.exp")
         state.flags = self._coerce_bool_dict(state_payload.get("flags"), "state.flags")
         state.party_members = self._coerce_party_members(state_payload.get("party_members"))
+        player_attributes = self._coerce_optional_attributes(
+            state_payload.get("player_attributes"), "state.player_attributes"
+        )
         state.pending_story_node_id = self._coerce_optional_str(
             state_payload.get("pending_story_node_id"), "state.pending_story_node_id"
         )
@@ -150,9 +154,14 @@ class SaveService:
 
         player_payload = state_payload.get("player")
         if player_payload is not None:
-            state.player = self._coerce_player(player_payload)
+            state.player = self._coerce_player(player_payload, attributes=player_attributes)
 
         state.equipment = self._coerce_equipment(state_payload.get("equipment"), state)
+        state.party_member_attributes = self._coerce_party_member_attributes(
+            state_payload.get("party_member_attributes"), state.party_members
+        )
+        if state.player:
+            self._recalculate_player_stats(state)
 
         self._validate_progress_consistency(state)
         self._validate_quest_state(state)
@@ -191,6 +200,11 @@ class SaveService:
             "exp": state.exp,
             "flags": dict(state.flags),
             "party_members": list(state.party_members),
+            "player_attributes": self._serialize_attributes(state.player.attributes) if state.player else None,
+            "party_member_attributes": {
+                member_id: self._serialize_attributes(attributes)
+                for member_id, attributes in state.party_member_attributes.items()
+            },
             "pending_story_node_id": state.pending_story_node_id,
             "pending_narration": pending_narration,
             "inventory": {
@@ -233,6 +247,16 @@ class SaveService:
             },
         }
 
+    @staticmethod
+    def _serialize_attributes(attributes: Attributes) -> Dict[str, int]:
+        return {
+            "STR": attributes.STR,
+            "DEX": attributes.DEX,
+            "INT": attributes.INT,
+            "VIT": attributes.VIT,
+            "BOND": attributes.BOND,
+        }
+
     def _coerce_rng_payload(self, payload: Mapping[str, Any]) -> RNGStatePayload:
         version = self._require_int(payload.get("version"), "rng.version")
         state_values = payload.get("state")
@@ -263,6 +287,11 @@ class SaveService:
             return None
         return self._require_str(value, context)
 
+    def _coerce_optional_attributes(self, value: Any, context: str) -> Attributes | None:
+        if value is None:
+            return None
+        return self._coerce_attributes(value, context)
+
     def _coerce_bool_dict(self, value: Any, context: str) -> Dict[str, bool]:
         mapping = self._require_dict(value, context)
         result: Dict[str, bool] = {}
@@ -284,6 +313,33 @@ class SaveService:
                 raise SaveLoadError(f"{context}.{key} must be an integer.")
             result[key] = entry
         return result
+
+    def _coerce_attributes(self, value: Any, context: str) -> Attributes:
+        mapping = self._require_dict(value, context)
+        expected = {"STR", "DEX", "INT", "VIT", "BOND"}
+        actual = set(mapping.keys())
+        if actual != expected:
+            missing = expected - actual
+            extra = actual - expected
+            msg_parts: list[str] = []
+            if missing:
+                msg_parts.append(f"missing keys: {sorted(missing)}")
+            if extra:
+                msg_parts.append(f"unknown keys: {sorted(extra)}")
+            raise SaveLoadError(f"{context} has schema issues ({'; '.join(msg_parts)}).")
+        values: dict[str, int] = {}
+        for key in expected:
+            value_int = self._require_int(mapping.get(key), f"{context}.{key}")
+            if value_int < 0:
+                raise SaveLoadError(f"{context}.{key} must be a non-negative integer.")
+            values[key] = value_int
+        return Attributes(
+            STR=values["STR"],
+            DEX=values["DEX"],
+            INT=values["INT"],
+            VIT=values["VIT"],
+            BOND=values["BOND"],
+        )
 
     def _coerce_str_list(self, value: Any, context: str) -> List[str]:
         if value is None:
@@ -525,6 +581,44 @@ class SaveService:
             equipment[member_id] = member_equipment
         return equipment
 
+    def _coerce_party_member_attributes(
+        self,
+        value: Any,
+        party_members: List[str],
+    ) -> Dict[str, Attributes]:
+        if value is None:
+            payload: Dict[str, Any] = {}
+        else:
+            payload = self._require_dict(value, "state.party_member_attributes")
+        known_members = set(party_members)
+        extra_members = set(payload.keys()) - known_members
+        if extra_members:
+            raise SaveLoadError(
+                f"state.party_member_attributes references unknown members: {sorted(extra_members)}."
+            )
+        attributes: Dict[str, Attributes] = {}
+        for member_id in party_members:
+            if member_id in payload:
+                attributes[member_id] = self._coerce_attributes(
+                    payload.get(member_id),
+                    f"state.party_member_attributes.{member_id}",
+                )
+                continue
+            try:
+                member_def = self._party_members_repo.get(member_id)
+            except KeyError as exc:
+                raise SaveLoadError(
+                    f"Save incompatible with current definitions: party member '{member_id}' missing."
+                ) from exc
+            attributes[member_id] = Attributes(
+                STR=member_def.starting_attributes.STR,
+                DEX=member_def.starting_attributes.DEX,
+                INT=member_def.starting_attributes.INT,
+                VIT=member_def.starting_attributes.VIT,
+                BOND=member_def.starting_attributes.BOND,
+            )
+        return attributes
+
     def _coerce_optional_weapon_id(self, value: Any, member_id: str, slot_index: int) -> str | None:
         if value is None:
             return None
@@ -549,13 +643,13 @@ class SaveService:
             ) from exc
         return armour_id
 
-    def _coerce_player(self, value: Any) -> Player:
+    def _coerce_player(self, value: Any, *, attributes: Attributes | None) -> Player:
         mapping = self._require_dict(value, "state.player")
         player_id = self._require_str(mapping.get("id"), "state.player.id")
         name = self._require_str(mapping.get("name"), "state.player.name")
         class_id = self._require_str(mapping.get("class_id"), "state.player.class_id")
         try:
-            self._classes_repo.get(class_id)
+            class_def = self._classes_repo.get(class_id)
         except KeyError as exc:
             raise SaveLoadError(
                 f"Save incompatible with current definitions: class '{class_id}' missing."
@@ -570,7 +664,99 @@ class SaveService:
             defense=self._require_int(stats_mapping.get("defense"), "state.player.stats.defense"),
             speed=self._require_int(stats_mapping.get("speed"), "state.player.stats.speed"),
         )
-        return Player(id=player_id, name=name, class_id=class_id, stats=stats)
+        if attributes is None:
+            attributes = Attributes(
+                STR=class_def.starting_attributes.STR,
+                DEX=class_def.starting_attributes.DEX,
+                INT=class_def.starting_attributes.INT,
+                VIT=class_def.starting_attributes.VIT,
+                BOND=class_def.starting_attributes.BOND,
+            )
+        base_stats = BaseStats(
+            max_hp=class_def.base_hp,
+            max_mp=class_def.base_mp,
+            attack=stats.attack,
+            defense=stats.defense,
+            speed=class_def.speed,
+        )
+        return Player(
+            id=player_id,
+            name=name,
+            class_id=class_id,
+            stats=stats,
+            attributes=attributes,
+            base_stats=base_stats,
+        )
+
+    def _recalculate_player_stats(self, state: GameState) -> None:
+        if not state.player:
+            return
+        try:
+            class_def = self._classes_repo.get(state.player.class_id)
+        except KeyError as exc:
+            raise SaveLoadError(
+                f"Save incompatible with current definitions: class '{state.player.class_id}' missing."
+            ) from exc
+        equipment = state.equipment.get(state.player.id)
+        weapon_ids = []
+        armour_ids = []
+        if equipment:
+            weapon_ids = [weapon_id for weapon_id in equipment.weapon_slots if weapon_id]
+            for slot in ARMOUR_SLOTS:
+                armour_id = equipment.armour_slots.get(slot)
+                if armour_id:
+                    armour_ids.append(armour_id)
+        try:
+            fallback_attack = self._weapons_repo.get(class_def.starting_weapon_id).attack
+        except KeyError:
+            fallback_attack = state.player.base_stats.attack
+        try:
+            fallback_defense = self._armour_repo.get(class_def.starting_armour_id).defense
+        except KeyError:
+            fallback_defense = state.player.base_stats.defense
+        base_attack = self._calculate_attack_from_weapons(weapon_ids, fallback_attack)
+        base_defense = self._calculate_defense_from_armour(armour_ids, fallback_defense)
+        base_stats = Stats(
+            max_hp=class_def.base_hp,
+            hp=state.player.stats.hp,
+            max_mp=class_def.base_mp,
+            mp=state.player.stats.mp,
+            attack=base_attack,
+            defense=base_defense,
+            speed=class_def.speed,
+        )
+        state.player.base_stats = BaseStats(
+            max_hp=base_stats.max_hp,
+            max_mp=base_stats.max_mp,
+            attack=base_stats.attack,
+            defense=base_stats.defense,
+            speed=base_stats.speed,
+        )
+        state.player.stats = apply_attribute_scaling(
+            state.player.base_stats,
+            state.player.attributes,
+            current_hp=state.player.stats.hp,
+            current_mp=state.player.stats.mp,
+        )
+
+    def _calculate_attack_from_weapons(self, weapon_ids: List[str], fallback: int) -> int:
+        for weapon_id in weapon_ids:
+            try:
+                weapon_def = self._weapons_repo.get(weapon_id)
+            except KeyError:
+                continue
+            return max(1, weapon_def.attack)
+        return max(1, fallback)
+
+    def _calculate_defense_from_armour(self, armour_ids: List[str], fallback: int) -> int:
+        total = 0
+        for armour_id in armour_ids:
+            try:
+                armour_def = self._armour_repo.get(armour_id)
+            except KeyError:
+                continue
+            total += armour_def.defense
+        return total if total > 0 else max(0, fallback)
 
     def _validate_story_node(self, node_id: str) -> None:
         try:

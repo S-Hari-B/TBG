@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Tuple
 
+from tbg.domain.entities import Attributes
 
 @dataclass(slots=True)
 class PartyMemberDef:
@@ -15,6 +16,7 @@ class PartyMemberDef:
     base_mp: int
     speed: int
     starting_level: int
+    starting_attributes: Attributes
     weapon_ids: Tuple[str, ...]
     armour_id: str | None
     armour_slots: Dict[str, str] = field(default_factory=dict)

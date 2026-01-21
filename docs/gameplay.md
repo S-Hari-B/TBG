@@ -121,6 +121,48 @@ level
 
 exp
 
+### Attributes (base)
+
+Attributes now deterministically feed into derived combat stats. They remain flat (no % scaling, no caps).
+
+- STR: increases attack (ATK) by +1 per point.
+- DEX: increases initiative/speed (INIT) by +1 per point.
+- INT: increases max MP by +2 per point.
+- VIT: increases max HP by +3 per point.
+- BOND: summon-only stat reserved for future summon systems (no current combat effect).
+
+Base vs final stats:
+
+- **Base stats** are computed from class/level baselines plus equipment (attack/defense from equipped gear).
+- **Final stats** are base stats plus attribute contributions.
+- Current HP/MP are always clamped to the final maxima after recalculation; there is no “base current HP/MP”.
+
+Scaling policy (implemented + future contract):
+
+- Each point matters; scaling is linear and deterministic.
+- Derived combat stats already incorporate STR/DEX/INT/VIT contributions.
+- Equipment requirements will use attributes in future tickets.
+- Summon systems will use BOND in future tickets.
+
+BOND currently has no effect on combat outcomes and is stored/displayed only.
+
+### Enemy stat scaling (deterministic)
+
+Enemy combat stats scale deterministically by battle level, derived from location context:
+
+- If `locations.json` provides `area_level`, that value is used.
+- Otherwise, the floor’s `level` from `floors.json` is used.
+- If neither is available, level defaults to 0.
+
+Scaling (flat per level, no RNG):
+
+- max HP: +10 per level
+- ATK: +2 per level
+- DEF: +1 per level
+- INIT: unchanged
+
+Floor Zero is level 0 and uses base enemy definitions with no scaling.
+
 Economy
 
 gold exists in v1

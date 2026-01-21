@@ -4,6 +4,7 @@ from typing import Iterator, List, Tuple
 
 from tbg.core.rng import RNG
 from tbg.domain.battle_models import BattleState, Combatant
+from tbg.domain.entities import Attributes, BaseStats
 from tbg.domain.entities.player import Player
 from tbg.domain.defs import SkillDef
 from tbg.domain.entities.stats import Stats
@@ -18,6 +19,7 @@ from tbg.services.battle_service import (
     BattleInventoryItem,
     BattleLevelUpEvent,
     BattleRewardsHeaderEvent,
+    BattleStartedEvent,
     BattleResolvedEvent,
     BattleView,
     CombatantDefeatedEvent,
@@ -164,7 +166,21 @@ class _FakeBattleService:
 def _build_state_and_battle(enemy_hp: int) -> Tuple[GameState, BattleState]:
     rng = RNG(1)
     player_stats = Stats(max_hp=40, hp=40, max_mp=5, mp=5, attack=6, defense=2, speed=10)
-    player = Player(id="hero", name="Hero", class_id="warrior", stats=player_stats)
+    player_attributes = Attributes(STR=6, DEX=4, INT=2, VIT=6, BOND=0)
+    player = Player(
+        id="hero",
+        name="Hero",
+        class_id="warrior",
+        stats=player_stats,
+        attributes=player_attributes,
+        base_stats=BaseStats(
+            max_hp=player_stats.max_hp,
+            max_mp=player_stats.max_mp,
+            attack=player_stats.attack,
+            defense=player_stats.defense,
+            speed=player_stats.speed,
+        ),
+    )
     state = GameState(seed=1, rng=rng, mode="battle", current_node_id="tutorial", player=player)
     state.party_members = []
     enemy_stats = Stats(max_hp=enemy_hp, hp=enemy_hp, max_mp=0, mp=0, attack=4, defense=1, speed=5)
@@ -347,12 +363,14 @@ def _build_panel_view() -> Tuple[BattleView, BattleState]:
         display_name="Goblin Grunt (1)",
         side="enemies",
         stats=enemy_a_stats,
+        base_stats=Stats(max_hp=12, hp=12, max_mp=0, mp=0, attack=1, defense=0, speed=4),
     )
     enemy_two = Combatant(
         instance_id="enemy_2",
         display_name="Goblin Grunt (2)",
         side="enemies",
         stats=enemy_b_stats,
+        base_stats=Stats(max_hp=12, hp=12, max_mp=0, mp=0, attack=1, defense=0, speed=4),
     )
     battle_state = BattleState(
         battle_id="panel",
@@ -498,7 +516,7 @@ def test_state_panel_shows_enemy_hp_with_debug(monkeypatch, capsys) -> None:
     # Debug mode now shows [15/15|D1] format including defense
     assert "[15/15|D1]" in out
     assert ">  1" in out
-    assert "  2 Emma" in out
+    assert "2 Emma" in out
     assert "  3" in out
 
 
@@ -741,7 +759,7 @@ def test_state_panel_lines_match_frame_width(capsys) -> None:
     out = capsys.readouterr().out
     block = _extract_state_panel_block(out)
     assert block, "Failed to capture battle state panel output."
-    expected_width = app._BATTLE_UI_WIDTH
+    expected_width, _, _ = app._battle_state_layout()
     assert all(len(line) == expected_width for line in block)
     assert all(line.endswith(("+", "|")) for line in block)
 
@@ -761,6 +779,41 @@ def test_rewards_render_in_boxed_panels(capsys) -> None:
     assert "| LEVEL UPS" in out
     assert "| LOOT" in out
     assert "Loot: Goblin Horn x3" in out
+
+
+def test_debug_scaling_panel_renders(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("TBG_DEBUG", "1")
+    events = [
+        BattleStartedEvent(
+            battle_id="battle_test",
+            enemy_names=["Goblin Grunt"],
+            battle_level=1,
+            level_source="floor_level",
+            level_source_value=1,
+            location_id="floor_one_gate",
+            floor_id="floor_one",
+            scaling_hp_per_level=10,
+            scaling_attack_per_level=2,
+            scaling_defense_per_level=1,
+            scaling_speed_per_level=0,
+        )
+    ]
+    app._render_battle_events(events)
+    out = capsys.readouterr().out
+    assert "Battle level: 1" in out
+    assert "Per level: +10 HP, +2 ATK, +1 DEF, +0 INIT" in out
+
+
+def test_enemy_debug_lines_include_base_and_scaled(monkeypatch, capsys) -> None:
+    monkeypatch.setenv("TBG_DEBUG", "1")
+    view, battle_state = _build_panel_view()
+    app._render_battle_state_panel(view, battle_state, active_id="hero")
+    out = capsys.readouterr().out
+    assert "Base 12 +3" in out
+    assert "HP 15" in out
+    debug_lines = [line for line in out.splitlines() if "Base" in line]
+    assert debug_lines
+    assert all("..." not in line for line in debug_lines)
 
 
 def test_loot_lines_aggregate() -> None:

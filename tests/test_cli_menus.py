@@ -313,6 +313,44 @@ def test_converse_auto_resume_does_not_end_demo() -> None:
     assert story_service.get_current_node_view(state).choices
 
 
+def test_attribute_lines_include_bond() -> None:
+    from tbg.domain.attribute_scaling import build_attribute_scaling_breakdown
+    from tbg.domain.entities import Attributes, BaseStats, Stats
+    from tbg.presentation.cli.app import _build_attribute_lines
+
+    attributes = Attributes(STR=1, DEX=2, INT=3, VIT=4, BOND=5)
+    base_stats = BaseStats(max_hp=10, max_mp=5, attack=2, defense=1, speed=3)
+    breakdown = build_attribute_scaling_breakdown(
+        base_stats,
+        attributes,
+        current_hp=10,
+        current_mp=5,
+    )
+    lines = _build_attribute_lines(breakdown)
+    joined = " ".join(lines)
+    for label in ("STR", "DEX", "INT", "VIT", "BOND"):
+        assert label in joined
+    assert "(+" in joined
+
+
+def test_attribute_debug_lines_do_not_show_base_current() -> None:
+    from tbg.domain.attribute_scaling import build_attribute_scaling_breakdown
+    from tbg.domain.entities import Attributes, BaseStats
+    from tbg.presentation.cli.app import _build_attribute_debug_lines
+
+    attributes = Attributes(STR=2, DEX=1, INT=1, VIT=1, BOND=0)
+    base_stats = BaseStats(max_hp=40, max_mp=10, attack=8, defense=3, speed=4)
+    breakdown = build_attribute_scaling_breakdown(
+        base_stats,
+        attributes,
+        current_hp=55,
+        current_mp=12,
+    )
+    lines = _build_attribute_debug_lines(breakdown)
+    base_line = next(line for line in lines if "MAX HP" in line and "MAX MP" in line)
+    assert "/" not in base_line
+
+
 def test_filter_turn_ins_by_location_npcs() -> None:
     from tbg.presentation.cli.app import _filter_turn_ins_for_location
     from tbg.services.quest_service import QuestTurnInView

@@ -14,6 +14,7 @@ class EnemyInstance:
     enemy_id: str
     name: str
     stats: Stats
+    base_stats: Stats
     xp_reward: int
     gold_reward: int
     tags: tuple[str, ...] = ()

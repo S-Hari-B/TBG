@@ -263,6 +263,7 @@ def _validate_classes(
                 "speed",
                 "starting_weapon",
                 "starting_armour",
+                "starting_attributes",
             },
             optional={"starting_weapons", "starting_items", "starting_abilities", "starting_level"},
             context=f"class '{class_id}'",
@@ -271,6 +272,9 @@ def _validate_classes(
         _require_int(mapping["base_hp"], f"class '{class_id}' base_hp")
         _require_int(mapping["base_mp"], f"class '{class_id}' base_mp")
         _require_int(mapping["speed"], f"class '{class_id}' speed")
+        _require_attributes_mapping(
+            mapping["starting_attributes"], f"class '{class_id}' starting_attributes"
+        )
         starting_weapon = _require_str(
             mapping["starting_weapon"], f"class '{class_id}' starting_weapon"
         )
@@ -707,6 +711,23 @@ def _require_str_list(value: Any, context: str) -> list[str]:
     for entry in value:
         result.append(_require_str(entry, context))
     return result
+
+
+def _require_attributes_mapping(value: Any, context: str) -> dict[str, int]:
+    mapping = _require_mapping(value, context)
+    expected = {"STR", "DEX", "INT", "VIT", "BOND"}
+    actual = set(mapping.keys())
+    missing = expected - actual
+    extra = actual - expected
+    assert not missing, f"{context} missing keys: {sorted(missing)}"
+    assert not extra, f"{context} has unknown keys: {sorted(extra)}"
+    values: dict[str, int] = {}
+    for key in expected:
+        raw = mapping.get(key)
+        value_int = _require_int(raw, f"{context}.{key}")
+        assert value_int >= 0, f"{context}.{key} must be non-negative."
+        values[key] = value_int
+    return values
 
 
 def _validate_loot_tables(definitions_dir: Path, item_ids: set[str]) -> None:

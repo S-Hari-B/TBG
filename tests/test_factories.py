@@ -32,11 +32,20 @@ def test_create_player_from_class_builds_expected_stats_and_equipment(tmp_path: 
 
     assert player.class_id == "fighter"
     assert player.name == "Aldric"
-    assert player.stats.hp == player.stats.max_hp == 50
-    assert player.stats.mp == player.stats.max_mp == 10
-    assert player.stats.attack == 3
+    assert player.stats.hp == player.stats.max_hp == 68
+    assert player.stats.mp == player.stats.max_mp == 20
+    assert player.stats.attack == 9
     assert player.stats.defense == 2
-    assert player.stats.speed == 4
+    assert player.stats.speed == 7
+    assert player.base_stats.max_hp == 50
+    assert player.base_stats.max_mp == 10
+    assert player.base_stats.attack == 3
+    assert player.base_stats.speed == 4
+    assert player.attributes.STR == 6
+    assert player.attributes.DEX == 3
+    assert player.attributes.INT == 5
+    assert player.attributes.VIT == 6
+    assert player.attributes.BOND == 0
     assert player.id.startswith("player_")
 
 
@@ -44,9 +53,17 @@ def test_create_enemy_instance_builds_expected_stats_and_rewards(tmp_path: Path)
     definitions_dir = _make_definitions_dir(tmp_path)
     _seed_minimal_enemy_definitions(definitions_dir)
     enemies_repo = EnemiesRepository(base_path=definitions_dir)
+    weapons_repo = WeaponsRepository(base_path=definitions_dir)
+    armour_repo = ArmourRepository(base_path=definitions_dir)
     rng = RNG(999)
 
-    enemy = create_enemy_instance("slime", enemies_repo=enemies_repo, rng=rng)
+    enemy = create_enemy_instance(
+        "slime",
+        enemies_repo=enemies_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=rng,
+    )
 
     assert enemy.enemy_id == "slime"
     assert enemy.name == "Slime"
@@ -130,6 +147,13 @@ def _seed_minimal_player_definitions(definitions_dir: Path) -> None:
                 "base_hp": 50,
                 "base_mp": 10,
                 "speed": 4,
+                "starting_attributes": {
+                    "STR": 6,
+                    "DEX": 3,
+                    "INT": 5,
+                    "VIT": 6,
+                    "BOND": 0
+                },
                 "starting_weapon": "fighter_blade",
                 "starting_armour": {"body": "fighter_mail"},
             }

@@ -37,6 +37,12 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
             self._assert_required(enemy_data, required_fields, f"enemy '{raw_id}'")
 
             tags = self._require_str_list(enemy_data.get("tags", []), f"enemy '{raw_id}' tags")
+            equipment = self._require_mapping(enemy_data.get("equipment", {}), f"enemy '{raw_id}' equipment")
+            weapon_ids = tuple(
+                self._require_str_list(equipment.get("weapons", []), f"enemy '{raw_id}' equipment.weapons")
+            )
+            armour_slots = self._parse_armour_slots(equipment.get("armour_slots"), raw_id)
+            armour_id = self._require_optional_str(equipment.get("armour"), f"enemy '{raw_id}' equipment.armour")
 
             enemies[raw_id] = EnemyDef(
                 id=raw_id,
@@ -49,6 +55,9 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
                 rewards_exp=self._require_int(enemy_data["rewards_exp"], f"enemy '{raw_id}' rewards_exp"),
                 rewards_gold=self._require_int(enemy_data["rewards_gold"], f"enemy '{raw_id}' rewards_gold"),
                 tags=tuple(tags),
+                weapon_ids=weapon_ids,
+                armour_id=armour_id,
+                armour_slots=armour_slots,
             )
         return enemies
 
@@ -73,6 +82,18 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
         return value
 
     @staticmethod
+    def _require_mapping(value: object, context: str) -> dict[str, object]:
+        if not isinstance(value, dict):
+            raise DataValidationError(f"{context} must be an object.")
+        return value
+
+    @staticmethod
+    def _require_optional_str(value: object, context: str) -> str | None:
+        if value is None:
+            return None
+        return EnemiesRepository._require_str(value, context)
+
+    @staticmethod
     def _require_str_list(value: object, context: str) -> List[str]:
         if not isinstance(value, list):
             raise DataValidationError(f"{context} must be a list.")
@@ -82,6 +103,26 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
                 raise DataValidationError(f"{context} entries must be strings.")
             result.append(item)
         return result
+
+    @staticmethod
+    def _require_slot_name(value: str, context: str) -> str:
+        if value not in {"head", "body", "hands", "boots"}:
+            raise DataValidationError(f"{context} must be one of head, body, hands, boots.")
+        return value
+
+    def _parse_armour_slots(
+        self,
+        raw_slots: object,
+        enemy_id: str,
+    ) -> dict[str, str]:
+        if raw_slots is None:
+            return {}
+        mapping = self._require_mapping(raw_slots, f"enemy '{enemy_id}' equipment.armour_slots")
+        parsed: dict[str, str] = {}
+        for slot_name, armour_id in mapping.items():
+            slot = self._require_slot_name(slot_name, f"enemy '{enemy_id}' armour slot")
+            parsed[slot] = self._require_str(armour_id, f"enemy '{enemy_id}' armour slot '{slot}'")
+        return parsed
 
     @staticmethod
     def _assert_required(payload: dict[str, object], required: set[str], context: str) -> None:

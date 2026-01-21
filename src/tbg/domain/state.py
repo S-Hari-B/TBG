@@ -6,7 +6,7 @@ from typing import Dict, List, Tuple
 
 from tbg.core.rng import RNG
 from tbg.core.types import GameMode
-from tbg.domain.entities import Player
+from tbg.domain.entities import Attributes, Player
 from tbg.domain.inventory import MemberEquipment, PartyInventory
 from tbg.domain.quest_state import QuestProgress
 
@@ -21,6 +21,7 @@ class GameState:
     current_node_id: str
     player: Player | None = None
     party_members: List[str] = field(default_factory=list)
+    party_member_attributes: Dict[str, Attributes] = field(default_factory=dict)
     player_name: str = "Hero"
     gold: int = 0
     exp: int = 0

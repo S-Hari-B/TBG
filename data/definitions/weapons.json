@@ -62,6 +62,42 @@
     "default_basic_attack_id": "basic_stab",
     "energy_bonus": 0
   },
+  "goblin_shiv": {
+    "name": "Goblin Shiv",
+    "attack": 3,
+    "value": 6,
+    "tags": ["dagger", "pierce"],
+    "slot_cost": 1,
+    "default_basic_attack_id": "basic_stab",
+    "energy_bonus": 0
+  },
+  "goblin_shortbow": {
+    "name": "Goblin Shortbow",
+    "attack": 4,
+    "value": 12,
+    "tags": ["bow", "pierce"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_shoot",
+    "energy_bonus": 0
+  },
+  "goblin_spear": {
+    "name": "Goblin Spear",
+    "attack": 5,
+    "value": 10,
+    "tags": ["spear", "pierce"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_thrust",
+    "energy_bonus": 0
+  },
+  "goblin_totem_staff": {
+    "name": "Goblin Totem Staff",
+    "attack": 3,
+    "value": 12,
+    "tags": ["staff", "blunt"],
+    "slot_cost": 2,
+    "default_basic_attack_id": "basic_staff_strike",
+    "energy_bonus": 0
+  },
   "wooden_spear": {
     "name": "Wooden Spear",
     "attack": 5,
@@ -89,6 +125,15 @@
     "default_basic_attack_id": "basic_thrust",
     "energy_bonus": 0
   },
+  "bandit_hatchet": {
+    "name": "Bandit Hatchet",
+    "attack": 6,
+    "value": 35,
+    "tags": ["axe", "slash"],
+    "slot_cost": 1,
+    "default_basic_attack_id": "basic_slash",
+    "energy_bonus": 0
+  },
   "hunter_spear": {
     "name": "Hunter's Spear",
     "attack": 7,
@@ -96,6 +141,15 @@
     "tags": ["spear", "pierce"],
     "slot_cost": 2,
     "default_basic_attack_id": "basic_thrust",
+    "energy_bonus": 0
+  },
+  "orc_bone_club": {
+    "name": "Orc Bone Club",
+    "attack": 7,
+    "value": 25,
+    "tags": ["club", "blunt"],
+    "slot_cost": 1,
+    "default_basic_attack_id": "basic_club_smash",
     "energy_bonus": 0
   },
   "steel_lance": {

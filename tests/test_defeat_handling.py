@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from tbg.core.rng import RNG
-from tbg.domain.entities import Player, Stats
+from tbg.domain.entities import Attributes, BaseStats, Player, Stats
 from tbg.domain.state import GameState
 from tbg.presentation.cli import app
 
@@ -64,6 +64,8 @@ def _make_state() -> GameState:
         name="Hero",
         class_id="warrior",
         stats=Stats(max_hp=30, hp=0, max_mp=10, mp=0, attack=5, defense=2, speed=5),
+        attributes=Attributes(STR=6, DEX=4, INT=2, VIT=6, BOND=0),
+        base_stats=BaseStats(max_hp=30, max_mp=10, attack=5, defense=2, speed=5),
     )
     state.gold = 100
     return state

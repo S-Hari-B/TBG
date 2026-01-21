@@ -8,15 +8,24 @@ from tbg.core.rng import RNG
 from tbg.data.repositories import (
     ArmourRepository,
     EnemiesRepository,
+    FloorsRepository,
     ItemsRepository,
     KnowledgeRepository,
     LootTablesRepository,
+    LocationsRepository,
     PartyMembersRepository,
     SkillsRepository,
     WeaponsRepository,
 )
 from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
 from tbg.domain.defs import ItemDef, KnowledgeEntry, LootTableDef, SkillDef
+from tbg.domain.attribute_scaling import apply_attribute_scaling
+from tbg.domain.enemy_scaling import (
+    ATTACK_PER_LEVEL,
+    DEFENSE_PER_LEVEL,
+    HP_PER_LEVEL,
+    SPEED_PER_LEVEL,
+)
 from tbg.domain.debuffs import (
     ActiveDebuff,
     apply_debuff_no_stack,
@@ -24,7 +33,7 @@ from tbg.domain.debuffs import (
     compute_effective_defense,
 )
 from tbg.domain.item_effects import apply_item_effects
-from tbg.domain.entities import Stats
+from tbg.domain.entities import BaseStats, Stats
 from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment
 from tbg.domain.state import GameState
 from tbg.services.errors import FactoryError
@@ -61,6 +70,24 @@ class BattleEvent:
 class BattleStartedEvent(BattleEvent):
     battle_id: str
     enemy_names: List[str]
+    battle_level: int | None = None
+    level_source: str | None = None
+    level_source_value: int | None = None
+    location_id: str | None = None
+    floor_id: str | None = None
+    scaling_hp_per_level: int | None = None
+    scaling_attack_per_level: int | None = None
+    scaling_defense_per_level: int | None = None
+    scaling_speed_per_level: int | None = None
+
+
+@dataclass(slots=True)
+class BattleLevelInfo:
+    level: int
+    source: str
+    source_value: int | None
+    location_id: str | None
+    floor_id: str | None
 
 
 @dataclass(slots=True)
@@ -192,6 +219,8 @@ class BattleService:
         skills_repo: SkillsRepository,
         items_repo: ItemsRepository,
         loot_tables_repo: LootTablesRepository,
+        floors_repo: FloorsRepository | None = None,
+        locations_repo: LocationsRepository | None = None,
         quest_service: QuestService | None = None,
     ) -> None:
         self._enemies_repo = enemies_repo
@@ -203,6 +232,8 @@ class BattleService:
         self._items_repo = items_repo
         self._loot_tables_repo = loot_tables_repo
         self._loot_tables_cache: List[LootTableDef] | None = None
+        self._floors_repo = floors_repo
+        self._locations_repo = locations_repo
         self._quest_service = quest_service
 
     # -----------------------
@@ -220,15 +251,24 @@ class BattleService:
             group_def = self._enemies_repo.get_group(enemy_id)
             enemy_ids = list(group_def.enemy_ids or [])
 
+        battle_level_info = self._resolve_battle_level(state)
         enemies: List[Combatant] = []
         for _id in enemy_ids:
-            enemy_instance = create_enemy_instance(_id, enemies_repo=self._enemies_repo, rng=state.rng)
+            enemy_instance = create_enemy_instance(
+                _id,
+                enemies_repo=self._enemies_repo,
+                weapons_repo=self._weapons_repo,
+                armour_repo=self._armour_repo,
+                rng=state.rng,
+                battle_level=battle_level_info.level,
+            )
             enemies.append(
                 Combatant(
                     instance_id=enemy_instance.id,
                     display_name=enemy_instance.name,
                     side="enemies",
                     stats=enemy_instance.stats,
+                    base_stats=enemy_instance.base_stats,
                     tags=enemy_instance.tags,
                     weapon_tags=(),
                     source_id=enemy_instance.enemy_id,
@@ -251,8 +291,67 @@ class BattleService:
         else:
             battle_state.round_last_actor_id = None
 
-        events = [BattleStartedEvent(battle_id=battle_id, enemy_names=[enemy.display_name for enemy in enemies])]
+        events = [
+            BattleStartedEvent(
+                battle_id=battle_id,
+                enemy_names=[enemy.display_name for enemy in enemies],
+                battle_level=battle_level_info.level,
+                level_source=battle_level_info.source,
+                level_source_value=battle_level_info.source_value,
+                location_id=battle_level_info.location_id,
+                floor_id=battle_level_info.floor_id,
+                scaling_hp_per_level=HP_PER_LEVEL,
+                scaling_attack_per_level=ATTACK_PER_LEVEL,
+                scaling_defense_per_level=DEFENSE_PER_LEVEL,
+                scaling_speed_per_level=SPEED_PER_LEVEL,
+            )
+        ]
         return battle_state, events
+
+    def _resolve_battle_level(self, state: GameState) -> BattleLevelInfo:
+        if not state.current_location_id or not self._locations_repo or not self._floors_repo:
+            return BattleLevelInfo(
+                level=0,
+                source="default",
+                source_value=None,
+                location_id=state.current_location_id or None,
+                floor_id=None,
+            )
+        try:
+            location_def = self._locations_repo.get(state.current_location_id)
+        except KeyError:
+            return BattleLevelInfo(
+                level=0,
+                source="default",
+                source_value=None,
+                location_id=state.current_location_id or None,
+                floor_id=None,
+            )
+        if location_def.area_level is not None:
+            return BattleLevelInfo(
+                level=max(0, location_def.area_level),
+                source="area_level",
+                source_value=location_def.area_level,
+                location_id=location_def.id,
+                floor_id=location_def.floor_id,
+            )
+        try:
+            floor_def = self._floors_repo.get(location_def.floor_id)
+        except KeyError:
+            return BattleLevelInfo(
+                level=0,
+                source="default",
+                source_value=None,
+                location_id=location_def.id,
+                floor_id=location_def.floor_id,
+            )
+        return BattleLevelInfo(
+            level=max(0, floor_def.level),
+            source="floor_level",
+            source_value=floor_def.level,
+            location_id=location_def.id,
+            floor_id=floor_def.id,
+        )
 
     def get_battle_view(self, battle_state: BattleState) -> BattleView:
         """Return structured information for rendering."""
@@ -572,8 +671,20 @@ class BattleService:
         equipment = state.equipment.get(state.player.id)
         weapon_ids = self._weapon_ids_from_equipment(equipment)
         armour_ids = self._armour_ids_from_equipment(equipment)
-        state.player.stats.attack = self._calculate_attack(weapon_ids, state.player.stats.attack)
-        state.player.stats.defense = self._calculate_defense(armour_ids, state.player.stats.defense)
+        base_stats = BaseStats(
+            max_hp=state.player.base_stats.max_hp,
+            max_mp=state.player.base_stats.max_mp,
+            attack=self._calculate_attack(weapon_ids, state.player.base_stats.attack),
+            defense=self._calculate_defense(armour_ids, state.player.base_stats.defense),
+            speed=state.player.base_stats.speed,
+        )
+        state.player.base_stats = base_stats
+        state.player.stats = apply_attribute_scaling(
+            base_stats,
+            state.player.attributes,
+            current_hp=state.player.stats.hp,
+            current_mp=state.player.stats.mp,
+        )
         return Combatant(
             instance_id=state.player.id,
             display_name=state.player.name,
@@ -600,15 +711,22 @@ class BattleService:
             except KeyError:
                 base_attack = 1
         base_defense = 0
-        stats = Stats(
+        base_stats = BaseStats(
             max_hp=member_def.base_hp,
-            hp=member_def.base_hp,
             max_mp=member_def.base_mp,
-            mp=member_def.base_mp,
             attack=self._calculate_attack(weapon_ids, base_attack),
             defense=self._calculate_defense(armour_ids, base_defense),
             speed=member_def.speed,
         )
+        attributes = state.party_member_attributes.get(member_id, member_def.starting_attributes)
+        stats = apply_attribute_scaling(
+            base_stats,
+            attributes,
+            current_hp=base_stats.max_hp,
+            current_mp=base_stats.max_mp,
+        )
+        stats.hp = stats.max_hp
+        stats.mp = stats.max_mp
         return Combatant(
             instance_id=f"party_{member_id}",
             display_name=member_def.name,
@@ -1086,6 +1204,8 @@ class BattleService:
         for level in leveled:
             events.append(BattleLevelUpEvent(member_id=member_id, member_name=member_name, new_level=level))
         if leveled:
+            if state.player and member_id == state.player.id:
+                self._recalculate_player_stats(state)
             self._restore_member_resources(state, member_id, restore_hp=True, restore_mp=True)
         return events
 
@@ -1151,6 +1271,27 @@ class BattleService:
         """Reset current resources for the player (and future party hooks) after battles."""
         for member_id in self._active_party_ids(state):
             self._restore_member_resources(state, member_id, restore_hp=restore_hp, restore_mp=restore_mp)
+
+    def _recalculate_player_stats(self, state: GameState) -> None:
+        if not state.player:
+            return
+        equipment = state.equipment.get(state.player.id)
+        weapon_ids = self._weapon_ids_from_equipment(equipment)
+        armour_ids = self._armour_ids_from_equipment(equipment)
+        base_stats = BaseStats(
+            max_hp=state.player.base_stats.max_hp,
+            max_mp=state.player.base_stats.max_mp,
+            attack=self._calculate_attack(weapon_ids, state.player.base_stats.attack),
+            defense=self._calculate_defense(armour_ids, state.player.base_stats.defense),
+            speed=state.player.base_stats.speed,
+        )
+        state.player.base_stats = base_stats
+        state.player.stats = apply_attribute_scaling(
+            base_stats,
+            state.player.attributes,
+            current_hp=state.player.stats.hp,
+            current_mp=state.player.stats.mp,
+        )
 
     def party_has_knowledge(self, state: GameState, enemy_tags: Tuple[str, ...]) -> bool:
         """

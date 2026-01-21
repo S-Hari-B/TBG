@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from tbg.core.rng import RNG
 from tbg.domain.battle_models import BattleState, Combatant
-from tbg.domain.entities import Stats, Player
+from tbg.domain.entities import Attributes, BaseStats, Stats, Player
 from tbg.domain.state import GameState
 from tbg.services import BattleController, BattleAction
 from tbg.services.battle_service import (
@@ -15,8 +15,10 @@ from tbg.services.battle_service import (
 from tbg.data.repositories import (
     ArmourRepository,
     EnemiesRepository,
+    FloorsRepository,
     ItemsRepository,
     KnowledgeRepository,
+    LocationsRepository,
     LootTablesRepository,
     PartyMembersRepository,
     SkillsRepository,
@@ -44,6 +46,8 @@ def _build_battle_controller() -> tuple[BattleController, GameState, BattleState
         skills_repo=skills_repo,
         items_repo=items_repo,
         loot_tables_repo=loot_repo,
+        floors_repo=FloorsRepository(),
+        locations_repo=LocationsRepository(floors_repo=FloorsRepository()),
     )
 
     controller = BattleController(battle_service)
@@ -54,6 +58,8 @@ def _build_battle_controller() -> tuple[BattleController, GameState, BattleState
         name="Hero",
         class_id="warrior",
         stats=Stats(max_hp=30, hp=30, max_mp=5, mp=5, attack=5, defense=2, speed=10),
+        attributes=Attributes(STR=6, DEX=4, INT=2, VIT=6, BOND=0),
+        base_stats=BaseStats(max_hp=30, max_mp=5, attack=5, defense=2, speed=10),
     )
     state = GameState(seed=42, rng=rng, mode="battle", current_node_id="test", player=player)
 

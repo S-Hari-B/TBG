@@ -1,6 +1,8 @@
 """Console-driven UI loops for TBG."""
 from __future__ import annotations
 import secrets
+import shutil
+import textwrap
 from typing import Callable, List, Literal, Sequence
 
 from tbg.data.repositories import (
@@ -20,6 +22,8 @@ from tbg.data.repositories import (
     ShopsRepository,
 )
 from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
+from tbg.domain.attribute_scaling import AttributeScalingBreakdown
+from tbg.domain.entities import Attributes
 from tbg.domain.inventory import ARMOUR_SLOTS
 from tbg.domain.defs import SkillDef
 from tbg.domain.state import GameState
@@ -117,6 +121,8 @@ _DEFEAT_CAMP_MESSAGE = "You barely make it back to camp, bruised but alive."
 _BATTLE_UI_WIDTH = 60
 _BATTLE_STATE_LEFT_COL = 27
 _BATTLE_STATE_RIGHT_COL = _BATTLE_UI_WIDTH - 3 - _BATTLE_STATE_LEFT_COL
+_BATTLE_STATE_MIN_TOTAL = 72
+_BATTLE_STATE_MIN_COL = 32
 _TURN_SEPARATOR = "=" * _BATTLE_UI_WIDTH
 _MENU_RESELECT = object()
 
@@ -195,18 +201,41 @@ def _truncate_enemy_name(
     return f"{prefix}{base}{suffix}".ljust(width)
 
 
-def _render_state_row(left: str, right: str) -> None:
+def _render_state_row(left: str, right: str, *, left_width: int, right_width: int) -> None:
     left_display = f" {left}" if left else ""
     right_display = f" {right}" if right else ""
-    left_cell = _truncate_cell(left_display, _BATTLE_STATE_LEFT_COL)
-    right_cell = _truncate_cell(right_display, _BATTLE_STATE_RIGHT_COL)
+    left_cell = _truncate_cell(left_display, left_width)
+    right_cell = _truncate_cell(right_display, right_width)
     print(f"|{left_cell}|{right_cell}|")
 
 
-def _state_row_border() -> str:
-    left = "-" * _BATTLE_STATE_LEFT_COL
-    right = "-" * _BATTLE_STATE_RIGHT_COL
+def _state_row_border(*, left_width: int, right_width: int) -> str:
+    left = "-" * left_width
+    right = "-" * right_width
     return f"+{left}+{right}+"
+
+
+def _battle_state_layout() -> tuple[int, int, int]:
+    terminal_width = shutil.get_terminal_size((_BATTLE_UI_WIDTH, 0)).columns
+    if terminal_width < _BATTLE_STATE_MIN_TOTAL:
+        total = _BATTLE_UI_WIDTH
+        return total, _BATTLE_STATE_LEFT_COL, _BATTLE_STATE_RIGHT_COL
+    total = terminal_width
+    available = total - 3
+    if available < _BATTLE_STATE_MIN_COL * 2:
+        left = max(1, available // 2)
+        right = available - left
+        return total, left, right
+    left = available // 2
+    right = available - left
+    return total, left, right
+
+
+def _wrap_text_to_width(text: str, width: int) -> List[str]:
+    if width <= 0:
+        return [text]
+    lines = textwrap.wrap(text, width=width, break_long_words=False, break_on_hyphens=False)
+    return lines or [""]
 
 
 def _build_turn_order_map(battle_state: BattleState) -> dict[str, int]:
@@ -223,6 +252,7 @@ def _build_turn_order_map(battle_state: BattleState) -> dict[str, int]:
 def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, active_id: str | None) -> None:
     debug_enabled = _debug_enabled()
     turn_order = _build_turn_order_map(battle_state) if debug_enabled else {}
+    _, left_width, right_width = _battle_state_layout()
     allies_lines: List[str] = []
     for ally in view.allies:
         marker = ">" if ally.instance_id == active_id else " "
@@ -233,7 +263,16 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
         if combatant is not None:
             mp_text = f"{combatant.stats.mp}/{combatant.stats.max_mp}"
         hp_display = ally.hp_display if ally.is_alive else "DOWN"
-        allies_lines.append(f"{marker} {order_prefix}{ally.name}  HP {hp_display} MP {mp_text}")
+        allies_lines.append(
+            _format_battle_state_ally_line(
+                marker=marker,
+                order_prefix=order_prefix,
+                name=ally.name,
+                hp_display=hp_display,
+                mp_text=mp_text,
+                width=left_width,
+            )
+        )
     enemies_lines: List[str] = []
     enemy_name_lookup = {
         combatant.instance_id: combatant.display_name
@@ -252,7 +291,7 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
         prefix = f"{marker} {order_prefix}"
         name_segment = f"{prefix}{display_name}"
         gap = " "
-        available_width = _BATTLE_STATE_RIGHT_COL - 1  # account for leading space applied later
+        available_width = right_width - 1  # account for leading space applied later
         name_width = available_width - len(status) - len(gap)
         if name_width < 0:
             name_width = 0
@@ -264,14 +303,18 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
             trimmed_name = ""
         spacer = gap if trimmed_name else ""
         enemies_lines.append(f"{trimmed_name}{spacer}{status}")
+        if debug_enabled:
+            debug_lines = _build_enemy_scaling_lines(combatant_ref, right_width)
+            for line in debug_lines:
+                enemies_lines.append(line)
     rows = max(len(allies_lines), len(enemies_lines))
-    print(_state_row_border())
-    _render_state_row("ALLIES", "ENEMIES")
+    print(_state_row_border(left_width=left_width, right_width=right_width))
+    _render_state_row("ALLIES", "ENEMIES", left_width=left_width, right_width=right_width)
     for index in range(rows):
         left = allies_lines[index] if index < len(allies_lines) else ""
         right = enemies_lines[index] if index < len(enemies_lines) else ""
-        _render_state_row(left, right)
-    print(_state_row_border())
+        _render_state_row(left, right, left_width=left_width, right_width=right_width)
+    print(_state_row_border(left_width=left_width, right_width=right_width))
     if debug_enabled:
         _render_debug_enemy_debuffs(battle_state)
 
@@ -505,6 +548,8 @@ def _build_services() -> tuple[
         skills_repo=skills_repo,
         items_repo=items_repo,
         loot_tables_repo=loot_repo,
+        floors_repo=floors_repo,
+        locations_repo=locations_repo,
         quest_service=quest_service,
     )
     area_service = AreaServiceV2(
@@ -1627,15 +1672,77 @@ def _run_member_equipment_menu(
         render_heading(f"{member.name}'s Equipment")
         _display_weapon_slots(weapon_slots)
         _display_armour_slots(armour_slots)
-        options = ["Manage Weapons", "Manage Armour", "Back"]
+        options = ["Manage Weapons", "Manage Armour", "View Attributes", "Back"]
         render_menu("Equipment Options", options)
         choice = _prompt_menu_index(len(options))
         if choice == 0:
             _run_weapon_menu(member, inventory_service, state)
         elif choice == 1:
             _run_armour_menu(member, inventory_service, state)
+        elif choice == 2:
+            _render_member_attributes(member, inventory_service, state)
         else:
             return
+
+
+def _render_member_attributes(
+    member: PartyMemberView,
+    inventory_service: InventoryService,
+    state: GameState,
+) -> None:
+    breakdown = inventory_service.build_attribute_breakdown(state, member.member_id)
+    lines = _build_attribute_lines(breakdown)
+    _render_boxed_panel(f"{member.name} Attributes", lines)
+    if _debug_enabled():
+        debug_lines = _build_attribute_debug_lines(breakdown)
+        _render_boxed_panel("Debug: Stat Breakdown", debug_lines)
+
+
+def _get_member_attributes(member: PartyMemberView, state: GameState) -> Attributes:
+    if member.is_player and state.player:
+        return state.player.attributes
+    return state.party_member_attributes.get(member.member_id, Attributes(STR=0, DEX=0, INT=0, VIT=0, BOND=0))
+
+
+def _build_attribute_lines(breakdown: AttributeScalingBreakdown) -> List[str]:
+    attributes = breakdown.attributes
+    contributions = breakdown.contributions
+    return [
+        f"STR: {attributes.STR:>3} (+{contributions.attack:>2} ATK)",
+        f"DEX: {attributes.DEX:>3} (+{contributions.speed:>2} INIT)",
+        f"INT: {attributes.INT:>3} (+{contributions.max_mp:>2} MAX MP)",
+        f"VIT: {attributes.VIT:>3} (+{contributions.max_hp:>2} MAX HP)",
+        f"BOND:{attributes.BOND:>3} (Summons only)",
+    ]
+
+
+def _build_attribute_debug_lines(breakdown: AttributeScalingBreakdown) -> List[str]:
+    clamp_notes: List[str] = []
+    if breakdown.hp_clamped:
+        clamp_notes.append(
+            f"HP clamped from {breakdown.hp_before_clamp} to {breakdown.final_stats.max_hp}"
+        )
+    if breakdown.mp_clamped:
+        clamp_notes.append(
+            f"MP clamped from {breakdown.mp_before_clamp} to {breakdown.final_stats.max_mp}"
+        )
+    clamp_line = f"Clamp: {', '.join(clamp_notes)}" if clamp_notes else "Clamp: none"
+    return [
+        "Base stats:",
+        f"  MAX HP {breakdown.base_stats.max_hp} MAX MP {breakdown.base_stats.max_mp}",
+        f"  ATK {breakdown.base_stats.attack} DEF {breakdown.base_stats.defense} INIT {breakdown.base_stats.speed}",
+        "Contributions:",
+        f"  +{breakdown.contributions.max_hp} MAX HP",
+        f"  +{breakdown.contributions.max_mp} MAX MP",
+        f"  +{breakdown.contributions.attack} ATK",
+        f"  +{breakdown.contributions.speed} INIT",
+        "Final stats:",
+        f"  MAX HP {breakdown.final_stats.max_hp} MAX MP {breakdown.final_stats.max_mp}",
+        f"  ATK {breakdown.final_stats.attack} DEF {breakdown.final_stats.defense} INIT {breakdown.final_stats.speed}",
+        "Current:",
+        f"  HP {breakdown.final_stats.hp}/{breakdown.final_stats.max_hp} MP {breakdown.final_stats.mp}/{breakdown.final_stats.max_mp}",
+        clamp_line,
+    ]
 
 
 def _display_weapon_slots(weapon_slots: List[WeaponSlotView]) -> None:
@@ -2410,6 +2517,24 @@ def _render_battle_events(events: List[BattleEvent]) -> None:
         if not standard_header_printed:
             render_events_header()
             standard_header_printed = True
+        if _debug_enabled() and isinstance(event, BattleStartedEvent) and event.battle_level is not None:
+            source_label = event.level_source or "default"
+            source_value = (
+                f"={event.level_source_value}" if event.level_source_value is not None else ""
+            )
+            location = f", location={event.location_id}" if event.location_id else ""
+            floor = f", floor={event.floor_id}" if event.floor_id else ""
+            lines = [
+                f"Battle level: {event.battle_level} (source: {source_label}{source_value}{location}{floor})",
+                (
+                    "Per level: "
+                    f"+{event.scaling_hp_per_level} HP, "
+                    f"+{event.scaling_attack_per_level} ATK, "
+                    f"+{event.scaling_defense_per_level} DEF, "
+                    f"+{event.scaling_speed_per_level} INIT"
+                ),
+            ]
+            _render_boxed_panel("Debug: Enemy Scaling", lines)
         # Use canonical formatter for consistency
         formatted = _format_battle_event_lines([event])
         for line in formatted:
@@ -2464,6 +2589,50 @@ def _format_enemy_debuff_badges(combatant: Combatant | None) -> str:
     if not badges:
         return ""
     return f"[{'/'.join(badges)}]"
+
+
+def _format_battle_state_ally_line(
+    *,
+    marker: str,
+    order_prefix: str,
+    name: str,
+    hp_display: str,
+    mp_text: str,
+    width: int,
+) -> str:
+    suffix = f"HP {hp_display} MP {mp_text}"
+    prefix = f"{marker} {order_prefix}"
+    line_prefix = prefix
+    space = " "
+    if len(line_prefix) + len(space) + len(suffix) > width:
+        line_prefix = ""
+        space = ""
+    available = width - len(line_prefix) - len(space) - len(suffix)
+    if available < 0:
+        available = 0
+    name_part = name[:available]
+    return f"{line_prefix}{name_part}{space}{suffix}".strip()
+
+
+def _build_enemy_scaling_lines(combatant: Combatant | None, width: int) -> List[str]:
+    if combatant is None or combatant.base_stats is None:
+        return []
+    base = combatant.base_stats
+    stats = combatant.stats
+    hp_delta = stats.max_hp - base.max_hp
+    atk_delta = stats.attack - base.attack
+    def_delta = stats.defense - base.defense
+    speed_delta = stats.speed - base.speed
+    details = (
+        f"HP {stats.max_hp} (Base {base.max_hp} +{hp_delta}) "
+        f"ATK {stats.attack} (Base {base.attack} +{atk_delta}) "
+        f"DEF {stats.defense} (Base {base.defense} +{def_delta}) "
+        f"INIT {stats.speed} (Base {base.speed} +{speed_delta})"
+    )
+    wrapped = _wrap_text_to_width(details, width - 2)
+    if len(wrapped) > 2:
+        wrapped = wrapped[:2]
+    return [f"  {line}" for line in wrapped]
 
 
 def _render_debug_enemy_debuffs(battle_state: BattleState) -> None:

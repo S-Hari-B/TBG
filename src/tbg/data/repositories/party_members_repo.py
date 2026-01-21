@@ -6,6 +6,7 @@ from typing import Dict, List
 from tbg.data.errors import DataValidationError
 from tbg.data.repositories.base import RepositoryBase
 from tbg.domain.defs import PartyMemberDef
+from tbg.domain.entities import Attributes
 
 
 class PartyMembersRepository(RepositoryBase[PartyMemberDef]):
@@ -20,6 +21,9 @@ class PartyMembersRepository(RepositoryBase[PartyMemberDef]):
             member_data = self._require_mapping(payload, f"party member '{raw_id}'")
             base_stats = self._require_mapping(member_data.get("base_stats"), f"party member '{raw_id}' base_stats")
             equipment = self._require_mapping(member_data.get("equipment"), f"party member '{raw_id}' equipment")
+            starting_attributes = self._parse_starting_attributes(
+                member_data.get("starting_attributes"), raw_id
+            )
 
             weapon_ids = tuple(
                 self._require_str_list(equipment.get("weapons", []), f"party member '{raw_id}' equipment.weapons")
@@ -34,6 +38,7 @@ class PartyMembersRepository(RepositoryBase[PartyMemberDef]):
                 base_mp=self._require_int(base_stats.get("max_mp"), f"party member '{raw_id}' base_stats.max_mp"),
                 speed=self._require_int(base_stats.get("speed"), f"party member '{raw_id}' base_stats.speed"),
                 starting_level=self._require_int(member_data.get("starting_level"), f"party member '{raw_id}' starting_level"),
+                starting_attributes=starting_attributes,
                 weapon_ids=weapon_ids,
                 armour_id=armour_id,
                 armour_slots=armour_slots,
@@ -95,5 +100,35 @@ class PartyMembersRepository(RepositoryBase[PartyMemberDef]):
             slot = self._require_slot_name(slot_name, f"party member '{member_id}' armour slot")
             parsed[slot] = self._require_str(armour_id, f"party member '{member_id}' armour slot '{slot}'")
         return parsed
+
+    def _parse_starting_attributes(self, raw_value: object, member_id: str) -> Attributes:
+        if raw_value is None:
+            return Attributes(STR=0, DEX=0, INT=0, VIT=0, BOND=0)
+        context = f"party member '{member_id}' starting_attributes"
+        mapping = self._require_mapping(raw_value, context)
+        expected = {"STR", "DEX", "INT", "VIT", "BOND"}
+        actual = set(mapping.keys())
+        if actual != expected:
+            missing = expected - actual
+            extra = actual - expected
+            msg_parts: list[str] = []
+            if missing:
+                msg_parts.append(f"missing keys: {sorted(missing)}")
+            if extra:
+                msg_parts.append(f"unknown keys: {sorted(extra)}")
+            raise DataValidationError(f"{context} has schema issues ({'; '.join(msg_parts)}).")
+        values: dict[str, int] = {}
+        for key in expected:
+            value = self._require_int(mapping.get(key), f"{context}.{key}")
+            if value < 0:
+                raise DataValidationError(f"{context}.{key} must be a non-negative integer.")
+            values[key] = value
+        return Attributes(
+            STR=values["STR"],
+            DEX=values["DEX"],
+            INT=values["INT"],
+            VIT=values["VIT"],
+            BOND=values["BOND"],
+        )
 
 

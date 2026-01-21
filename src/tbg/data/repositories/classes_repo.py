@@ -8,6 +8,7 @@ from tbg.data.repositories.armour_repo import ArmourRepository
 from tbg.data.repositories.base import RepositoryBase
 from tbg.data.repositories.weapons_repo import WeaponsRepository
 from tbg.domain.defs import ClassDef
+from tbg.domain.entities import Attributes
 
 
 class ClassesRepository(RepositoryBase[ClassDef]):
@@ -36,7 +37,15 @@ class ClassesRepository(RepositoryBase[ClassDef]):
             class_data = self._require_mapping(payload, f"class '{raw_id}'")
             self._assert_exact_fields(
                 class_data,
-                {"name", "base_hp", "base_mp", "speed", "starting_weapon", "starting_armour"},
+                {
+                    "name",
+                    "base_hp",
+                    "base_mp",
+                    "speed",
+                    "starting_weapon",
+                    "starting_armour",
+                    "starting_attributes",
+                },
                 f"class '{raw_id}'",
                 optional_fields={"starting_weapons", "starting_items", "starting_abilities", "starting_level"},
             )
@@ -88,6 +97,9 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 starting_items = {}
             starting_level = self._require_int(class_data.get("starting_level", 1), f"class '{raw_id}' starting_level")
             self._starting_levels[raw_id] = starting_level
+            starting_attributes = self._parse_starting_attributes(
+                class_data.get("starting_attributes"), raw_id
+            )
 
             classes[raw_id] = ClassDef(
                 id=raw_id,
@@ -95,6 +107,7 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 base_hp=base_hp,
                 base_mp=base_mp,
                 speed=speed,
+                starting_attributes=starting_attributes,
                 starting_weapon_id=starting_weapon,
                 starting_armour_id=starting_armour,
                 starting_weapons=tuple(starting_weapons),
@@ -161,6 +174,34 @@ class ClassesRepository(RepositoryBase[ClassDef]):
         if slot not in {"head", "body", "hands", "boots"}:
             raise DataValidationError(f"{context} must be one of head, body, hands, boots.")
         return slot
+
+    def _parse_starting_attributes(self, raw_value: object, class_id: str) -> Attributes:
+        context = f"class '{class_id}' starting_attributes"
+        mapping = self._require_mapping(raw_value, context)
+        expected = {"STR", "DEX", "INT", "VIT", "BOND"}
+        actual = set(mapping.keys())
+        if actual != expected:
+            missing = expected - actual
+            extra = actual - expected
+            msg_parts: list[str] = []
+            if missing:
+                msg_parts.append(f"missing keys: {sorted(missing)}")
+            if extra:
+                msg_parts.append(f"unknown keys: {sorted(extra)}")
+            raise DataValidationError(f"{context} has schema issues ({'; '.join(msg_parts)}).")
+        values: dict[str, int] = {}
+        for key in expected:
+            value = self._require_int(mapping.get(key), f"{context}.{key}")
+            if value < 0:
+                raise DataValidationError(f"{context}.{key} must be a non-negative integer.")
+            values[key] = value
+        return Attributes(
+            STR=values["STR"],
+            DEX=values["DEX"],
+            INT=values["INT"],
+            VIT=values["VIT"],
+            BOND=values["BOND"],
+        )
 
     def _parse_starting_armour(
         self,

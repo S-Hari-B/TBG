@@ -9,8 +9,10 @@ from tbg.data.repositories import (
     ArmourRepository,
     ClassesRepository,
     EnemiesRepository,
+    FloorsRepository,
     ItemsRepository,
     KnowledgeRepository,
+    LocationsRepository,
     LootTablesRepository,
     PartyMembersRepository,
     SkillsRepository,
@@ -37,6 +39,8 @@ from tbg.services.inventory_service import InventoryService
 
 
 def _make_battle_service() -> BattleService:
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
     return BattleService(
         enemies_repo=EnemiesRepository(),
         party_members_repo=PartyMembersRepository(),
@@ -46,6 +50,8 @@ def _make_battle_service() -> BattleService:
         skills_repo=SkillsRepository(),
         items_repo=ItemsRepository(),
         loot_tables_repo=LootTablesRepository(),
+        floors_repo=floors_repo,
+        locations_repo=locations_repo,
     )
 
 
@@ -226,7 +232,7 @@ def test_party_talk_hp_estimate_is_deterministic() -> None:
 
     assert (
         talk_event.text
-        == "Emma: Goblin Grunt look to have around 20-25 HP. Average, but quicker than most untrained adventurers. Often attack in groups and try to overwhelm isolated targets."
+        == "Emma: Goblin Grunt look to have around 40-45 HP. Average, but quicker than most untrained adventurers. Often attack in groups and try to overwhelm isolated targets."
     )
 
 
@@ -305,6 +311,29 @@ def test_level_up_restores_player_hp_and_mp() -> None:
     assert state.player.stats.mp == state.player.stats.max_mp
 
 
+def test_level_up_recalculates_attribute_scaled_stats() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    assert state.player is not None
+    base = state.player.base_stats
+    # Simulate unscaled stats to ensure recalculation runs.
+    state.player.stats.max_hp = base.max_hp
+    state.player.stats.max_mp = base.max_mp
+    state.player.stats.attack = base.attack
+    state.player.stats.speed = base.speed
+
+    service._award_exp(state, state.player.id, 20)
+
+    expected_max_hp = base.max_hp + state.player.attributes.VIT * 3
+    expected_max_mp = base.max_mp + state.player.attributes.INT * 2
+    expected_attack = base.attack + state.player.attributes.STR
+    expected_speed = base.speed + state.player.attributes.DEX
+    assert state.player.stats.max_hp == expected_max_hp
+    assert state.player.stats.max_mp == expected_max_mp
+    assert state.player.stats.attack == expected_attack
+    assert state.player.stats.speed == expected_speed
+
+
 def test_party_ai_prefers_skill_when_available() -> None:
     service = _make_battle_service()
     state = _make_state()
@@ -345,6 +374,54 @@ def test_apply_victory_rewards_grants_gold_exp_and_loot() -> None:
     assert any(isinstance(evt, LootAcquiredEvent) for evt in events)
 
 
+def test_enemy_scaling_floor_zero_no_change() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    state.current_location_id = "threshold_inn"
+
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+
+    enemy = battle_state.enemies[0]
+    assert enemy.stats.max_hp == 42
+    assert enemy.stats.attack == 17
+    assert enemy.stats.defense == 8
+    assert enemy.stats.speed == 8
+
+
+def test_enemy_scaling_floor_one_applies() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    state.current_location_id = "floor_one_gate"
+
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+
+    enemy = battle_state.enemies[0]
+    assert enemy.stats.max_hp == 52
+    assert enemy.stats.attack == 19
+    assert enemy.stats.defense == 9
+    assert enemy.stats.speed == 8
+
+
+def test_enemy_scaling_deterministic_for_same_seed() -> None:
+    service = _make_battle_service()
+    state_a = _make_state(seed=444, with_party=False)
+    state_b = _make_state(seed=444, with_party=False)
+    state_a.current_location_id = "floor_one_gate"
+    state_b.current_location_id = "floor_one_gate"
+
+    battle_a, _ = service.start_battle("goblin_grunt", state_a)
+    battle_b, _ = service.start_battle("goblin_grunt", state_b)
+
+    stats_a = battle_a.enemies[0].stats
+    stats_b = battle_b.enemies[0].stats
+    assert (stats_a.max_hp, stats_a.attack, stats_a.defense, stats_a.speed) == (
+        stats_b.max_hp,
+        stats_b.attack,
+        stats_b.defense,
+        stats_b.speed,
+    )
+
+
 def test_optional_loot_drop_is_deterministic_by_seed(tmp_path) -> None:
     loot_dir = tmp_path / "loot_defs"
     loot_dir.mkdir()
@@ -365,6 +442,8 @@ def test_optional_loot_drop_is_deterministic_by_seed(tmp_path) -> None:
     )
 
     def _drops(seed: int) -> bool:
+        floors_repo = FloorsRepository()
+        locations_repo = LocationsRepository(floors_repo=floors_repo)
         service = BattleService(
             enemies_repo=EnemiesRepository(),
             party_members_repo=PartyMembersRepository(),
@@ -374,6 +453,8 @@ def test_optional_loot_drop_is_deterministic_by_seed(tmp_path) -> None:
             skills_repo=SkillsRepository(),
             items_repo=ItemsRepository(),
             loot_tables_repo=LootTablesRepository(base_path=loot_dir),
+            floors_repo=floors_repo,
+            locations_repo=locations_repo,
         )
         state = _make_state(with_party=False)
         battle_state, _ = service.start_battle("goblin_grunt", state)
@@ -407,7 +488,7 @@ def test_single_target_skill_applies_damage_and_cost() -> None:
     events = service.use_skill(battle_state, state.player.id, "skill_power_slash", [enemy_id])
 
     assert any(isinstance(evt, SkillUsedEvent) for evt in events)
-    assert battle_state.enemies[0].stats.hp == 12  # 22 - 10 damage
+    assert battle_state.enemies[0].stats.hp == 30  # 42 - 12 damage
     assert state.player.stats.mp == initial_mp - 3
 
 
@@ -423,7 +504,7 @@ def test_multi_target_skill_hits_up_to_three_targets() -> None:
     assert sum(isinstance(evt, SkillUsedEvent) for evt in events) == 3
     assert state.player.stats.mp == initial_mp - 6
     for enemy in battle_state.enemies:
-        assert enemy.stats.hp == 18  # 22 - 4
+        assert enemy.stats.hp == 41  # 42 - 1
 
 
 def test_guard_reduces_next_damage_then_expires() -> None:
@@ -589,6 +670,7 @@ def test_use_item_consumes_even_without_effect() -> None:
     battle_state, _ = service.start_battle("goblin_grunt", state)
     assert state.player is not None
     player = next(ally for ally in battle_state.allies if ally.instance_id == state.player.id)
+    player.stats.hp = player.stats.max_hp
     qty_before = state.inventory.items.get("potion_hp_small", 0)
 
     events = service.use_item(battle_state, state, player.instance_id, "potion_hp_small", player.instance_id)

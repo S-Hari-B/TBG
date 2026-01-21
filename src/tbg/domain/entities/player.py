@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .attributes import Attributes
+from .base_stats import BaseStats
 from .stats import Stats
 
 
@@ -14,6 +16,8 @@ class Player:
     name: str
     class_id: str
     stats: Stats
+    attributes: Attributes
+    base_stats: BaseStats
 
 
 

@@ -13,6 +13,7 @@ Layers:
 * Never computes combat outcomes or modifies domain objects directly
 * Debug-only instrumentation (seed/node/location headers, Location Debug menu, extra load slot metadata) lives exclusively in this layer so lower layers stay pure
   * Owns the boxed battle renderer: 60-character ASCII panels for turn headers, battlefield snapshots, per-turn results, and player-only menus. Services only expose structured `BattleView` snapshots/events, keeping layout concerns isolated to the CLI. Long text in boxed panels (RESULTS, Party Talk) is word-wrapped at render time to preserve readability without breaking the fixed 60-char borders.
+  * The battle state panel is width-aware in the CLI and expands columns when the terminal allows; debug-only enemy scaling details are rendered as wrapped second lines.
 * **Battle rendering is tied to decision points, not input loops**: The state panel renders once per player turn, regardless of invalid input retries. See `battle_controller.md`.
 
 ## services (orchestration)
@@ -21,6 +22,7 @@ Layers:
 * Loads definitions via repositories
 * Constructs domain entities using factories
 * Owns GameState (overall runtime state)
+* Initializes base attributes from definitions, persists them through SaveService, and keeps them purely informational until future scaling work lands
 * Returns structured results and events for presentation to render
 * Implements persistence orchestration (`SaveService`) to serialize/deserialize `GameState` + RNG snapshots, validate ids against current definitions, and guard against schema/version drift
 * Maintains auxiliary services such as `AreaServiceV2` (floor-based location state, travel events, entry-story hooks), `QuestService` (quest acceptance/progress/turn-in), `ShopService` (deterministic shop stock + transactions), and `SaveService` (v2 save format validated against `locations.json`) so the CLI stays declarative and story remains data-driven
@@ -32,6 +34,9 @@ Layers:
 * Entities: actors, party members, enemies, inventory state
 * Combat rules, actions, effects, initiative
 * No printing, no file I/O, no input(), no global randomness
+* Attribute scaling lives in a domain helper that turns base stats + attributes into derived combat stats
+* Base stats are computed in services from class baselines + equipment, then passed into the domain helper for final stats
+* Enemy stat scaling lives in a domain helper and is applied in BattleService using floor/area levels from repositories
 
 ## data (definitions and loading)
 

@@ -63,6 +63,8 @@ def _make_story_service() -> StoryService:
 
 
 def _make_battle_service() -> BattleService:
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
     return BattleService(
         enemies_repo=EnemiesRepository(),
         party_members_repo=PartyMembersRepository(),
@@ -72,6 +74,8 @@ def _make_battle_service() -> BattleService:
         skills_repo=SkillsRepository(),
         items_repo=ItemsRepository(),
         loot_tables_repo=LootTablesRepository(),
+        floors_repo=floors_repo,
+        locations_repo=locations_repo,
     )
 
 
