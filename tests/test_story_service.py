@@ -15,6 +15,7 @@ from tbg.data.repositories import (
     StoryRepository,
     WeaponsRepository,
 )
+from tbg.domain.defs import StoryEffectDef
 from tbg.services.story_service import (
     BattleRequestedEvent,
     GameMenuEnteredEvent,
@@ -85,7 +86,7 @@ def test_story_repository_loads_nodes() -> None:
     arrival_node = repo.get("arrival_beach_wake")
 
     assert class_node.text
-    assert len(class_node.choices) == 4
+    assert len(class_node.choices) == 5
     assert arrival_node.next_node_id == "arrival_beach_rescue"
 
 
@@ -198,6 +199,17 @@ def test_companion_choice_affects_party() -> None:
     assert "niale" in state.party_members
     assert "emma" not in state.party_members
     assert state.flags.get("flag_companion_niale") is True
+
+
+def test_beastmaster_starts_with_default_equipped_summons() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=123, player_name="Hero")
+
+    effects = [StoryEffectDef(type="set_class", data={"class_id": "beastmaster"})]
+    service._apply_effects(effects, state)
+
+    assert state.player is not None
+    assert state.player.equipped_summons == ["micro_raptor", "micro_raptor"]
     assert state.flags.get("flag_companion_emma") is not True
 
 

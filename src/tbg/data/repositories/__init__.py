@@ -14,6 +14,7 @@ from .floors_repo import FloorsRepository
 from .locations_repo import LocationsRepository
 from .quests_repo import QuestsRepository
 from .shops_repo import ShopsRepository
+from .summons_repo import SummonsRepository
 
 __all__ = [
     "ItemsRepository",
@@ -30,6 +31,7 @@ __all__ = [
     "LocationsRepository",
     "QuestsRepository",
     "ShopsRepository",
+    "SummonsRepository",
 ]
 
 

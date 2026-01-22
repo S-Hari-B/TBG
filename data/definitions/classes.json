@@ -110,5 +110,34 @@
       "armor_sunder_powder": 1
     },
     "starting_level": 1
+  },
+  "beastmaster": {
+    "name": "Beastmaster",
+    "base_hp": 34,
+    "base_mp": 8,
+    "speed": 6,
+    "starting_attributes": {
+      "STR": 5,
+      "DEX": 6,
+      "INT": 3,
+      "VIT": 4,
+      "BOND": 10
+    },
+    "starting_weapon": "iron_dagger",
+    "starting_weapons": ["iron_dagger", "shortbow"],
+    "starting_armour": {
+      "body": "medium_leather_armour_common",
+      "head": "leather_cap",
+      "hands": "leather_gloves",
+      "boots": "leather_boots"
+    },
+    "starting_items": {
+      "potion_hp_small": 1,
+      "potion_energy_small": 1,
+      "weakening_vial": 1
+    },
+    "starting_level": 1,
+    "known_summons": ["micro_raptor", "black_hawk"],
+    "default_equipped_summons": ["micro_raptor", "micro_raptor"]
   }
 }

@@ -256,6 +256,7 @@ class StoryService:
                     armour_repo=self._armour_repo,
                     rng=state.rng,
                 )
+                player.equipped_summons = list(class_def.default_equipped_summons)
                 state.player = player
                 state.member_levels[player.id] = starting_level
                 state.member_exp[player.id] = 0

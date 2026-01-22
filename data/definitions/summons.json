@@ -1,0 +1,40 @@
+{
+  "micro_raptor": {
+    "name": "Micro Raptor",
+    "max_hp": 20,
+    "max_mp": 0,
+    "attack": 6,
+    "defense": 2,
+    "speed": 7,
+    "bond_cost": 5,
+    "bond_scaling": {
+      "hp_per_bond": 1.5,
+      "atk_per_bond": 1,
+      "def_per_bond": 1,
+      "init_per_bond": 0.5
+    },
+    "tags": [
+      "beast",
+      "raptor"
+    ]
+  },
+  "black_hawk": {
+    "name": "Black Hawk",
+    "max_hp": 16,
+    "max_mp": 4,
+    "attack": 5,
+    "defense": 1,
+    "speed": 9,
+    "bond_cost": 8,
+    "bond_scaling": {
+      "hp_per_bond": 2,
+      "atk_per_bond": 1.25,
+      "def_per_bond": 1,
+      "init_per_bond": 1
+    },
+    "tags": [
+      "beast",
+      "avian"
+    ]
+  }
+}

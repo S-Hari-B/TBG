@@ -180,6 +180,7 @@ def _build_state_and_battle(enemy_hp: int) -> Tuple[GameState, BattleState]:
             defense=player_stats.defense,
             speed=player_stats.speed,
         ),
+        equipped_summons=[],
     )
     state = GameState(seed=1, rng=rng, mode="battle", current_node_id="tutorial", player=player)
     state.party_members = []

@@ -130,6 +130,7 @@ def test_save_round_trip_preserves_state() -> None:
     state.party_member_attributes[member_def.id] = member_def.starting_attributes
     state.member_levels[state.player.id] = 2
     state.member_exp[state.player.id] = 150
+    state.player.equipped_summons = ["micro_raptor", "black_hawk"]
     state.member_levels[state.party_members[0]] = 3
     state.member_exp[state.party_members[0]] = 90
     member_equipment = MemberEquipment()
@@ -164,6 +165,7 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.current_node_id == state.current_node_id
     assert restored.player == state.player
     assert restored.player.attributes == state.player.attributes
+    assert restored.player.equipped_summons == state.player.equipped_summons
     assert restored.inventory.weapons == state.inventory.weapons
     assert restored.inventory.armour == state.inventory.armour
     assert restored.inventory.items == state.inventory.items
@@ -183,6 +185,29 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.party_member_attributes == state.party_member_attributes
     assert "cerel_kill_hunt" in restored.quests_active
     assert restored.quests_completed == state.quests_completed
+
+
+def test_missing_equipped_summons_defaults_to_empty() -> None:
+    (
+        story_service,
+        _,
+        _,
+        save_service,
+        area_service,
+        _,
+    ) = _build_test_services()
+    state = story_service.start_new_game(seed=321, player_name="Hero")
+    area_service.initialize_state(state)
+    area_service.initialize_state(state)
+    story_service.choose(state, 0)
+
+    payload = save_service.serialize(state)
+    assert payload["state"]["player"]["equipped_summons"] == []
+    del payload["state"]["player"]["equipped_summons"]
+    restored = save_service.deserialize(payload)
+
+    assert restored.player is not None
+    assert restored.player.equipped_summons == []
 
 
 def test_rng_determinism_survives_save_round_trip() -> None:

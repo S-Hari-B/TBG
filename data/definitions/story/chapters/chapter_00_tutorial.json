@@ -23,7 +23,7 @@
     "next": "class_overview"
   },
   "class_overview": {
-    "text": "Cerel nods. \"Class selection is permanent for most. It shapes your combat style, your growth, your role in a party.\"\n\nHe gestures to a worn chart on the wall:\n\n**Warrior**: Frontline durability. High HP, solid defense. Reliable damage, shield skills.\n\n**Rogue**: Speed and precision. Lower HP, high evasion. Strong single-target burst.\n\n**Mage**: Ranged magic. Fragile, but devastating area attacks. MP-hungry.\n\n**Commoner**: Unspecialized. Balanced stats, no clear strengths. A challenge run for veterans.\n\n\"Take your time. This choice matters.\"",
+    "text": "Cerel nods. \"Class selection is permanent for most. It shapes your combat style, your growth, your role in a party.\"\n\nHe gestures to a worn chart on the wall:\n\n**Warrior**: Frontline durability. High HP, solid defense. Reliable damage, shield skills.\n\n**Rogue**: Speed and precision. Lower HP, high evasion. Strong single-target burst.\n\n**Mage**: Ranged magic. Fragile, but devastating area attacks. MP-hungry.\n\n**Beastmaster**: Command of allies. Balanced stats, bonded summons, flexible support.\n\n**Commoner**: Unspecialized. Balanced stats, no clear strengths. A challenge run for veterans.\n\n\"Take your time. This choice matters.\"",
     "next": "class_select"
   },
   "class_select": {
@@ -59,6 +59,14 @@
         "effects": [
           { "type": "set_class", "class_id": "commoner" },
           { "type": "set_flag", "flag_id": "flag_class_selected_commoner", "value": true }
+        ]
+      },
+      { 
+        "label": "Beastmaster", 
+        "next": "class_confirm",
+        "effects": [
+          { "type": "set_class", "class_id": "beastmaster" },
+          { "type": "set_flag", "flag_id": "flag_class_selected_beastmaster", "value": true }
         ]
       }
     ]

@@ -69,6 +69,7 @@ def create_player_from_class_id(
         stats=stats,
         attributes=attributes,
         base_stats=base_stats,
+        equipped_summons=[],
     )
 
 

@@ -60,6 +60,7 @@ def _build_battle_controller() -> tuple[BattleController, GameState, BattleState
         stats=Stats(max_hp=30, hp=30, max_mp=5, mp=5, attack=5, defense=2, speed=10),
         attributes=Attributes(STR=6, DEX=4, INT=2, VIT=6, BOND=0),
         base_stats=BaseStats(max_hp=30, max_mp=5, attack=5, defense=2, speed=10),
+        equipped_summons=[],
     )
     state = GameState(seed=42, rng=rng, mode="battle", current_node_id="test", player=player)
 

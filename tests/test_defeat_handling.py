@@ -66,6 +66,7 @@ def _make_state() -> GameState:
         stats=Stats(max_hp=30, hp=0, max_mp=10, mp=0, attack=5, defense=2, speed=5),
         attributes=Attributes(STR=6, DEX=4, INT=2, VIT=6, BOND=0),
         base_stats=BaseStats(max_hp=30, max_mp=10, attack=5, defense=2, speed=5),
+        equipped_summons=[],
     )
     state.gold = 100
     return state
@@ -88,6 +89,7 @@ def test_open_area_defeat_does_not_rewind_and_keeps_location(monkeypatch) -> Non
         inventory_service=_StubInventoryService(),
         quest_service=object(),
         shop_service=object(),
+        summon_loadout_service=_StubInventoryService(),
         state=state,
         save_service=_StubSaveService(),
         slot_store=_StubSlotStore(),
@@ -121,6 +123,7 @@ def test_story_defeat_rewinds_and_restores(monkeypatch) -> None:
         inventory_service=_StubInventoryService(),
         quest_service=object(),
         shop_service=object(),
+        summon_loadout_service=_StubInventoryService(),
         state=state,
         save_service=_StubSaveService(),
         slot_store=_StubSlotStore(),
@@ -152,6 +155,7 @@ def test_open_area_defeat_does_not_leak_context(monkeypatch) -> None:
         inventory_service=_StubInventoryService(),
         quest_service=object(),
         shop_service=object(),
+        summon_loadout_service=_StubInventoryService(),
         state=state,
         save_service=_StubSaveService(),
         slot_store=_StubSlotStore(),
@@ -167,6 +171,7 @@ def test_open_area_defeat_does_not_leak_context(monkeypatch) -> None:
         inventory_service=_StubInventoryService(),
         quest_service=object(),
         shop_service=object(),
+        summon_loadout_service=_StubInventoryService(),
         state=state,
         save_service=_StubSaveService(),
         slot_store=_StubSlotStore(),

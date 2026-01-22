@@ -15,6 +15,7 @@ from tbg.data.repositories import (
     LocationsRepository,
     PartyMembersRepository,
     SkillsRepository,
+    SummonsRepository,
     WeaponsRepository,
 )
 from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
@@ -33,11 +34,11 @@ from tbg.domain.debuffs import (
     compute_effective_defense,
 )
 from tbg.domain.item_effects import apply_item_effects
-from tbg.domain.entities import BaseStats, Stats
+from tbg.domain.entities import Attributes, BaseStats, Stats
 from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment
 from tbg.domain.state import GameState
 from tbg.services.errors import FactoryError
-from tbg.services.factories import create_enemy_instance, make_instance_id
+from tbg.services.factories import create_enemy_instance, create_summon_combatant, make_instance_id
 from tbg.services.quest_service import QuestService
 
 
@@ -79,6 +80,25 @@ class BattleStartedEvent(BattleEvent):
     scaling_attack_per_level: int | None = None
     scaling_defense_per_level: int | None = None
     scaling_speed_per_level: int | None = None
+
+
+@dataclass(slots=True)
+class SummonSpawnedEvent(BattleEvent):
+    owner_id: str
+    summon_id: str
+    summon_instance_id: str
+    summon_name: str
+    bond_cost: int | None = None
+    owner_bond: int | None = None
+    base_stats: Stats | None = None
+    scaled_stats: Stats | None = None
+
+
+@dataclass(slots=True)
+class SummonAutoSpawnDebugEvent(BattleEvent):
+    bond_capacity: int
+    equipped_summons: List[str]
+    decisions: List[tuple[str, int, bool]]
 
 
 @dataclass(slots=True)
@@ -219,6 +239,7 @@ class BattleService:
         skills_repo: SkillsRepository,
         items_repo: ItemsRepository,
         loot_tables_repo: LootTablesRepository,
+        summons_repo: SummonsRepository | None = None,
         floors_repo: FloorsRepository | None = None,
         locations_repo: LocationsRepository | None = None,
         quest_service: QuestService | None = None,
@@ -232,6 +253,7 @@ class BattleService:
         self._items_repo = items_repo
         self._loot_tables_repo = loot_tables_repo
         self._loot_tables_cache: List[LootTableDef] | None = None
+        self._summons_repo = summons_repo or SummonsRepository()
         self._floors_repo = floors_repo
         self._locations_repo = locations_repo
         self._quest_service = quest_service
@@ -284,12 +306,6 @@ class BattleService:
         battle_id = make_instance_id("battle", state.rng)
         player_id = state.player.id if state.player else None
         battle_state = BattleState(battle_id=battle_id, allies=allies, enemies=enemies, player_id=player_id)
-        self._rebuild_turn_queue(battle_state)
-        if battle_state.turn_queue:
-            battle_state.current_actor_id = battle_state.turn_queue[0]
-            battle_state.round_last_actor_id = battle_state.turn_queue[-1]
-        else:
-            battle_state.round_last_actor_id = None
 
         events = [
             BattleStartedEvent(
@@ -306,7 +322,92 @@ class BattleService:
                 scaling_speed_per_level=SPEED_PER_LEVEL,
             )
         ]
+        events.extend(self._auto_spawn_equipped_summons(state, battle_state))
+        self._rebuild_turn_queue(battle_state)
+        if battle_state.turn_queue:
+            battle_state.current_actor_id = battle_state.turn_queue[0]
+            battle_state.round_last_actor_id = battle_state.turn_queue[-1]
+        else:
+            battle_state.round_last_actor_id = None
         return battle_state, events
+
+    def _auto_spawn_equipped_summons(
+        self,
+        state: GameState,
+        battle_state: BattleState,
+    ) -> List[BattleEvent]:
+        if not state.player:
+            return []
+        equipped = list(state.player.equipped_summons)
+        if not equipped:
+            return []
+        remaining = state.player.attributes.BOND
+        if remaining <= 0:
+            return []
+        events: List[BattleEvent] = []
+        decisions: List[tuple[str, int, bool]] = []
+        for summon_id in equipped:
+            summon_def = self._summons_repo.get(summon_id)
+            if summon_def.bond_cost > remaining:
+                decisions.append((summon_id, summon_def.bond_cost, False))
+                break
+            events.extend(
+                self._spawn_summon_into_battle(
+                    state,
+                    battle_state,
+                    owner_id=state.player.id,
+                    owner_bond=self._resolve_owner_bond(state, state.player.id),
+                    summon_id=summon_id,
+                )
+            )
+            decisions.append((summon_id, summon_def.bond_cost, True))
+            remaining -= summon_def.bond_cost
+        events.append(
+            SummonAutoSpawnDebugEvent(
+                bond_capacity=state.player.attributes.BOND,
+                equipped_summons=equipped,
+                decisions=decisions,
+            )
+        )
+        return events
+
+    def _spawn_summon_into_battle(
+        self,
+        state: GameState,
+        battle_state: BattleState,
+        owner_id: str,
+        owner_bond: int,
+        summon_id: str,
+    ) -> List[BattleEvent]:
+        if not any(ally.instance_id == owner_id for ally in battle_state.allies):
+            raise ValueError(f"Summon owner '{owner_id}' not found among allies.")
+
+        summon = create_summon_combatant(
+            summon_id,
+            summons_repo=self._summons_repo,
+            owner_id=owner_id,
+            owner_bond=owner_bond,
+            rng=state.rng,
+        )
+        battle_state.allies.append(summon)
+        self._rebuild_turn_queue(battle_state)
+        return [
+            SummonSpawnedEvent(
+                owner_id=owner_id,
+                summon_id=summon_id,
+                summon_instance_id=summon.instance_id,
+                summon_name=summon.display_name,
+                bond_cost=summon.bond_cost,
+                owner_bond=owner_bond,
+                base_stats=summon.base_stats,
+                scaled_stats=summon.stats,
+            )
+        ]
+
+    def _resolve_owner_bond(self, state: GameState, owner_id: str) -> int:
+        if state.player and state.player.id == owner_id:
+            return state.player.attributes.BOND
+        return state.party_member_attributes.get(owner_id, Attributes(STR=0, DEX=0, INT=0, VIT=0, BOND=0)).BOND
 
     def _resolve_battle_level(self, state: GameState) -> BattleLevelInfo:
         if not state.current_location_id or not self._locations_repo or not self._floors_repo:

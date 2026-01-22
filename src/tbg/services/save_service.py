@@ -236,6 +236,7 @@ class SaveService:
             "id": player.id,
             "name": player.name,
             "class_id": player.class_id,
+            "equipped_summons": list(player.equipped_summons),
             "stats": {
                 "max_hp": player.stats.max_hp,
                 "hp": player.stats.hp,
@@ -648,6 +649,10 @@ class SaveService:
         player_id = self._require_str(mapping.get("id"), "state.player.id")
         name = self._require_str(mapping.get("name"), "state.player.name")
         class_id = self._require_str(mapping.get("class_id"), "state.player.class_id")
+        equipped_summons = self._coerce_str_list(
+            mapping.get("equipped_summons"),
+            "state.player.equipped_summons",
+        )
         try:
             class_def = self._classes_repo.get(class_id)
         except KeyError as exc:
@@ -686,6 +691,7 @@ class SaveService:
             stats=stats,
             attributes=attributes,
             base_stats=base_stats,
+            equipped_summons=equipped_summons,
         )
 
     def _recalculate_player_stats(self, state: GameState) -> None:

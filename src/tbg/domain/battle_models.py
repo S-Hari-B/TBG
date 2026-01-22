@@ -24,10 +24,20 @@ class Combatant:
     guard_reduction: int = 0
     source_id: str | None = None  # original definition id
     debuffs: List[ActiveDebuff] = field(default_factory=list)
+    owner_id: str | None = None
+    bond_cost: int | None = None
 
     @property
     def is_alive(self) -> bool:
         return self.stats.hp > 0
+
+
+def is_summon(combatant: Combatant) -> bool:
+    return combatant.owner_id is not None
+
+
+def summon_owner_id(combatant: Combatant) -> str | None:
+    return combatant.owner_id
 
 
 @dataclass(slots=True)

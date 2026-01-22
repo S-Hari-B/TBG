@@ -25,6 +25,7 @@ from .story_def import StoryChoiceDef, StoryEffectDef, StoryNodeDef
 from .party_member_def import PartyMemberDef
 from .knowledge_def import KnowledgeEntry
 from .skill_def import SkillDef
+from .summon_def import BondScaling, SummonDef
 from .weapon_def import WeaponDef
 
 __all__ = [
@@ -54,6 +55,8 @@ __all__ = [
     "StoryNodeDef",
     "StoryEffectDef",
     "SkillDef",
+    "BondScaling",
+    "SummonDef",
     "WeaponDef",
 ]
 

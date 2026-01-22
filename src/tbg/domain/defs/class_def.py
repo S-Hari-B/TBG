@@ -21,3 +21,5 @@ class ClassDef:
     starting_weapons: Tuple[str, ...] = ()
     starting_armour_slots: Dict[str, str] = field(default_factory=dict)
     starting_items: Dict[str, int] = field(default_factory=dict)
+    known_summons: Tuple[str, ...] = ()
+    default_equipped_summons: Tuple[str, ...] = ()

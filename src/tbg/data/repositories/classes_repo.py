@@ -7,6 +7,7 @@ from tbg.data.errors import DataReferenceError, DataValidationError
 from tbg.data.repositories.armour_repo import ArmourRepository
 from tbg.data.repositories.base import RepositoryBase
 from tbg.data.repositories.weapons_repo import WeaponsRepository
+from tbg.data.repositories.summons_repo import SummonsRepository
 from tbg.domain.defs import ClassDef
 from tbg.domain.entities import Attributes
 
@@ -18,11 +19,13 @@ class ClassesRepository(RepositoryBase[ClassDef]):
         self,
         weapons_repo: WeaponsRepository | None = None,
         armour_repo: ArmourRepository | None = None,
+        summons_repo: SummonsRepository | None = None,
         base_path=None,
     ) -> None:
         super().__init__("classes.json", base_path)
         self._weapons_repo = weapons_repo or WeaponsRepository(base_path=base_path)
         self._armour_repo = armour_repo or ArmourRepository(base_path=base_path)
+        self._summons_repo = summons_repo or SummonsRepository(base_path=base_path)
         self._starting_levels: Dict[str, int] = {}
 
     def _build(self, raw: dict[str, object]) -> Dict[str, ClassDef]:
@@ -47,7 +50,14 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                     "starting_attributes",
                 },
                 f"class '{raw_id}'",
-                optional_fields={"starting_weapons", "starting_items", "starting_abilities", "starting_level"},
+                optional_fields={
+                    "starting_weapons",
+                    "starting_items",
+                    "starting_abilities",
+                    "starting_level",
+                    "known_summons",
+                    "default_equipped_summons",
+                },
             )
 
             name = self._require_str(class_data["name"], f"class '{raw_id}' name")
@@ -100,6 +110,12 @@ class ClassesRepository(RepositoryBase[ClassDef]):
             starting_attributes = self._parse_starting_attributes(
                 class_data.get("starting_attributes"), raw_id
             )
+            known_summons = self._parse_known_summons(class_data.get("known_summons"), raw_id)
+            default_equipped_summons = self._parse_default_equipped_summons(
+                class_data.get("default_equipped_summons"),
+                raw_id,
+                known_summons,
+            )
 
             classes[raw_id] = ClassDef(
                 id=raw_id,
@@ -113,6 +129,8 @@ class ClassesRepository(RepositoryBase[ClassDef]):
                 starting_weapons=tuple(starting_weapons),
                 starting_armour_slots=armour_slots,
                 starting_items=starting_items,
+                known_summons=known_summons,
+                default_equipped_summons=default_equipped_summons,
             )
         return classes
 
@@ -202,6 +220,47 @@ class ClassesRepository(RepositoryBase[ClassDef]):
             VIT=values["VIT"],
             BOND=values["BOND"],
         )
+
+    def _parse_known_summons(self, raw_value: object, class_id: str) -> tuple[str, ...]:
+        if raw_value is None:
+            return ()
+        summon_ids = self._require_str_list(raw_value, f"class '{class_id}' known_summons")
+        if not summon_ids:
+            return ()
+        known: list[str] = []
+        for summon_id in summon_ids:
+            try:
+                self._summons_repo.get(summon_id)
+            except KeyError as exc:
+                raise DataReferenceError(
+                    f"class '{class_id}' references missing summon '{summon_id}'."
+                ) from exc
+            known.append(summon_id)
+        return tuple(known)
+
+    def _parse_default_equipped_summons(
+        self,
+        raw_value: object,
+        class_id: str,
+        known_summons: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        if raw_value is None:
+            return ()
+        if not known_summons:
+            raise DataValidationError(
+                f"class '{class_id}' default_equipped_summons requires known_summons."
+            )
+        summon_ids = self._require_str_list(
+            raw_value, f"class '{class_id}' default_equipped_summons"
+        )
+        defaulted: list[str] = []
+        for summon_id in summon_ids:
+            if summon_id not in known_summons:
+                raise DataValidationError(
+                    f"class '{class_id}' default_equipped_summons includes unknown summon '{summon_id}'."
+                )
+            defaulted.append(summon_id)
+        return tuple(defaulted)
 
     def _parse_starting_armour(
         self,

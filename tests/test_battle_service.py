@@ -16,6 +16,7 @@ from tbg.data.repositories import (
     LootTablesRepository,
     PartyMembersRepository,
     SkillsRepository,
+    SummonsRepository,
     WeaponsRepository,
 )
 from tbg.domain.battle_models import BattleState, Combatant
@@ -32,6 +33,7 @@ from tbg.services.battle_service import (
     ItemUsedEvent,
     LootAcquiredEvent,
     PartyTalkEvent,
+    SummonSpawnedEvent,
     SkillUsedEvent,
 )
 from tbg.services.factories import create_player_from_class_id
@@ -111,6 +113,89 @@ def test_start_battle_group_enemy_creates_multiple_enemies() -> None:
     assert len(set(names)) == len(names)
     assert all("(" in name for name in names)
     assert len({id(enemy) for enemy in battle_state.enemies}) == len(battle_state.enemies)
+
+
+def test_auto_spawn_equipped_summons_respects_bond_capacity() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False, class_id="beastmaster")
+    assert state.player is not None
+    state.player.attributes.BOND = 10
+    state.player.equipped_summons = ["micro_raptor", "micro_raptor"]
+
+    battle_state, events = service.start_battle("goblin_grunt", state)
+
+    summons = [ally for ally in battle_state.allies if "summon" in ally.tags]
+    assert len(summons) == 2
+    assert all(summon.owner_id == state.player.id for summon in summons)
+    assert [summon.source_id for summon in summons] == ["micro_raptor", "micro_raptor"]
+    assert [summon.bond_cost for summon in summons] == [5, 5]
+    summon_def = SummonsRepository().get("micro_raptor")
+    expected_attack = summon_def.attack + state.player.attributes.BOND * summon_def.bond_scaling.atk_per_bond
+    assert summons[0].stats.attack == expected_attack
+    assert sum(isinstance(evt, SummonSpawnedEvent) for evt in events) == 2
+
+
+def test_auto_spawn_stops_when_capacity_exceeded() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False, class_id="beastmaster")
+    assert state.player is not None
+    state.player.attributes.BOND = 8
+    state.player.equipped_summons = ["micro_raptor", "micro_raptor"]
+
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+
+    summons = [ally for ally in battle_state.allies if "summon" in ally.tags]
+    assert len(summons) == 1
+    assert summons[0].source_id == "micro_raptor"
+
+
+def test_auto_spawn_respects_order_and_stop_rule() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False, class_id="beastmaster")
+    assert state.player is not None
+    state.player.attributes.BOND = 10
+    state.player.equipped_summons = ["black_hawk", "micro_raptor"]
+
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+
+    summons = [ally for ally in battle_state.allies if "summon" in ally.tags]
+    assert len(summons) == 1
+    assert summons[0].source_id == "black_hawk"
+
+
+def test_auto_spawn_deterministic_for_same_seed() -> None:
+    service_a = _make_battle_service()
+    service_b = _make_battle_service()
+    state_a = _make_state(seed=555, with_party=False, class_id="beastmaster")
+    state_b = _make_state(seed=555, with_party=False, class_id="beastmaster")
+    assert state_a.player is not None
+    assert state_b.player is not None
+    state_a.player.attributes.BOND = 10
+    state_b.player.attributes.BOND = 10
+    state_a.player.equipped_summons = ["micro_raptor", "micro_raptor"]
+    state_b.player.equipped_summons = ["micro_raptor", "micro_raptor"]
+
+    battle_a, events_a = service_a.start_battle("goblin_grunt", state_a)
+    battle_b, events_b = service_b.start_battle("goblin_grunt", state_b)
+
+    summon_ids_a = [evt.summon_instance_id for evt in events_a if isinstance(evt, SummonSpawnedEvent)]
+    summon_ids_b = [evt.summon_instance_id for evt in events_b if isinstance(evt, SummonSpawnedEvent)]
+    assert summon_ids_a == summon_ids_b
+    assert battle_a.turn_queue == battle_b.turn_queue
+
+
+def test_auto_spawn_noop_when_equipped_empty() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False, class_id="beastmaster")
+    assert state.player is not None
+    state.player.attributes.BOND = 10
+    state.player.equipped_summons = []
+
+    battle_state, events = service.start_battle("goblin_grunt", state)
+
+    summons = [ally for ally in battle_state.allies if "summon" in ally.tags]
+    assert len(summons) == 0
+    assert not any(isinstance(evt, SummonSpawnedEvent) for evt in events)
 
 
 def test_basic_attack_reduces_hp_and_can_kill() -> None:
@@ -232,7 +317,7 @@ def test_party_talk_hp_estimate_is_deterministic() -> None:
 
     assert (
         talk_event.text
-        == "Emma: Goblin Grunt look to have around 40-45 HP. Average, but quicker than most untrained adventurers. Often attack in groups and try to overwhelm isolated targets."
+        == "Emma: Goblin Grunt look to have around 27-32 HP. Average, but quicker than most untrained adventurers. Often attack in groups and try to overwhelm isolated targets."
     )
 
 
@@ -382,8 +467,8 @@ def test_enemy_scaling_floor_zero_no_change() -> None:
     battle_state, _ = service.start_battle("goblin_grunt", state)
 
     enemy = battle_state.enemies[0]
-    assert enemy.stats.max_hp == 42
-    assert enemy.stats.attack == 17
+    assert enemy.stats.max_hp == 29  # rebalance baseline
+    assert enemy.stats.attack == 10  # 7 base + 3 weapon
     assert enemy.stats.defense == 8
     assert enemy.stats.speed == 8
 
@@ -396,8 +481,8 @@ def test_enemy_scaling_floor_one_applies() -> None:
     battle_state, _ = service.start_battle("goblin_grunt", state)
 
     enemy = battle_state.enemies[0]
-    assert enemy.stats.max_hp == 52
-    assert enemy.stats.attack == 19
+    assert enemy.stats.max_hp == 39  # +10 per level
+    assert enemy.stats.attack == 12  # +2 per level
     assert enemy.stats.defense == 9
     assert enemy.stats.speed == 8
 
@@ -488,7 +573,7 @@ def test_single_target_skill_applies_damage_and_cost() -> None:
     events = service.use_skill(battle_state, state.player.id, "skill_power_slash", [enemy_id])
 
     assert any(isinstance(evt, SkillUsedEvent) for evt in events)
-    assert battle_state.enemies[0].stats.hp == 30  # 42 - 12 damage
+    assert battle_state.enemies[0].stats.hp == 17  # 29 - 12 damage
     assert state.player.stats.mp == initial_mp - 3
 
 
@@ -504,7 +589,7 @@ def test_multi_target_skill_hits_up_to_three_targets() -> None:
     assert sum(isinstance(evt, SkillUsedEvent) for evt in events) == 3
     assert state.player.stats.mp == initial_mp - 6
     for enemy in battle_state.enemies:
-        assert enemy.stats.hp == 41  # 42 - 1
+        assert enemy.stats.hp == 28  # 29 - 1
 
 
 def test_guard_reduces_next_damage_then_expires() -> None:
@@ -519,6 +604,76 @@ def test_guard_reduces_next_damage_then_expires() -> None:
     attack_events = service.basic_attack(battle_state, enemy_id, state.player.id)
     damage_event = next(evt for evt in attack_events if isinstance(evt, AttackResolvedEvent))
     assert damage_event.damage == 0  # 5 guard absorbs the 5 damage
+
+
+def test_spawn_summon_injects_combatant_with_expected_fields() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    summon_def = SummonsRepository().get("micro_raptor")
+
+    events = service._spawn_summon_into_battle(
+        state,
+        battle_state,
+        owner_id=state.player.id,
+        owner_bond=state.player.attributes.BOND,
+        summon_id="micro_raptor",
+    )
+
+    summon = next(
+        ally for ally in battle_state.allies if ally.source_id == "micro_raptor"
+    )
+    assert summon.display_name == summon_def.name
+    assert summon.owner_id == state.player.id
+    assert summon.bond_cost == summon_def.bond_cost
+    assert summon.source_id == "micro_raptor"
+    assert "summon" in summon.tags
+    assert summon.instance_id in battle_state.turn_queue
+    assert any(isinstance(evt, SummonSpawnedEvent) for evt in events)
+
+
+def test_spawn_summon_is_deterministic_for_same_seed() -> None:
+    service_a = _make_battle_service()
+    service_b = _make_battle_service()
+    state_a = _make_state(seed=777, with_party=False)
+    state_b = _make_state(seed=777, with_party=False)
+    battle_a, _ = service_a.start_battle("goblin_grunt", state_a)
+    battle_b, _ = service_b.start_battle("goblin_grunt", state_b)
+
+    events_a = service_a._spawn_summon_into_battle(
+        state_a,
+        battle_a,
+        owner_id=state_a.player.id,
+        owner_bond=state_a.player.attributes.BOND,
+        summon_id="micro_raptor",
+    )
+    events_b = service_b._spawn_summon_into_battle(
+        state_b,
+        battle_b,
+        owner_id=state_b.player.id,
+        owner_bond=state_b.player.attributes.BOND,
+        summon_id="micro_raptor",
+    )
+
+    summon_id_a = next(evt.summon_instance_id for evt in events_a if isinstance(evt, SummonSpawnedEvent))
+    summon_id_b = next(evt.summon_instance_id for evt in events_b if isinstance(evt, SummonSpawnedEvent))
+    assert summon_id_a == summon_id_b
+    assert battle_a.turn_queue == battle_b.turn_queue
+
+
+def test_spawn_summon_rejects_unknown_owner() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+
+    with pytest.raises(ValueError):
+        service._spawn_summon_into_battle(
+            state,
+            battle_state,
+            owner_id="missing_owner",
+            owner_bond=0,
+            summon_id="micro_raptor",
+        )
 
 
 def test_attack_debuff_lasts_until_round_boundary() -> None:

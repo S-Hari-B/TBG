@@ -265,7 +265,14 @@ def _validate_classes(
                 "starting_armour",
                 "starting_attributes",
             },
-            optional={"starting_weapons", "starting_items", "starting_abilities", "starting_level"},
+            optional={
+                "starting_weapons",
+                "starting_items",
+                "starting_abilities",
+                "starting_level",
+                "known_summons",
+                "default_equipped_summons",
+            },
             context=f"class '{class_id}'",
         )
         _require_str(mapping["name"], f"class '{class_id}' name")
@@ -278,6 +285,13 @@ def _validate_classes(
         starting_weapon = _require_str(
             mapping["starting_weapon"], f"class '{class_id}' starting_weapon"
         )
+        if "known_summons" in mapping:
+            _require_str_list(mapping["known_summons"], f"class '{class_id}' known_summons")
+        if "default_equipped_summons" in mapping:
+            _require_str_list(
+                mapping["default_equipped_summons"],
+                f"class '{class_id}' default_equipped_summons",
+            )
         assert (
             starting_weapon in weapon_ids
         ), f"class '{class_id}' references missing weapon '{starting_weapon}'"

@@ -14,6 +14,14 @@ from tbg.presentation.cli.app import (
 from tbg.services.shop_service import ShopSummaryView, ShopView
 from tbg.services.area_service_v2 import AreaServiceV2
 from tbg.data.repositories import FloorsRepository, LocationsRepository
+from tbg.data.repositories import (
+    ArmourRepository,
+    ClassesRepository,
+    SummonsRepository,
+    WeaponsRepository,
+)
+from tbg.services.summon_loadout_service import SummonLoadoutService
+from tbg.services.factories import create_player_from_class_id
 from tbg.services.story_service import GameMenuEnteredEvent
 
 
@@ -21,9 +29,21 @@ def _camp_state() -> GameState:
     return GameState(seed=1, rng=RNG(1), mode="camp_menu", current_node_id="class_select")
 
 
+def _summon_service() -> SummonLoadoutService:
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    summons_repo = SummonsRepository()
+    classes_repo = ClassesRepository(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        summons_repo=summons_repo,
+    )
+    return SummonLoadoutService(classes_repo=classes_repo, summons_repo=summons_repo)
+
+
 def test_camp_menu_includes_save_option() -> None:
     state = _camp_state()
-    entries = _build_camp_menu_entries(state)
+    entries = _build_camp_menu_entries(state, _summon_service())
     labels = [label for label, _ in entries]
     assert "Save Game" in labels
     assert "Travel" in labels
@@ -32,11 +52,36 @@ def test_camp_menu_includes_save_option() -> None:
 
 def test_town_menu_includes_converse_and_quests() -> None:
     state = _camp_state()
-    entries = _build_town_menu_entries(state)
+    entries = _build_town_menu_entries(state, _summon_service())
     labels = [label for label, _ in entries]
     assert "Converse" in labels
     assert "Quests" in labels
     assert "Shops" in labels
+
+
+def test_camp_menu_includes_summons_when_known() -> None:
+    state = _camp_state()
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    summons_repo = SummonsRepository()
+    classes_repo = ClassesRepository(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        summons_repo=summons_repo,
+    )
+    state.player = create_player_from_class_id(
+        class_id="beastmaster",
+        name="Hero",
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=state.rng,
+    )
+    summon_service = SummonLoadoutService(classes_repo=classes_repo, summons_repo=summons_repo)
+
+    entries = _build_camp_menu_entries(state, summon_service)
+    labels = [label for label, _ in entries]
+    assert "Summons" in labels
 
 
 def test_main_menu_includes_load_but_not_save() -> None:
@@ -49,7 +94,7 @@ def test_main_menu_includes_load_but_not_save() -> None:
 def test_camp_menu_debug_option_hidden_without_flag(monkeypatch) -> None:
     monkeypatch.delenv("TBG_DEBUG", raising=False)
     state = _camp_state()
-    entries = _build_camp_menu_entries(state)
+    entries = _build_camp_menu_entries(state, _summon_service())
     labels = [label for label, _ in entries]
     assert all("Location Debug" not in label for label in labels)
 
@@ -57,7 +102,7 @@ def test_camp_menu_debug_option_hidden_without_flag(monkeypatch) -> None:
 def test_town_menu_debug_option_hidden_without_flag(monkeypatch) -> None:
     monkeypatch.delenv("TBG_DEBUG", raising=False)
     state = _camp_state()
-    entries = _build_town_menu_entries(state)
+    entries = _build_town_menu_entries(state, _summon_service())
     labels = [label for label, _ in entries]
     assert all("Location Debug" not in label for label in labels)
 
@@ -65,7 +110,7 @@ def test_town_menu_debug_option_hidden_without_flag(monkeypatch) -> None:
 def test_camp_menu_debug_option_visible_with_flag(monkeypatch) -> None:
     monkeypatch.setenv("TBG_DEBUG", "1")
     state = _camp_state()
-    entries = _build_camp_menu_entries(state)
+    entries = _build_camp_menu_entries(state, _summon_service())
     labels = [label for label, _ in entries]
     assert any("Location Debug" in label for label in labels)
 
@@ -73,7 +118,7 @@ def test_camp_menu_debug_option_visible_with_flag(monkeypatch) -> None:
 def test_town_menu_debug_option_visible_with_flag(monkeypatch) -> None:
     monkeypatch.setenv("TBG_DEBUG", "1")
     state = _camp_state()
-    entries = _build_town_menu_entries(state)
+    entries = _build_town_menu_entries(state, _summon_service())
     labels = [label for label, _ in entries]
     assert any("Location Debug" in label for label in labels)
 
@@ -107,6 +152,7 @@ def test_interlude_reselects_menu_after_travel(monkeypatch) -> None:
         inventory_service=object(),
         quest_service=object(),
         shop_service=object(),
+        summon_loadout_service=_summon_service(),
         state=state,
         save_service=object(),
         slot_store=object(),
@@ -125,7 +171,7 @@ def test_town_menu_shops_dispatch(monkeypatch) -> None:
         del shop_service, area_service, state_arg
         calls["count"] += 1
 
-    def fake_menu_entries(_state):
+    def fake_menu_entries(_state, _summon_service):
         return [("Shops", "shops"), ("Quit to Main Menu", "quit")]
 
     choices = iter([0, 1])
@@ -140,6 +186,7 @@ def test_town_menu_shops_dispatch(monkeypatch) -> None:
         inventory_service=object(),
         quest_service=object(),
         shop_service=object(),
+        summon_loadout_service=_summon_service(),
         state=state,
         save_service=object(),
         slot_store=object(),
@@ -213,13 +260,14 @@ def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> Non
         inventory_service,
         quest_service_arg,
         shop_service_arg,
+        summon_loadout_service,
         state_arg,
         save_service,
         slot_store,
         battle_service,
         area_service_arg,
     ):
-        del shop_service_arg
+        del shop_service_arg, summon_loadout_service
         captured["area_service"] = area_service_arg
         captured["quest_service"] = quest_service_arg
         return [object()]
@@ -235,6 +283,7 @@ def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> Non
         inventory_service=object(),
         quest_service=quest_service,
         shop_service=object(),
+        summon_loadout_service=_summon_service(),
         state=state,
         save_service=object(),
         slot_store=object(),
@@ -378,6 +427,7 @@ def test_turn_in_check_nodes_do_not_end_demo(monkeypatch, capsys) -> None:
         area_service,
         quest_service,
         shop_service,
+        summon_loadout_service,
     ) = app._build_services()
     for node_id in ("dana_turn_in_check", "dana_protoquest_turn_in_check", "cerel_turn_in_check"):
         state = story_service.start_new_game(seed=101, player_name="Hero")
@@ -400,6 +450,7 @@ def test_turn_in_check_nodes_do_not_end_demo(monkeypatch, capsys) -> None:
                 inventory_service,
                 quest_service,
                 shop_service,
+                summon_loadout_service,
                 state,
                 save_service,
                 app.SaveSlotStore(),
