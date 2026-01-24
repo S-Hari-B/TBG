@@ -71,6 +71,20 @@ def render_heading(title: str) -> None:
     print(f"\n=== {title} ===")
 
 
+_TEXT_DISPLAY_MODE = "instant"
+
+
+def set_text_display_mode(mode: str) -> None:
+    """Set story text display mode ('instant' or 'step')."""
+    global _TEXT_DISPLAY_MODE
+    _TEXT_DISPLAY_MODE = "step" if mode == "step" else "instant"
+
+
+def get_text_display_mode() -> str:
+    """Return the current story text display mode."""
+    return _TEXT_DISPLAY_MODE
+
+
 def render_story(segments: Sequence[tuple[str, str]]) -> None:
     """Render story narration segments with optional node ids."""
     if not segments:
@@ -79,12 +93,16 @@ def render_story(segments: Sequence[tuple[str, str]]) -> None:
     if not trimmed:
         return
     render_heading("Story")
+    step_mode = _TEXT_DISPLAY_MODE == "step" and len(trimmed) > 1
     for idx, (node_id, text) in enumerate(trimmed):
         if debug_enabled():
             print(f"[{node_id}]")
         print(text)
         if idx < len(trimmed) - 1:
             print("\n---")
+            if step_mode:
+                print()
+                input("")
 
 
 def render_choices(choices: Sequence[str]) -> None:

@@ -1,6 +1,6 @@
 from tbg.core.rng import RNG
 from tbg.domain.state import GameState
-from tbg.presentation.cli import app
+from tbg.presentation.cli import app, config
 from tbg.presentation.cli.app import (
     _MENU_RESELECT,
     _build_camp_menu_entries,
@@ -12,11 +12,14 @@ from tbg.presentation.cli.app import (
     _print_startup_banner,
     _prompt_index_batch,
     _play_node_with_auto_resume,
+    _run_options_menu,
+    _run_text_display_mode_menu,
     _run_information_menu,
     _run_shop_menu,
     _show_placeholder_screen,
     _warp_to_checkpoint_location,
 )
+from tbg.presentation.cli.save_slots import SaveSlotStore, SlotMetadata
 from tbg.services.shop_service import ShopSummaryView, ShopView
 from tbg.services.area_service_v2 import AreaServiceV2
 from tbg.data.repositories import FloorsRepository, LocationsRepository
@@ -33,6 +36,7 @@ from tbg.data.repositories import (
 from tbg.services.summon_loadout_service import SummonLoadoutService
 from tbg.services.factories import create_player_from_class_id
 from tbg.services.story_service import GameMenuEnteredEvent
+from tbg.presentation.cli.render import get_text_display_mode, set_text_display_mode
 from tbg.services.inventory_service import InventoryService
 from tbg.services.story_service import StoryService
 from tbg.services.quest_service import QuestService
@@ -208,6 +212,23 @@ def test_information_menu_has_required_entries() -> None:
     ]
 
 
+def test_options_menu_label_explains_change(monkeypatch, capsys) -> None:
+    selections = iter(["2"])
+    monkeypatch.setattr("builtins.input", lambda _: next(selections))
+    _run_options_menu()
+    output = capsys.readouterr().out
+    assert "Text display mode" in output
+    assert "select to change" in output
+
+
+def test_text_display_mode_menu_explains_step(monkeypatch, capsys) -> None:
+    selections = iter(["3"])
+    monkeypatch.setattr("builtins.input", lambda _: next(selections))
+    _run_text_display_mode_menu()
+    output = capsys.readouterr().out
+    assert "Step (pause between story segments; press Enter to continue)" in output
+
+
 def test_information_menu_sections_render_and_return(monkeypatch, capsys) -> None:
     # Choose each section, then Back.
     selections = iter(["1", "", "2", "", "3", "", "4", "", "5", "", "6", "", "7"])
@@ -220,6 +241,126 @@ def test_information_menu_sections_render_and_return(monkeypatch, capsys) -> Non
     assert "How to Progress" in output
     assert "Save & Replay Expectations" in output
     assert "Credits & Version" in output
+
+
+def test_options_menu_persists_text_mode(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    monkeypatch.setattr(config, "get_default_config_path", lambda: config_path)
+    set_text_display_mode("instant")
+
+    selections = iter(["1", "2", "2"])
+    monkeypatch.setattr("builtins.input", lambda _: next(selections))
+    _run_options_menu()
+
+    assert get_text_display_mode() == "step"
+    loaded = config.load_config()
+    assert loaded["text_display_mode"] == "step"
+    set_text_display_mode("instant")
+
+
+def test_load_config_falls_back_on_corrupt_file(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    config_path.write_text("{not valid json", encoding="utf-8")
+    monkeypatch.setattr(config, "get_default_config_path", lambda: config_path)
+
+    loaded = config.load_config()
+    assert loaded["text_display_mode"] == "instant"
+
+
+def test_options_menu_cycles_text_mode(monkeypatch, tmp_path) -> None:
+    config_path = tmp_path / "config.json"
+    monkeypatch.setattr(config, "get_default_config_path", lambda: config_path)
+    set_text_display_mode("instant")
+
+    selections = iter(["1", "2", "1", "1", "2"])
+    monkeypatch.setattr("builtins.input", lambda _: next(selections))
+    _run_options_menu()
+
+    assert get_text_display_mode() == "instant"
+
+
+def test_prompt_confirmation_defaults_no(monkeypatch) -> None:
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    assert app._prompt_confirmation("Confirm?") is False
+
+
+def test_save_overwrite_requires_confirmation(monkeypatch, tmp_path) -> None:
+    (
+        story_service,
+        _battle_service,
+        _inventory_service,
+        save_service,
+        area_service,
+        _quest_service,
+        _shop_service,
+        _summon_loadout_service,
+        _attribute_service,
+    ) = app._build_services()
+    state = story_service.start_new_game(seed=1, player_name="Hero")
+    area_service.initialize_state(state)
+
+    slot_store = SaveSlotStore(base_dir=tmp_path, slot_count=1)
+    original_payload = save_service.serialize(state)
+    slot_store.write_slot(1, original_payload)
+    original_text = (tmp_path / "slot_1.json").read_text(encoding="utf-8")
+
+    selection = SlotMetadata(slot=1, exists=True, metadata=original_payload.get("metadata"))
+    monkeypatch.setattr(app, "_prompt_slot_choice", lambda *_args, **_kwargs: selection)
+    monkeypatch.setattr(app, "_prompt_confirmation", lambda *_args, **_kwargs: False)
+    app._handle_save_request(state, save_service, slot_store)
+    assert (tmp_path / "slot_1.json").read_text(encoding="utf-8") == original_text
+
+    state.gold += 10
+    monkeypatch.setattr(app, "_prompt_confirmation", lambda *_args, **_kwargs: True)
+    app._handle_save_request(state, save_service, slot_store)
+    assert (tmp_path / "slot_1.json").read_text(encoding="utf-8") != original_text
+
+
+def test_load_game_delete_flow(monkeypatch, tmp_path) -> None:
+    (
+        story_service,
+        _battle_service,
+        _inventory_service,
+        save_service,
+        area_service,
+        _quest_service,
+        _shop_service,
+        _summon_loadout_service,
+        _attribute_service,
+    ) = app._build_services()
+    state = story_service.start_new_game(seed=2, player_name="Hero")
+    area_service.initialize_state(state)
+
+    slot_store = SaveSlotStore(base_dir=tmp_path, slot_count=1)
+    slot_store.write_slot(1, save_service.serialize(state))
+    assert (tmp_path / "slot_1.json").exists()
+
+    selections = iter(["1", "2", "y", "2"])
+    monkeypatch.setattr("builtins.input", lambda _: next(selections))
+    app._load_game_flow(save_service, slot_store)
+    assert not (tmp_path / "slot_1.json").exists()
+
+
+def test_load_game_corrupt_allows_delete(monkeypatch, tmp_path) -> None:
+    (
+        _story_service,
+        _battle_service,
+        _inventory_service,
+        save_service,
+        _area_service,
+        _quest_service,
+        _shop_service,
+        _summon_loadout_service,
+        _attribute_service,
+    ) = app._build_services()
+    slot_store = SaveSlotStore(base_dir=tmp_path, slot_count=1)
+    (tmp_path / "slot_1.json").write_text("{not valid json", encoding="utf-8")
+    assert (tmp_path / "slot_1.json").exists()
+
+    selections = iter(["1", "2", "y", "2"])
+    monkeypatch.setattr("builtins.input", lambda _: next(selections))
+    app._load_game_flow(save_service, slot_store)
+    assert not (tmp_path / "slot_1.json").exists()
 
 
 def test_camp_menu_debug_option_hidden_without_flag(monkeypatch) -> None:
@@ -891,7 +1032,7 @@ def test_filter_turn_ins_by_location_npcs() -> None:
     assert [entry.quest_id for entry in filtered] == ["q1"]
 
 
-def test_turn_in_check_nodes_do_not_end_demo(monkeypatch, capsys) -> None:
+def test_turn_in_check_nodes_do_not_end_demo(monkeypatch, capsys, tmp_path) -> None:
     (
         story_service,
         battle_service,
@@ -928,7 +1069,7 @@ def test_turn_in_check_nodes_do_not_end_demo(monkeypatch, capsys) -> None:
                 attribute_service,
                 state,
                 save_service,
-                app.SaveSlotStore(),
+                app.SaveSlotStore(base_dir=tmp_path, slot_count=1),
                 area_service,
                 from_load=False,
             )

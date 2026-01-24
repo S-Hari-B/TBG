@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
 
-from tbg.data.paths import get_repo_root
+from tbg.presentation.cli import config
 
 
 @dataclass(slots=True)
@@ -23,7 +23,7 @@ class SaveSlotStore:
     """Handles slot-based persistence on disk."""
 
     def __init__(self, base_dir: Path | str | None = None, slot_count: int = 3) -> None:
-        self._base_dir = Path(base_dir) if base_dir is not None else get_repo_root() / "data" / "saves"
+        self._base_dir = Path(base_dir) if base_dir is not None else config.get_save_dir()
         self._slot_count = slot_count
 
     def list_slots(self) -> List[SlotMetadata]:
@@ -61,6 +61,15 @@ class SaveSlotStore:
         self._base_dir.mkdir(parents=True, exist_ok=True)
         path = self._slot_path(slot)
         path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+    def delete_slot(self, slot: int) -> None:
+        """Delete the requested slot payload if it exists."""
+        self._validate_slot(slot)
+        path = self._slot_path(slot)
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            return
 
     def _slot_path(self, slot: int) -> Path:
         return self._base_dir / f"slot_{slot}.json"

@@ -103,14 +103,17 @@ from tbg.services.inventory_service import (
     PartyMemberView,
     WeaponSlotView,
 )
+from . import config
 from .render import (
     debug_enabled,
+    get_text_display_mode,
     render_bullet_lines,
     render_choices,
     render_events_header,
     render_heading,
     render_menu,
     render_story,
+    set_text_display_mode,
     wrap_text_for_box,
 )
 from .save_slots import SaveSlotStore, SlotMetadata
@@ -488,6 +491,39 @@ def _run_information_menu() -> None:
             _info_credits_version()
 
 
+def _run_options_menu() -> None:
+    while True:
+        mode_label = "Instant" if get_text_display_mode() == "instant" else "Step"
+        options = [
+            f"Text display mode: {mode_label} (select to change)",
+            "Back",
+        ]
+        render_menu("Options", options)
+        choice = _prompt_menu_index(len(options))
+        if choice == 1:
+            return
+        new_mode = _run_text_display_mode_menu()
+        if new_mode is None:
+            continue
+        set_text_display_mode(new_mode)
+        config.save_config({"text_display_mode": new_mode})
+
+
+def _run_text_display_mode_menu() -> str | None:
+    options = [
+        "Instant (default)",
+        "Step (pause between story segments; press Enter to continue)",
+        "Back",
+    ]
+    render_menu("Text Display Mode", options)
+    choice = _prompt_menu_index(len(options))
+    if choice == 0:
+        return "instant"
+    if choice == 1:
+        return "step"
+    return None
+
+
 def _build_camp_menu_entries(
     state: GameState, summon_loadout_service: SummonLoadoutService
 ) -> List[tuple[str, str]]:
@@ -588,6 +624,8 @@ def main() -> None:
         attribute_service,
     ) = _build_services()
     slot_store = SaveSlotStore()
+    settings = config.load_config()
+    set_text_display_mode(settings.get("text_display_mode", "instant"))
     _print_startup_banner()
     running = True
     while running:
@@ -596,13 +634,7 @@ def main() -> None:
             running = False
             continue
         if action == "options":
-            _show_placeholder_screen(
-                "Options",
-                [
-                    "Options are not available in this demo.",
-                    "More settings will be added in a future update.",
-                ],
-            )
+            _run_options_menu()
             continue
         if action == "information":
             _run_information_menu()
@@ -780,6 +812,18 @@ def _load_game_flow(save_service: SaveService, slot_store: SaveSlotStore) -> Gam
             continue
         if selection.is_corrupt:
             print("Slot data is corrupt. Overwrite it from the Camp Menu.")
+        action = _prompt_load_slot_action(selection, allow_load=not selection.is_corrupt)
+        if action == "back":
+            continue
+        if action == "delete":
+            if _confirm_delete_slot(selection):
+                slot_store.delete_slot(selection.slot)
+                print(f"Deleted Slot {selection.slot}.")
+            continue
+        if action != "load":
+            continue
+        if selection.is_corrupt:
+            print("Load failed: Slot data is corrupt.")
             continue
         try:
             payload = slot_store.read_slot(selection.slot)
@@ -1888,6 +1932,11 @@ def _handle_save_request(state: GameState, save_service: SaveService, slot_store
     selection = _prompt_slot_choice(slot_store, title="Save Game")
     if selection is None:
         return
+    if selection.exists:
+        label = _format_slot_label(selection)
+        print(f"Slot {selection.slot} already contains: {label}")
+        if not _prompt_confirmation("Overwrite this save?"):
+            return
     try:
         payload = save_service.serialize(state)
         slot_store.write_slot(selection.slot, payload)
@@ -1895,6 +1944,27 @@ def _handle_save_request(state: GameState, save_service: SaveService, slot_store
         print(f"Save failed: {exc}")
         return
     print(f"Saved to Slot {selection.slot}.")
+
+
+def _prompt_load_slot_action(selection: SlotMetadata, *, allow_load: bool) -> str:
+    label = _format_slot_label(selection)
+    render_heading(f"Slot {selection.slot}: {label}")
+    options = [
+        "Load this save",
+        "Delete this save",
+        "Back",
+    ]
+    render_menu("Load Options", options)
+    choice = _prompt_menu_index(len(options))
+    if choice == 0:
+        return "load" if allow_load else "invalid"
+    if choice == 1:
+        return "delete"
+    return "back"
+
+
+def _confirm_delete_slot(selection: SlotMetadata) -> bool:
+    return _prompt_confirmation(f"Delete Slot {selection.slot} permanently?")
 
 
 def _prompt_slot_choice(slot_store: SaveSlotStore, *, title: str) -> SlotMetadata | None:

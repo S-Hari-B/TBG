@@ -1,7 +1,7 @@
 """Tests for CLI rendering utilities."""
 import pytest
 
-from tbg.presentation.cli.render import wrap_text_for_box
+from tbg.presentation.cli.render import render_story, set_text_display_mode, wrap_text_for_box
 
 
 def test_wrap_text_for_box_short_text() -> None:
@@ -80,3 +80,30 @@ def test_wrap_text_for_box_exact_width() -> None:
     text = "X" * 50
     result = wrap_text_for_box(text, width=50)
     assert result == [text]
+
+
+def test_render_story_step_mode_prompts_between_segments(monkeypatch, capsys) -> None:
+    set_text_display_mode("step")
+    prompts: list[object] = []
+    monkeypatch.setattr("builtins.input", lambda _: prompts.append(object()) or "")
+
+    render_story([("node_a", "First."), ("node_b", "Second.")])
+    output = capsys.readouterr().out
+    assert "First." in output
+    assert "Second." in output
+    assert "Press Enter" not in output
+    assert len(prompts) == 1
+    set_text_display_mode("instant")
+
+
+def test_render_story_instant_mode_does_not_prompt(monkeypatch, capsys) -> None:
+    set_text_display_mode("instant")
+
+    def _fail_input(_: str) -> str:
+        raise AssertionError("Unexpected prompt in instant mode")
+
+    monkeypatch.setattr("builtins.input", _fail_input)
+    render_story([("node_a", "First."), ("node_b", "Second.")])
+    output = capsys.readouterr().out
+    assert "First." in output
+    assert "Second." in output
