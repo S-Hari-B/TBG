@@ -130,9 +130,13 @@ def test_save_round_trip_preserves_state() -> None:
     state.party_member_attributes[member_def.id] = member_def.starting_attributes
     state.member_levels[state.player.id] = 2
     state.member_exp[state.player.id] = 150
+    state.player_attribute_points_spent = 2
+    state.player_attribute_points_debug_bonus = 4
     state.player.equipped_summons = ["micro_raptor", "black_hawk"]
     state.member_levels[state.party_members[0]] = 3
     state.member_exp[state.party_members[0]] = 90
+    state.owned_summons = {"micro_raptor": 2, "black_hawk": 1}
+    state.party_member_summon_loadouts = {state.party_members[0]: ["micro_raptor"]}
     member_equipment = MemberEquipment()
     member_equipment.weapon_slots = [weapon_id, None]
     member_equipment.armour_slots["body"] = armour_id
@@ -165,6 +169,8 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.current_node_id == state.current_node_id
     assert restored.player == state.player
     assert restored.player.attributes == state.player.attributes
+    assert restored.player_attribute_points_spent == state.player_attribute_points_spent
+    assert restored.player_attribute_points_debug_bonus == state.player_attribute_points_debug_bonus
     assert restored.player.equipped_summons == state.player.equipped_summons
     assert restored.inventory.weapons == state.inventory.weapons
     assert restored.inventory.armour == state.inventory.armour
@@ -183,6 +189,8 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.story_checkpoint_location_id == state.story_checkpoint_location_id
     assert restored.story_checkpoint_thread_id == state.story_checkpoint_thread_id
     assert restored.party_member_attributes == state.party_member_attributes
+    assert restored.owned_summons == state.owned_summons
+    assert restored.party_member_summon_loadouts == state.party_member_summon_loadouts
     assert "cerel_kill_hunt" in restored.quests_active
     assert restored.quests_completed == state.quests_completed
 
@@ -208,6 +216,102 @@ def test_missing_equipped_summons_defaults_to_empty() -> None:
 
     assert restored.player is not None
     assert restored.player.equipped_summons == []
+
+
+def test_missing_attribute_points_spent_defaults_to_zero() -> None:
+    (
+        story_service,
+        _,
+        _,
+        save_service,
+        area_service,
+        _,
+    ) = _build_test_services()
+    state = story_service.start_new_game(seed=222, player_name="Hero")
+    area_service.initialize_state(state)
+    area_service.initialize_state(state)
+    story_service.choose(state, 0)
+    state.player_attribute_points_spent = 3
+
+    payload = save_service.serialize(state)
+    del payload["state"]["player_attribute_points_spent"]
+    restored = save_service.deserialize(payload)
+
+    assert restored.player_attribute_points_spent == 0
+
+
+def test_missing_attribute_points_debug_bonus_defaults_to_zero() -> None:
+    (
+        story_service,
+        _,
+        _,
+        save_service,
+        area_service,
+        _,
+    ) = _build_test_services()
+    state = story_service.start_new_game(seed=333, player_name="Hero")
+    area_service.initialize_state(state)
+    area_service.initialize_state(state)
+    story_service.choose(state, 0)
+    state.player_attribute_points_debug_bonus = 5
+
+    payload = save_service.serialize(state)
+    del payload["state"]["player_attribute_points_debug_bonus"]
+    restored = save_service.deserialize(payload)
+
+    assert restored.player_attribute_points_debug_bonus == 0
+
+
+def test_missing_owned_summons_defaults_from_class() -> None:
+    (
+        story_service,
+        _,
+        _,
+        save_service,
+        area_service,
+        _,
+    ) = _build_test_services()
+    state = story_service.start_new_game(seed=444, player_name="Hero")
+    area_service.initialize_state(state)
+    area_service.initialize_state(state)
+    story_service.choose(state, 3)  # commoner has no summons
+
+    payload = save_service.serialize(state)
+    del payload["state"]["owned_summons"]
+    restored = save_service.deserialize(payload)
+    assert restored.owned_summons == {}
+
+    state = story_service.start_new_game(seed=445, player_name="Hero")
+    area_service.initialize_state(state)
+    area_service.initialize_state(state)
+    story_service.choose(state, 4)  # beastmaster
+
+    payload = save_service.serialize(state)
+    del payload["state"]["owned_summons"]
+    restored = save_service.deserialize(payload)
+    assert restored.owned_summons.get("micro_raptor") == 2
+    assert restored.owned_summons.get("black_hawk") == 1
+
+
+def test_missing_party_member_summon_loadouts_defaults_empty() -> None:
+    (
+        story_service,
+        _,
+        _,
+        save_service,
+        area_service,
+        repos,
+    ) = _build_test_services()
+    state = story_service.start_new_game(seed=446, player_name="Hero")
+    area_service.initialize_state(state)
+    area_service.initialize_state(state)
+    story_service.choose(state, 0)
+    state.party_members.append(repos["party"].all()[0].id)
+
+    payload = save_service.serialize(state)
+    del payload["state"]["party_member_summon_loadouts"]
+    restored = save_service.deserialize(payload)
+    assert restored.party_member_summon_loadouts == {}
 
 
 def test_rng_determinism_survives_save_round_trip() -> None:

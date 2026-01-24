@@ -88,6 +88,7 @@ def _make_state(seed: int = 123, with_party: bool = True, class_id: str = "warri
         inventory_service.initialize_party_member_loadout(state, "emma", member_def)
         state.member_levels["emma"] = member_def.starting_level
         state.member_exp["emma"] = 0
+        state.party_member_attributes["emma"] = member_def.starting_attributes
     return state
 
 
@@ -130,9 +131,7 @@ def test_auto_spawn_equipped_summons_respects_bond_capacity() -> None:
     assert [summon.source_id for summon in summons] == ["micro_raptor", "micro_raptor"]
     assert [summon.bond_cost for summon in summons] == [5, 5]
     summon_def = SummonsRepository().get("micro_raptor")
-    expected_attack = int(
-        summon_def.attack + state.player.attributes.BOND * summon_def.bond_scaling.atk_per_bond
-    )
+    expected_attack = summon_def.attack + state.player.attributes.BOND * summon_def.bond_scaling.atk_per_bond
     assert summons[0].stats.attack == expected_attack
     assert sum(isinstance(evt, SummonSpawnedEvent) for evt in events) == 2
 
@@ -198,6 +197,27 @@ def test_auto_spawn_noop_when_equipped_empty() -> None:
     summons = [ally for ally in battle_state.allies if "summon" in ally.tags]
     assert len(summons) == 0
     assert not any(isinstance(evt, SummonSpawnedEvent) for evt in events)
+
+
+def test_auto_spawn_party_members_in_order_with_owner_bond() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=True, class_id="beastmaster")
+    assert state.player is not None
+    state.player.attributes.BOND = 10
+    state.party_member_attributes["emma"].BOND = 5
+    state.player.equipped_summons = ["micro_raptor"]
+    state.party_member_summon_loadouts["emma"] = ["micro_raptor"]
+
+    battle_state, events = service.start_battle("goblin_grunt", state)
+
+    summon_events = [evt for evt in events if isinstance(evt, SummonSpawnedEvent)]
+    assert [evt.owner_id for evt in summon_events] == [state.player.id, "party_emma"]
+    summons = [ally for ally in battle_state.allies if "summon" in ally.tags]
+    assert {summon.source_id for summon in summons} == {"micro_raptor"}
+    emma_summon = next(summon for summon in summons if summon.owner_id == "party_emma")
+    raptor_def = SummonsRepository().get("micro_raptor")
+    expected_attack = raptor_def.attack + state.party_member_attributes["emma"].BOND * raptor_def.bond_scaling.atk_per_bond
+    assert emma_summon.stats.attack == expected_attack
 
 
 def test_basic_attack_reduces_hp_and_can_kill() -> None:

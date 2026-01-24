@@ -8,8 +8,7 @@
       "stock_pool": [
         { "id": "potion_hp_small", "qty": 10 },
         { "id": "potion_energy_small", "qty": 8 },
-        { "id": "goblin_horn", "qty": 5 },
-        { "id": "wolf_tooth", "qty": 5 }
+        { "id": "summon_micro_raptor", "qty": 2 }
       ],
       "stock_size": 10
     },

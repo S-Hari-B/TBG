@@ -23,6 +23,10 @@ class GameState:
     party_members: List[str] = field(default_factory=list)
     party_member_attributes: Dict[str, Attributes] = field(default_factory=dict)
     player_name: str = "Hero"
+    player_attribute_points_spent: int = 0
+    player_attribute_points_debug_bonus: int = 0
+    owned_summons: Dict[str, int] = field(default_factory=dict)
+    party_member_summon_loadouts: Dict[str, List[str]] = field(default_factory=dict)
     gold: int = 0
     exp: int = 0
     flags: Dict[str, bool] = field(default_factory=dict)

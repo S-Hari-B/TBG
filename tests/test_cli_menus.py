@@ -57,9 +57,10 @@ def test_town_menu_includes_converse_and_quests() -> None:
     assert "Converse" in labels
     assert "Quests" in labels
     assert "Shops" in labels
+    assert "Summons" not in labels
 
 
-def test_camp_menu_includes_summons_when_known() -> None:
+def test_camp_menu_does_not_include_summons() -> None:
     state = _camp_state()
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
@@ -81,7 +82,7 @@ def test_camp_menu_includes_summons_when_known() -> None:
 
     entries = _build_camp_menu_entries(state, summon_service)
     labels = [label for label, _ in entries]
-    assert "Summons" in labels
+    assert "Summons" not in labels
 
 
 def test_main_menu_includes_load_but_not_save() -> None:
@@ -153,6 +154,7 @@ def test_interlude_reselects_menu_after_travel(monkeypatch) -> None:
         quest_service=object(),
         shop_service=object(),
         summon_loadout_service=_summon_service(),
+        attribute_service=object(),
         state=state,
         save_service=object(),
         slot_store=object(),
@@ -187,6 +189,7 @@ def test_town_menu_shops_dispatch(monkeypatch) -> None:
         quest_service=object(),
         shop_service=object(),
         summon_loadout_service=_summon_service(),
+        attribute_service=object(),
         state=state,
         save_service=object(),
         slot_store=object(),
@@ -227,6 +230,342 @@ def test_shop_menu_debug_option_visibility(monkeypatch) -> None:
     assert "Give Gold (DEBUG)" in captured["options"]
 
 
+def test_town_menu_allocate_attributes_flow(monkeypatch) -> None:
+    from tbg.data.repositories import ArmourRepository, ClassesRepository, PartyMembersRepository, WeaponsRepository
+    from tbg.services.attribute_allocation_service import AttributeAllocationService
+    from tbg.services.factories import create_player_from_class_id
+    from tbg.services.inventory_service import InventoryService
+    from tbg.services.summon_loadout_service import SummonLoadoutService
+    from tbg.data.repositories import SummonsRepository
+
+    state = _camp_state()
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    summons_repo = SummonsRepository()
+    classes_repo = ClassesRepository(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        summons_repo=summons_repo,
+    )
+    party_repo = PartyMembersRepository()
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
+    summon_service = SummonLoadoutService(classes_repo=classes_repo, summons_repo=summons_repo)
+    attribute_service = AttributeAllocationService(classes_repo=classes_repo)
+    player = create_player_from_class_id(
+        class_id="warrior",
+        name="Hero",
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=state.rng,
+    )
+    state.player = player
+    starting_level = classes_repo.get_starting_level("warrior")
+    state.member_levels[player.id] = starting_level + 1
+    state.player_attribute_points_spent = 0
+    base_str = player.attributes.STR
+
+    last_menu: dict[str, list[str] | str] = {}
+    choices = {
+        "Town Menu": ["Allocate Attributes", "Quit to Main Menu"],
+        "Allocation Options": ["STR", "Back"],
+    }
+
+    def fake_render_menu(title, options):
+        last_menu["title"] = title
+        last_menu["options"] = options
+        if title == "Town Menu":
+            assert "Allocate Attributes" in options
+
+    def fake_prompt(_count: int) -> int:
+        title = last_menu.get("title")
+        options = last_menu.get("options", [])
+        assert isinstance(title, str)
+        assert isinstance(options, list)
+        next_label = choices[title].pop(0)
+        return options.index(next_label)
+
+    monkeypatch.setattr(app, "render_heading", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "_render_boxed_panel", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "render_menu", fake_render_menu)
+    monkeypatch.setattr(app, "_prompt_menu_index", fake_prompt)
+
+    result = app._run_town_menu(
+        story_service=object(),
+        inventory_service=inventory_service,
+        quest_service=object(),
+        shop_service=object(),
+        summon_loadout_service=summon_service,
+        attribute_service=attribute_service,
+        state=state,
+        save_service=object(),
+        slot_store=object(),
+        battle_service=object(),
+        area_service=object(),
+    )
+
+    assert result is None
+    assert state.player.attributes.STR == base_str + 1
+    assert state.player_attribute_points_spent == 1
+
+
+def test_allocate_attributes_menu_debug_option_visibility(monkeypatch) -> None:
+    from tbg.data.repositories import ArmourRepository, ClassesRepository, PartyMembersRepository, WeaponsRepository
+    from tbg.services.attribute_allocation_service import AttributeAllocationService
+    from tbg.services.factories import create_player_from_class_id
+    from tbg.services.inventory_service import InventoryService
+
+    state = _camp_state()
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    classes_repo = ClassesRepository(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+    )
+    party_repo = PartyMembersRepository()
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
+    attribute_service = AttributeAllocationService(classes_repo=classes_repo)
+    state.player = create_player_from_class_id(
+        class_id="warrior",
+        name="Hero",
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=state.rng,
+    )
+    state.member_levels[state.player.id] = classes_repo.get_starting_level("warrior")
+    state.player_attribute_points_spent = 0
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_render_menu(title, options):
+        if title == "Allocation Options":
+            captured["options"] = list(options)
+
+    monkeypatch.setattr(app, "render_heading", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "_render_boxed_panel", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "render_menu", fake_render_menu)
+    def choose_back(_count: int) -> int:
+        options = captured.get("options", [])
+        return options.index("Back")
+
+    monkeypatch.setattr(app, "_prompt_menu_index", choose_back)
+
+    monkeypatch.delenv("TBG_DEBUG", raising=False)
+    app._run_attribute_allocation_menu(attribute_service, inventory_service, state)
+    assert "DEBUG: Grant Attribute Points" not in captured["options"]
+
+    monkeypatch.setenv("TBG_DEBUG", "1")
+    app._run_attribute_allocation_menu(attribute_service, inventory_service, state)
+    assert "DEBUG: Grant Attribute Points" in captured["options"]
+
+
+def test_inventory_equipment_summons_visible_for_non_beastmaster(monkeypatch, capsys) -> None:
+    from tbg.data.repositories import ArmourRepository, ClassesRepository, PartyMembersRepository, WeaponsRepository
+    from tbg.services.factories import create_player_from_class_id
+    from tbg.services.inventory_service import InventoryService
+    from tbg.services.summon_loadout_service import SummonLoadoutService
+    from tbg.data.repositories import SummonsRepository
+
+    state = _camp_state()
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    summons_repo = SummonsRepository()
+    classes_repo = ClassesRepository(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        summons_repo=summons_repo,
+    )
+    party_repo = PartyMembersRepository()
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
+    summon_service = SummonLoadoutService(classes_repo=classes_repo, summons_repo=summons_repo)
+    player = create_player_from_class_id(
+        class_id="warrior",
+        name="Hero",
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=state.rng,
+    )
+    state.player = player
+
+    menus: list[list[str]] = []
+
+    def fake_render_menu(_title, options):
+        menus.append(list(options))
+
+    monkeypatch.setattr(app, "render_heading", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "render_menu", fake_render_menu)
+    monkeypatch.setattr(app, "_prompt_menu_index", lambda _count: menus[-1].index("Back"))
+
+    app._run_member_equipment_menu(
+        inventory_service.list_party_members(state)[0],
+        inventory_service,
+        summon_service,
+        state,
+    )
+
+    out = capsys.readouterr().out
+    assert "No summons available." in out
+    assert any("Manage Summons" in options for options in menus)
+
+
+def test_party_member_equipment_has_manage_summons(monkeypatch) -> None:
+    from tbg.data.repositories import ArmourRepository, ClassesRepository, PartyMembersRepository, WeaponsRepository
+    from tbg.services.factories import create_player_from_class_id
+    from tbg.services.inventory_service import InventoryService
+    from tbg.services.summon_loadout_service import SummonLoadoutService
+    from tbg.data.repositories import SummonsRepository
+
+    state = _camp_state()
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    summons_repo = SummonsRepository()
+    classes_repo = ClassesRepository(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        summons_repo=summons_repo,
+    )
+    party_repo = PartyMembersRepository()
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
+    summon_service = SummonLoadoutService(classes_repo=classes_repo, summons_repo=summons_repo)
+    state.player = create_player_from_class_id(
+        class_id="warrior",
+        name="Hero",
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=state.rng,
+    )
+    state.party_members = ["emma"]
+    member_def = party_repo.get("emma")
+    state.party_member_attributes["emma"] = member_def.starting_attributes
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_render_menu(_title, options):
+        captured["options"] = list(options)
+
+    monkeypatch.setattr(app, "render_heading", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "render_menu", fake_render_menu)
+    monkeypatch.setattr(app, "_prompt_menu_index", lambda _count: captured["options"].index("Back"))
+
+    app._run_member_equipment_menu(
+        inventory_service.list_party_members(state)[1],
+        inventory_service,
+        summon_service,
+        state,
+    )
+
+    assert "Manage Summons" in captured["options"]
+
+
+def test_shared_inventory_has_no_summon_section(monkeypatch, capsys) -> None:
+    from tbg.data.repositories import ArmourRepository, ClassesRepository, PartyMembersRepository, WeaponsRepository
+    from tbg.services.factories import create_player_from_class_id
+    from tbg.services.inventory_service import InventoryService
+    from tbg.services.summon_loadout_service import SummonLoadoutService
+    from tbg.data.repositories import SummonsRepository
+
+    state = _camp_state()
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    summons_repo = SummonsRepository()
+    classes_repo = ClassesRepository(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        summons_repo=summons_repo,
+    )
+    party_repo = PartyMembersRepository()
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
+    summon_service = SummonLoadoutService(classes_repo=classes_repo, summons_repo=summons_repo)
+    state.player = create_player_from_class_id(
+        class_id="warrior",
+        name="Hero",
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=state.rng,
+    )
+
+    monkeypatch.setattr(app, "render_heading", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "render_menu", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "_prompt_menu_index", lambda _count: _count - 1)
+
+    app._run_inventory_flow(inventory_service, summon_service, state)
+    out = capsys.readouterr().out
+    assert "Summons:" not in out
+
+
+def test_beastmaster_can_manage_summons_via_equipment(monkeypatch) -> None:
+    from tbg.data.repositories import ArmourRepository, ClassesRepository, PartyMembersRepository, WeaponsRepository
+    from tbg.services.factories import create_player_from_class_id
+    from tbg.services.inventory_service import InventoryService
+    from tbg.services.summon_loadout_service import SummonLoadoutService
+    from tbg.data.repositories import SummonsRepository
+
+    state = _camp_state()
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    summons_repo = SummonsRepository()
+    classes_repo = ClassesRepository(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        summons_repo=summons_repo,
+    )
+    party_repo = PartyMembersRepository()
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
+    summon_service = SummonLoadoutService(classes_repo=classes_repo, summons_repo=summons_repo)
+    player = create_player_from_class_id(
+        class_id="beastmaster",
+        name="Hero",
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=state.rng,
+    )
+    state.player = player
+
+    choices = iter([3, 0, 0, 3, 4])
+
+    monkeypatch.setattr(app, "render_heading", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "render_menu", lambda *args, **kwargs: None)
+    monkeypatch.setattr(app, "_prompt_menu_index", lambda _count: next(choices))
+
+    app._run_member_equipment_menu(
+        inventory_service.list_party_members(state)[0],
+        inventory_service,
+        summon_service,
+        state,
+    )
+
+    assert summon_service.get_equipped_summons(state, state.player.id)
+
+
 def test_prompt_index_batch_parses_and_dedupes(monkeypatch) -> None:
     monkeypatch.setattr("builtins.input", lambda _prompt: "1, 3, 1,5")
     assert _prompt_index_batch(5, "Select: ") == [1, 3, 5]
@@ -261,13 +600,14 @@ def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> Non
         quest_service_arg,
         shop_service_arg,
         summon_loadout_service,
+        attribute_service,
         state_arg,
         save_service,
         slot_store,
         battle_service,
         area_service_arg,
     ):
-        del shop_service_arg, summon_loadout_service
+        del shop_service_arg, summon_loadout_service, attribute_service
         captured["area_service"] = area_service_arg
         captured["quest_service"] = quest_service_arg
         return [object()]
@@ -284,6 +624,7 @@ def test_handle_story_events_recursion_receives_area_service(monkeypatch) -> Non
         quest_service=quest_service,
         shop_service=object(),
         summon_loadout_service=_summon_service(),
+        attribute_service=object(),
         state=state,
         save_service=object(),
         slot_store=object(),
@@ -380,6 +721,7 @@ def test_attribute_lines_include_bond() -> None:
     for label in ("STR", "DEX", "INT", "VIT", "BOND"):
         assert label in joined
     assert "(+" in joined
+    assert "increases" in joined
 
 
 def test_attribute_debug_lines_do_not_show_base_current() -> None:
@@ -428,6 +770,7 @@ def test_turn_in_check_nodes_do_not_end_demo(monkeypatch, capsys) -> None:
         quest_service,
         shop_service,
         summon_loadout_service,
+        attribute_service,
     ) = app._build_services()
     for node_id in ("dana_turn_in_check", "dana_protoquest_turn_in_check", "cerel_turn_in_check"):
         state = story_service.start_new_game(seed=101, player_name="Hero")
@@ -451,6 +794,7 @@ def test_turn_in_check_nodes_do_not_end_demo(monkeypatch, capsys) -> None:
                 quest_service,
                 shop_service,
                 summon_loadout_service,
+                attribute_service,
                 state,
                 save_service,
                 app.SaveSlotStore(),

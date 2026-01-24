@@ -4,7 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Sequence, Tuple
 
-from tbg.data.repositories import ArmourRepository, ItemsRepository, ShopsRepository, WeaponsRepository
+from tbg.data.repositories import (
+    ArmourRepository,
+    ItemsRepository,
+    ShopsRepository,
+    SummonsRepository,
+    WeaponsRepository,
+)
 from tbg.domain.defs import ShopDef, ShopStockEntryDef, ShopType
 from tbg.domain.state import GameState
 
@@ -86,11 +92,13 @@ class ShopService:
         items_repo: ItemsRepository,
         weapons_repo: WeaponsRepository,
         armour_repo: ArmourRepository,
+        summons_repo: SummonsRepository,
     ) -> None:
         self._shops_repo = shops_repo
         self._items_repo = items_repo
         self._weapons_repo = weapons_repo
         self._armour_repo = armour_repo
+        self._summons_repo = summons_repo
 
     def list_shops_for_location(self, location_tags: Sequence[str]) -> List[ShopSummaryView]:
         tags = set(location_tags)
@@ -277,7 +285,11 @@ class ShopService:
 
     def _resolve_name(self, shop_type: ShopType, item_id: str) -> str:
         if shop_type == "item":
-            return self._items_repo.get(item_id).name
+            item_def = self._items_repo.get(item_id)
+            if item_def.kind == "summon":
+                summon_id = self._summon_id_for_item(item_id)
+                return self._summons_repo.get(summon_id).name
+            return item_def.name
         if shop_type == "weapon":
             return self._weapons_repo.get(item_id).name
         if shop_type == "armour":
@@ -299,9 +311,12 @@ class ShopService:
             return self._armour_repo.get(item_id).value
         raise ValueError(f"Unsupported shop type '{shop_type}'.")
 
-    @staticmethod
-    def _owned_quantity(state: GameState, shop_type: ShopType, item_id: str) -> int:
+    def _owned_quantity(self, state: GameState, shop_type: ShopType, item_id: str) -> int:
         if shop_type == "item":
+            item_def = self._items_repo.get(item_id)
+            if item_def.kind == "summon":
+                summon_id = self._summon_id_for_item(item_id)
+                return state.owned_summons.get(summon_id, 0)
             return state.inventory.items.get(item_id, 0)
         if shop_type == "weapon":
             return state.inventory.weapons.get(item_id, 0)
@@ -319,21 +334,33 @@ class ShopService:
             return dict(state.inventory.armour)
         return {}
 
-    @staticmethod
-    def _add_to_inventory(state: GameState, shop_type: ShopType, item_id: str, quantity: int) -> None:
+    def _add_to_inventory(self, state: GameState, shop_type: ShopType, item_id: str, quantity: int) -> None:
         if shop_type == "item":
+            item_def = self._items_repo.get(item_id)
+            if item_def.kind == "summon":
+                summon_id = self._summon_id_for_item(item_id)
+                state.owned_summons[summon_id] = state.owned_summons.get(summon_id, 0) + quantity
+                return
             state.inventory.add_item(item_id, quantity)
         elif shop_type == "weapon":
             state.inventory.add_weapon(item_id, quantity)
         elif shop_type == "armour":
             state.inventory.add_armour(item_id, quantity)
 
-    @staticmethod
-    def _remove_from_inventory(state: GameState, shop_type: ShopType, item_id: str, quantity: int) -> bool:
+    def _remove_from_inventory(self, state: GameState, shop_type: ShopType, item_id: str, quantity: int) -> bool:
         if shop_type == "item":
+            item_def = self._items_repo.get(item_id)
+            if item_def.kind == "summon":
+                return False
             return state.inventory.remove_item(item_id, quantity)
         if shop_type == "weapon":
             return state.inventory.remove_weapon(item_id, quantity)
         if shop_type == "armour":
             return state.inventory.remove_armour(item_id, quantity)
         return False
+
+    @staticmethod
+    def _summon_id_for_item(item_id: str) -> str:
+        if item_id.startswith("summon_"):
+            return item_id[len("summon_") :]
+        return item_id

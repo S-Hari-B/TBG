@@ -829,6 +829,29 @@ def test_loot_lines_aggregate() -> None:
     assert lines == ["- Loot: Goblin Horn x3"]
 
 
+def test_summon_spawn_formatting_hides_repr(monkeypatch) -> None:
+    from tbg.presentation.cli.app import _format_battle_event_lines
+    from tbg.services.battle_service import SummonSpawnedEvent
+    from tbg.domain.entities import Stats
+
+    monkeypatch.delenv("TBG_DEBUG", raising=False)
+    events = [
+        SummonSpawnedEvent(
+            owner_id="hero",
+            summon_id="micro_raptor",
+            summon_instance_id="summon_1",
+            summon_name="Micro Raptor",
+            bond_cost=2,
+            owner_bond=5,
+            base_stats=Stats(max_hp=10, hp=10, max_mp=0, mp=0, attack=3, defense=1, speed=4),
+            scaled_stats=Stats(max_hp=12, hp=12, max_mp=0, mp=0, attack=4, defense=2, speed=5),
+        )
+    ]
+    lines = _format_battle_event_lines(events)
+    assert all("SummonSpawnedEvent(" not in line for line in lines)
+    assert lines == ["- Micro Raptor is summoned."]
+
+
 def test_skill_preview_with_knowledge_shows_projected(monkeypatch, capsys) -> None:
     """Non-debug mode WITH knowledge should show projected damage."""
     hero_stats = Stats(max_hp=30, hp=30, max_mp=5, mp=5, attack=6, defense=1, speed=8)

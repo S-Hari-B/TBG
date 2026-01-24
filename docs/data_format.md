@@ -560,7 +560,7 @@ Manual saves are plain JSON written to `data/saves/slot_1.json` through `slot_3.
 * `save_version`: integer schema version (v1 = `1`). Loaders refuse mismatched versions.
 * `metadata`: presentation summary used when rendering the slot picker (player name, current node id, current location id, mode, gold, seed, ISO timestamp).
 * `rng`: deterministic RNG snapshot (`{"version": 3, "state": [...], "gauss": null}`).
-* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, visit counts, pending narration, party roster, inventory/equipment, member levels/exp, base attributes, flags, camp message, checkpoint metadata, quest progress, and the player object).
+* `state`: serialized `GameState` (seed, mode, story node ids, current location id, visited locations, entry-story flags, visit counts, pending narration, party roster, inventory/equipment, member levels/exp, base attributes, player attribute points spent, debug attribute point bonus, flags, camp message, checkpoint metadata, quest progress, and the player object).
 
 Example (trimmed):
 
@@ -587,6 +587,8 @@ Example (trimmed):
     "current_node_id": "post_ambush_menu",
     "current_location_id": "village_outskirts",
     "player_name": "Hero",
+    "player_attribute_points_spent": 1,
+    "player_attribute_points_debug_bonus": 0,
     "gold": 42,
     "exp": 18,
     "flags": {"tutorial_complete": true, "flag_last_battle_defeat": false},

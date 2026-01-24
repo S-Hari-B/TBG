@@ -336,39 +336,38 @@ class BattleService:
         state: GameState,
         battle_state: BattleState,
     ) -> List[BattleEvent]:
-        if not state.player:
-            return []
-        equipped = list(state.player.equipped_summons)
-        if not equipped:
-            return []
-        remaining = state.player.attributes.BOND
-        if remaining <= 0:
+        owners = self._summon_spawn_owners(state)
+        if not owners:
             return []
         events: List[BattleEvent] = []
-        decisions: List[tuple[str, int, bool]] = []
-        for summon_id in equipped:
-            summon_def = self._summons_repo.get(summon_id)
-            if summon_def.bond_cost > remaining:
-                decisions.append((summon_id, summon_def.bond_cost, False))
-                break
-            events.extend(
-                self._spawn_summon_into_battle(
-                    state,
-                    battle_state,
-                    owner_id=state.player.id,
-                    owner_bond=self._resolve_owner_bond(state, state.player.id),
-                    summon_id=summon_id,
+        for owner_id, owner_key, equipped in owners:
+            remaining = self._resolve_owner_bond(state, owner_key)
+            if remaining <= 0 or not equipped:
+                continue
+            decisions: List[tuple[str, int, bool]] = []
+            for summon_id in equipped:
+                summon_def = self._summons_repo.get(summon_id)
+                if summon_def.bond_cost > remaining:
+                    decisions.append((summon_id, summon_def.bond_cost, False))
+                    break
+                events.extend(
+                    self._spawn_summon_into_battle(
+                        state,
+                        battle_state,
+                        owner_id=owner_id,
+                        owner_bond=self._resolve_owner_bond(state, owner_key),
+                        summon_id=summon_id,
+                    )
+                )
+                decisions.append((summon_id, summon_def.bond_cost, True))
+                remaining -= summon_def.bond_cost
+            events.append(
+                SummonAutoSpawnDebugEvent(
+                    bond_capacity=self._resolve_owner_bond(state, owner_key),
+                    equipped_summons=list(equipped),
+                    decisions=decisions,
                 )
             )
-            decisions.append((summon_id, summon_def.bond_cost, True))
-            remaining -= summon_def.bond_cost
-        events.append(
-            SummonAutoSpawnDebugEvent(
-                bond_capacity=state.player.attributes.BOND,
-                equipped_summons=equipped,
-                decisions=decisions,
-            )
-        )
         return events
 
     def _spawn_summon_into_battle(
@@ -404,10 +403,24 @@ class BattleService:
             )
         ]
 
-    def _resolve_owner_bond(self, state: GameState, owner_id: str) -> int:
-        if state.player and state.player.id == owner_id:
+    def _resolve_owner_bond(self, state: GameState, owner_key: str) -> int:
+        if state.player and state.player.id == owner_key:
             return state.player.attributes.BOND
-        return state.party_member_attributes.get(owner_id, Attributes(STR=0, DEX=0, INT=0, VIT=0, BOND=0)).BOND
+        return state.party_member_attributes.get(
+            owner_key, Attributes(STR=0, DEX=0, INT=0, VIT=0, BOND=0)
+        ).BOND
+
+    def _summon_spawn_owners(self, state: GameState) -> List[tuple[str, str, List[str]]]:
+        owners: List[tuple[str, str, List[str]]] = []
+        if state.player:
+            owners.append((state.player.id, state.player.id, list(state.player.equipped_summons)))
+        for member_id in state.party_members:
+            loadout = list(state.party_member_summon_loadouts.get(member_id, []))
+            if not loadout:
+                owners.append((f"party_{member_id}", member_id, []))
+                continue
+            owners.append((f"party_{member_id}", member_id, loadout))
+        return owners
 
     def _resolve_battle_level(self, state: GameState) -> BattleLevelInfo:
         if not state.current_location_id or not self._locations_repo or not self._floors_repo:

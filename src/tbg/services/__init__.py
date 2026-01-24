@@ -25,6 +25,12 @@ from .area_service_v2 import (
     TravelResult,
 )
 from .battle_service import BattleService
+from .attribute_allocation_service import (
+    AttributeAllocationService,
+    AttributeGrantResult,
+    AttributePointSummary,
+    AttributeSpendResult,
+)
 from .quest_service import QuestService
 from .shop_service import ShopService
 from .save_service import SaveService
@@ -55,6 +61,10 @@ __all__ = [
     "TravelPerformedEvent",
     "TravelResult",
     "BattleService",
+    "AttributeAllocationService",
+    "AttributeGrantResult",
+    "AttributePointSummary",
+    "AttributeSpendResult",
     "QuestService",
     "ShopService",
     "SaveService",

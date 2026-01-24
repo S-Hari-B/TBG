@@ -4,7 +4,13 @@ import json
 from pathlib import Path
 
 from tbg.core.rng import RNG
-from tbg.data.repositories import ArmourRepository, ItemsRepository, ShopsRepository, WeaponsRepository
+from tbg.data.repositories import (
+    ArmourRepository,
+    ItemsRepository,
+    ShopsRepository,
+    SummonsRepository,
+    WeaponsRepository,
+)
 from tbg.domain.state import GameState
 from tbg.services.shop_service import (
     ShopActionFailedEvent,
@@ -29,6 +35,7 @@ def _build_service(definitions_dir: Path) -> ShopService:
     items_repo = ItemsRepository(base_path=definitions_dir)
     weapons_repo = WeaponsRepository(base_path=definitions_dir)
     armour_repo = ArmourRepository(base_path=definitions_dir)
+    summons_repo = SummonsRepository(base_path=definitions_dir)
     shops_repo = ShopsRepository(
         base_path=definitions_dir,
         items_repo=items_repo,
@@ -40,6 +47,7 @@ def _build_service(definitions_dir: Path) -> ShopService:
         items_repo=items_repo,
         weapons_repo=weapons_repo,
         armour_repo=armour_repo,
+        summons_repo=summons_repo,
     )
 
 
@@ -182,6 +190,55 @@ def test_shop_sell_price_uses_floor(tmp_path: Path) -> None:
 
     assert isinstance(events[0], ShopSaleEvent)
     assert state.gold == 2
+
+
+def test_shop_buy_summon_increments_owned(tmp_path: Path) -> None:
+    definitions_dir = _make_definitions_dir(tmp_path)
+    _write_json(
+        definitions_dir / "items.json",
+        {"summon_micro_raptor": {"name": "Micro Raptor (Summon)", "kind": "summon", "value": 20}},
+    )
+    _write_json(definitions_dir / "weapons.json", {})
+    _write_json(definitions_dir / "armour.json", {})
+    _write_json(
+        definitions_dir / "summons.json",
+        {
+            "micro_raptor": {
+                "name": "Micro Raptor",
+                "max_hp": 10,
+                "max_mp": 0,
+                "attack": 3,
+                "defense": 1,
+                "speed": 4,
+                "bond_cost": 5,
+            }
+        },
+    )
+    _write_json(
+        definitions_dir / "shops.json",
+        {
+            "shops": {
+                "item_shop": {
+                    "id": "item_shop",
+                    "name": "Item Shop",
+                    "shop_type": "item",
+                    "tags": ["town"],
+                    "stock_pool": [{"id": "summon_micro_raptor", "qty": 2}],
+                    "stock_size": 10,
+                }
+            }
+        },
+    )
+    shop_service = _build_service(definitions_dir)
+    state = GameState(seed=1, rng=RNG(1), mode="camp_menu", current_node_id="start")
+    state.gold = 100
+    state.location_visits["town"] = 0
+
+    events = shop_service.buy(state, "town", "item_shop", "summon_micro_raptor")
+
+    assert isinstance(events[0], ShopPurchaseEvent)
+    assert state.owned_summons.get("micro_raptor") == 1
+    assert "summon_micro_raptor" not in state.inventory.items
 
 
 def test_shop_stock_rotation_changes_on_visit_count(tmp_path: Path) -> None:

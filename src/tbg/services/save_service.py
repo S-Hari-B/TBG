@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Sequence
 
 from tbg.core.rng import RNG, RNGStatePayload
 from tbg.core.types import GameMode
@@ -98,6 +98,16 @@ class SaveService:
 
         state = GameState(seed=seed, rng=rng, mode=mode, current_node_id=current_node_id)
         state.player_name = self._require_str(state_payload.get("player_name"), "state.player_name")
+        state.player_attribute_points_spent = self._coerce_non_negative_int(
+            state_payload.get("player_attribute_points_spent"),
+            "state.player_attribute_points_spent",
+            default=0,
+        )
+        state.player_attribute_points_debug_bonus = self._coerce_non_negative_int(
+            state_payload.get("player_attribute_points_debug_bonus"),
+            "state.player_attribute_points_debug_bonus",
+            default=0,
+        )
         state.gold = self._require_int(state_payload.get("gold"), "state.gold")
         state.exp = self._require_int(state_payload.get("exp"), "state.exp")
         state.flags = self._coerce_bool_dict(state_payload.get("flags"), "state.flags")
@@ -114,6 +124,13 @@ class SaveService:
         state.inventory = self._coerce_inventory(state_payload.get("inventory"))
         state.member_levels = self._coerce_int_dict(state_payload.get("member_levels"), "state.member_levels")
         state.member_exp = self._coerce_int_dict(state_payload.get("member_exp"), "state.member_exp")
+        player_payload = state_payload.get("player")
+        state.owned_summons = self._coerce_owned_summons(
+            state_payload.get("owned_summons"), player_payload
+        )
+        state.party_member_summon_loadouts = self._coerce_party_member_summon_loadouts(
+            state_payload.get("party_member_summon_loadouts"), state.party_members
+        )
         state.camp_message = self._coerce_optional_str(state_payload.get("camp_message"), "state.camp_message")
         state.story_checkpoint_node_id = self._coerce_optional_str(
             state_payload.get("story_checkpoint_node_id"), "state.story_checkpoint_node_id"
@@ -152,7 +169,6 @@ class SaveService:
             state_payload.get("quests_turned_in"), "state.quests_turned_in"
         )
 
-        player_payload = state_payload.get("player")
         if player_payload is not None:
             state.player = self._coerce_player(player_payload, attributes=player_attributes)
 
@@ -196,6 +212,8 @@ class SaveService:
             "current_node_id": state.current_node_id,
             "current_location_id": state.current_location_id,
             "player_name": state.player_name,
+            "player_attribute_points_spent": state.player_attribute_points_spent,
+            "player_attribute_points_debug_bonus": state.player_attribute_points_debug_bonus,
             "gold": state.gold,
             "exp": state.exp,
             "flags": dict(state.flags),
@@ -215,6 +233,11 @@ class SaveService:
             "equipment": equipment_payload,
             "member_levels": dict(state.member_levels),
             "member_exp": dict(state.member_exp),
+            "owned_summons": dict(state.owned_summons),
+            "party_member_summon_loadouts": {
+                member_id: list(loadout)
+                for member_id, loadout in state.party_member_summon_loadouts.items()
+            },
             "camp_message": state.camp_message,
             "player": self._serialize_player(state.player) if state.player else None,
             "visited_locations": list(state.visited_locations),
@@ -283,6 +306,14 @@ class SaveService:
             raise SaveLoadError(f"{context} must be an integer.")
         return value
 
+    def _coerce_non_negative_int(self, value: Any, context: str, *, default: int) -> int:
+        if value is None:
+            return default
+        value_int = self._require_int(value, context)
+        if value_int < 0:
+            raise SaveLoadError(f"{context} must be a non-negative integer.")
+        return value_int
+
     def _coerce_optional_str(self, value: Any, context: str) -> str | None:
         if value is None:
             return None
@@ -292,6 +323,74 @@ class SaveService:
         if value is None:
             return None
         return self._coerce_attributes(value, context)
+
+    def _coerce_owned_summons(self, value: Any, player_payload: Any) -> Dict[str, int]:
+        if value is None:
+            return self._default_owned_summons(player_payload)
+        mapping = self._require_dict(value, "state.owned_summons")
+        result: Dict[str, int] = {}
+        for summon_id, count in mapping.items():
+            summon_key = self._require_str(summon_id, "state.owned_summons key")
+            qty = self._require_int(count, f"state.owned_summons[{summon_key}]")
+            if qty < 0:
+                raise SaveLoadError("state.owned_summons values must be non-negative.")
+            result[summon_key] = qty
+        return result
+
+    def _coerce_party_member_summon_loadouts(
+        self, value: Any, party_members: List[str]
+    ) -> Dict[str, List[str]]:
+        if value is None:
+            return {}
+        mapping = self._require_dict(value, "state.party_member_summon_loadouts")
+        result: Dict[str, List[str]] = {}
+        known_members = set(party_members)
+        extra_members = set(mapping.keys()) - known_members
+        if extra_members:
+            raise SaveLoadError(
+                f"state.party_member_summon_loadouts references unknown members: {sorted(extra_members)}."
+            )
+        for member_id, entries in mapping.items():
+            member_key = self._require_str(member_id, "state.party_member_summon_loadouts key")
+            if not isinstance(entries, list):
+                raise SaveLoadError(
+                    f"state.party_member_summon_loadouts[{member_key}] must be a list."
+                )
+            loadout: List[str] = []
+            for entry in entries:
+                summon_id = self._require_str(
+                    entry, f"state.party_member_summon_loadouts[{member_key}] entry"
+                )
+                loadout.append(summon_id)
+            result[member_key] = loadout
+        return result
+
+    def _default_owned_summons(self, player_payload: Any) -> Dict[str, int]:
+        if player_payload is None:
+            return {}
+        mapping = self._require_dict(player_payload, "state.player")
+        class_id = self._require_str(mapping.get("class_id"), "state.player.class_id")
+        try:
+            class_def = self._classes_repo.get(class_id)
+        except KeyError as exc:
+            raise SaveLoadError(
+                f"Save incompatible with current definitions: class '{class_id}' missing."
+            ) from exc
+        return self._build_initial_owned_summons(
+            class_def.known_summons, class_def.default_equipped_summons
+        )
+
+    @staticmethod
+    def _build_initial_owned_summons(
+        known_summons: Sequence[str],
+        default_equipped: Sequence[str],
+    ) -> Dict[str, int]:
+        owned: Dict[str, int] = {}
+        for summon_id in default_equipped:
+            owned[summon_id] = owned.get(summon_id, 0) + 1
+        for summon_id in known_summons:
+            owned[summon_id] = max(owned.get(summon_id, 0), 1)
+        return owned
 
     def _coerce_bool_dict(self, value: Any, context: str) -> Dict[str, bool]:
         mapping = self._require_dict(value, context)

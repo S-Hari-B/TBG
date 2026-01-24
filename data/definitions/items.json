@@ -39,5 +39,10 @@
     "name": "Wolf Tooth",
     "kind": "material",
     "value": 8
+  },
+  "summon_micro_raptor": {
+    "name": "Micro Raptor (Summon)",
+    "kind": "summon",
+    "value": 60
   }
 }

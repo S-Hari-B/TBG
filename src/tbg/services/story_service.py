@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 from tbg.core.rng import RNG
 from tbg.data.repositories import (
@@ -260,6 +260,9 @@ class StoryService:
                 state.player = player
                 state.member_levels[player.id] = starting_level
                 state.member_exp[player.id] = 0
+                state.owned_summons = self._build_initial_owned_summons(
+                    class_def.known_summons, class_def.default_equipped_summons
+                )
                 self._inventory_service.initialize_player_loadout(state, player.id, class_def)
                 emitted.append(PlayerClassSetEvent(class_id=class_id, player_id=player.id))
             elif effect_type == "start_battle":
@@ -452,6 +455,18 @@ class StoryService:
                 state.player.stats.hp = state.player.stats.max_hp
             if restore_mp:
                 state.player.stats.mp = state.player.stats.max_mp
+
+    @staticmethod
+    def _build_initial_owned_summons(
+        known_summons: Sequence[str],
+        default_equipped: Sequence[str],
+    ) -> Dict[str, int]:
+        owned: Dict[str, int] = {}
+        for summon_id in default_equipped:
+            owned[summon_id] = owned.get(summon_id, 0) + 1
+        for summon_id in known_summons:
+            owned[summon_id] = max(owned.get(summon_id, 0), 1)
+        return owned
 
     def clear_checkpoint(self, state: GameState, thread_id: str = "main_story") -> None:
         """Clear any stored story checkpoint after a successful battle."""

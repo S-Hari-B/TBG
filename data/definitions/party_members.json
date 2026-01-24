@@ -14,7 +14,7 @@
       "DEX": 4,
       "INT": 10,
       "VIT": 4,
-      "BOND": 0
+      "BOND": 5
     },
     "equipment": {
       "weapons": ["fire_staff"],
@@ -46,7 +46,7 @@
       "DEX": 8,
       "INT": 4,
       "VIT": 4,
-      "BOND": 0
+      "BOND": 5
     },
     "equipment": {
       "weapons": ["iron_dagger", "iron_dagger"],

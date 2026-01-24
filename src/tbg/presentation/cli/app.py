@@ -30,6 +30,7 @@ from tbg.domain.defs import SkillDef
 from tbg.domain.state import GameState
 from tbg.services import (
     AreaServiceV2,
+    AttributeAllocationService,
     BattleAction,
     BattleController,
     BattleRequestedEvent,
@@ -364,8 +365,7 @@ def _build_camp_menu_entries(
     if _debug_enabled():
         entries.append(("Location Debug (DEBUG)", "location_debug"))
     entries.append(("Inventory / Equipment", "inventory"))
-    if _has_known_summons(state, summon_loadout_service):
-        entries.append(("Summons", "summons"))
+    entries.append(("Allocate Attributes", "allocate_attributes"))
     if state.party_members:
         entries.append(("Party Talk", "talk"))
     entries.append(("Save Game", "save"))
@@ -386,8 +386,7 @@ def _build_town_menu_entries(
     entries.append(("Quests", "quests"))
     entries.append(("Shops", "shops"))
     entries.append(("Inventory / Equipment", "inventory"))
-    if _has_known_summons(state, summon_loadout_service):
-        entries.append(("Summons", "summons"))
+    entries.append(("Allocate Attributes", "allocate_attributes"))
     if state.party_members:
         entries.append(("Party Talk", "talk"))
     entries.append(("Save Game", "save"))
@@ -453,6 +452,7 @@ def main() -> None:
         quest_service,
         shop_service,
         summon_loadout_service,
+        attribute_service,
     ) = _build_services()
     slot_store = SaveSlotStore()
     print("=== Text Based Game (To be renamed) ===")
@@ -477,6 +477,7 @@ def main() -> None:
             quest_service,
             shop_service,
             summon_loadout_service,
+            attribute_service,
             game_state,
             save_service,
             slot_store,
@@ -515,6 +516,7 @@ def _build_services() -> tuple[
     QuestService,
     ShopService,
     SummonLoadoutService,
+    AttributeAllocationService,
 ]:
     weapons_repo = WeaponsRepository()
     armour_repo = ArmourRepository()
@@ -584,6 +586,7 @@ def _build_services() -> tuple[
         items_repo=items_repo,
         weapons_repo=weapons_repo,
         armour_repo=armour_repo,
+        summons_repo=summons_repo,
     )
     save_service = SaveService(
         story_repo=story_repo,
@@ -599,6 +602,7 @@ def _build_services() -> tuple[
         classes_repo=classes_repo,
         summons_repo=summons_repo,
     )
+    attribute_service = AttributeAllocationService(classes_repo=classes_repo)
     return (
         story_service,
         battle_service,
@@ -608,6 +612,7 @@ def _build_services() -> tuple[
         quest_service,
         shop_service,
         summon_loadout_service,
+        attribute_service,
     )
 
 
@@ -674,6 +679,7 @@ def _run_story_loop(
     quest_service: QuestService,
     shop_service: ShopService,
     summon_loadout_service: SummonLoadoutService,
+    attribute_service: AttributeAllocationService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -692,6 +698,7 @@ def _run_story_loop(
                 quest_service,
                 shop_service,
                 summon_loadout_service,
+                attribute_service,
                 state,
                 save_service,
                 slot_store,
@@ -708,6 +715,7 @@ def _run_story_loop(
                 quest_service,
                 shop_service,
                 summon_loadout_service,
+                attribute_service,
                 state,
                 save_service,
                 slot_store,
@@ -732,6 +740,7 @@ def _run_story_loop(
                         quest_service,
                         shop_service,
                         summon_loadout_service,
+                        attribute_service,
                         state,
                         save_service,
                         slot_store,
@@ -752,6 +761,7 @@ def _run_story_loop(
             quest_service,
             shop_service,
             summon_loadout_service,
+            attribute_service,
             state,
             save_service,
             slot_store,
@@ -786,6 +796,7 @@ def _process_story_events(
     quest_service: QuestService,
     shop_service: ShopService,
     summon_loadout_service: SummonLoadoutService,
+    attribute_service: AttributeAllocationService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -799,6 +810,7 @@ def _process_story_events(
         quest_service,
         shop_service,
         summon_loadout_service,
+        attribute_service,
         state,
         save_service,
         slot_store,
@@ -815,6 +827,7 @@ def _handle_story_events(
     quest_service: QuestService,
     shop_service: ShopService,
     summon_loadout_service: SummonLoadoutService,
+    attribute_service: AttributeAllocationService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -846,6 +859,7 @@ def _handle_story_events(
                     quest_service,
                     shop_service,
                     summon_loadout_service,
+                    attribute_service,
                     state,
                     save_service,
                     slot_store,
@@ -864,6 +878,7 @@ def _handle_story_events(
                 quest_service,
                 shop_service,
                 summon_loadout_service,
+                attribute_service,
                 state,
                 save_service,
                 slot_store,
@@ -907,6 +922,7 @@ def _handle_story_events(
                 quest_service,
                 shop_service,
                 summon_loadout_service,
+                attribute_service,
                 state,
                 save_service,
                 slot_store,
@@ -923,6 +939,7 @@ def _handle_story_events(
                 quest_service,
                 shop_service,
                     summon_loadout_service,
+                attribute_service,
                 state,
                 save_service,
                 slot_store,
@@ -944,6 +961,7 @@ def _run_post_battle_interlude(
     quest_service: QuestService,
     shop_service: ShopService,
     summon_loadout_service: SummonLoadoutService,
+    attribute_service: AttributeAllocationService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -963,6 +981,7 @@ def _run_post_battle_interlude(
                 quest_service,
                 shop_service,
                 summon_loadout_service,
+                attribute_service,
                 state,
                 save_service,
                 slot_store,
@@ -975,6 +994,7 @@ def _run_post_battle_interlude(
                 inventory_service,
                 quest_service,
                 summon_loadout_service,
+                attribute_service,
                 state,
                 save_service,
                 slot_store,
@@ -991,6 +1011,7 @@ def _run_camp_menu(
     inventory_service: InventoryService,
     quest_service: QuestService,
     summon_loadout_service: SummonLoadoutService,
+    attribute_service: AttributeAllocationService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -1025,8 +1046,8 @@ def _run_camp_menu(
         if action == "inventory":
             _run_inventory_flow(inventory_service, summon_loadout_service, state)
             continue
-        if action == "summons":
-            _run_summons_menu(summon_loadout_service, state)
+        if action == "allocate_attributes":
+            _run_attribute_allocation_menu(attribute_service, inventory_service, state)
             continue
         if action == "talk":
             _handle_menu_party_talk(state)
@@ -1037,12 +1058,69 @@ def _run_camp_menu(
         return None
 
 
+def _run_attribute_allocation_menu(
+    attribute_service: AttributeAllocationService,
+    inventory_service: InventoryService,
+    state: GameState,
+) -> None:
+    if not state.player:
+        print("No player is available for allocation.")
+        return
+    while True:
+        summary = attribute_service.get_player_attribute_points_summary(state)
+        breakdown = inventory_service.build_attribute_breakdown(state, state.player.id)
+        lines = _build_attribute_lines(breakdown)
+        lines.append(f"Available points: {summary.available}")
+        render_heading("Allocate Attributes")
+        _render_boxed_panel("Attributes", lines)
+        if summary.available <= 0:
+            options = ["Back"]
+            if _debug_enabled():
+                options.insert(0, "DEBUG: Grant Attribute Points")
+            render_menu("Allocation Options", options)
+            choice = _prompt_menu_index(len(options))
+            if _debug_enabled() and choice == 0:
+                amount = _prompt_non_negative_int("Enter number of points to grant: ")
+                if amount < 1:
+                    print("Grant amount must be at least 1.")
+                    continue
+                if amount > 999:
+                    print("Grant amount must be 999 or less.")
+                    continue
+                result = attribute_service.grant_debug_attribute_points(state, amount)
+                print(result.message)
+                continue
+            return
+        options = ["STR", "DEX", "INT", "VIT", "BOND"]
+        if _debug_enabled():
+            options.append("DEBUG: Grant Attribute Points")
+        options.append("Back")
+        render_menu("Allocation Options", options)
+        choice = _prompt_menu_index(len(options))
+        if choice == len(options) - 1:
+            return
+        if _debug_enabled() and options[choice] == "DEBUG: Grant Attribute Points":
+            amount = _prompt_non_negative_int("Enter number of points to grant: ")
+            if amount < 1:
+                print("Grant amount must be at least 1.")
+                continue
+            if amount > 999:
+                print("Grant amount must be 999 or less.")
+                continue
+            result = attribute_service.grant_debug_attribute_points(state, amount)
+            print(result.message)
+            continue
+        result = attribute_service.spend_player_attribute_point(state, options[choice])
+        print(result.message)
+
+
 def _run_town_menu(
     story_service: StoryService,
     inventory_service: InventoryService,
     quest_service: QuestService,
     shop_service: ShopService,
     summon_loadout_service: SummonLoadoutService,
+    attribute_service: AttributeAllocationService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -1090,8 +1168,8 @@ def _run_town_menu(
         if action == "inventory":
             _run_inventory_flow(inventory_service, summon_loadout_service, state)
             continue
-        if action == "summons":
-            _run_summons_menu(summon_loadout_service, state)
+        if action == "allocate_attributes":
+            _run_attribute_allocation_menu(attribute_service, inventory_service, state)
             continue
         if action == "talk":
             _handle_menu_party_talk(state)
@@ -1109,6 +1187,7 @@ def _handle_defeat_flow(
     quest_service: QuestService,
     shop_service: ShopService,
     summon_loadout_service: SummonLoadoutService,
+    attribute_service: AttributeAllocationService,
     state: GameState,
     save_service: SaveService,
     slot_store: SaveSlotStore,
@@ -1133,6 +1212,7 @@ def _handle_defeat_flow(
         quest_service,
         shop_service,
         summon_loadout_service,
+        attribute_service,
         state,
         save_service,
         slot_store,
@@ -1151,6 +1231,7 @@ def _handle_defeat_flow(
         quest_service,
         shop_service,
         summon_loadout_service,
+        attribute_service,
         state,
         save_service,
         slot_store,
@@ -1683,7 +1764,6 @@ def _run_inventory_flow(
         summary = inventory_service.build_inventory_summary(state)
         render_heading("Shared Inventory")
         _render_inventory_summary(summary)
-        _render_summon_loadout_summary(state, summon_loadout_service)
         members = inventory_service.list_party_members(state)
         if not members:
             print("No party members available.")
@@ -1727,33 +1807,39 @@ def _render_inventory_summary(summary: InventorySummary) -> None:
 
 
 def _render_summon_loadout_summary(
-    state: GameState, summon_loadout_service: SummonLoadoutService
+    state: GameState, summon_loadout_service: SummonLoadoutService, owner_id: str
 ) -> None:
-    if not _has_known_summons(state, summon_loadout_service):
-        return
-    known_defs = summon_loadout_service.list_known_summons(state)
-    known_lookup = {summon.id: summon for summon in known_defs}
-    equipped = summon_loadout_service.get_equipped_summons(state)
     print("Summons:")
-    if equipped:
-        for index, summon_id in enumerate(equipped, start=1):
-            summon_def = known_lookup.get(summon_id)
-            if summon_def:
-                print(f"  {index}. {summon_def.name} (Bond {summon_def.bond_cost})")
-            else:
-                print(f"  {index}. {summon_id}")
-    else:
-        print("  Equipped: (none)")
+    known_defs = summon_loadout_service.list_known_summons(state)
+    if not known_defs:
+        print("  No summons available.")
+        return
+    known_lookup = {summon.id: summon for summon in known_defs}
+    owned_counts = summon_loadout_service.get_owned_summons(state)
+    equipped = summon_loadout_service.get_equipped_summons(state, owner_id)
+    equipped_counts: dict[str, int] = {}
+    for summon_id in equipped:
+        equipped_counts[summon_id] = equipped_counts.get(summon_id, 0) + 1
+    for summon_id in sorted(known_lookup.keys()):
+        summon_def = known_lookup[summon_id]
+        owned = owned_counts.get(summon_id, 0)
+        equipped_count = equipped_counts.get(summon_id, 0)
+        print(
+            f"  {summon_def.name} (Bond {summon_def.bond_cost}) - "
+            f"Owned {owned}, Equipped {equipped_count}"
+        )
 
 
-def _run_summons_menu(summon_loadout_service: SummonLoadoutService, state: GameState) -> None:
+def _run_summons_menu(
+    summon_loadout_service: SummonLoadoutService, state: GameState, owner_id: str, owner_name: str
+) -> None:
     known_defs = summon_loadout_service.list_known_summons(state)
     if not known_defs:
         print("No summons available.")
         return
     while True:
-        render_heading("Summons")
-        _render_summon_loadout_summary(state, summon_loadout_service)
+        render_heading(f"{owner_name}'s Summons")
+        _render_summon_loadout_summary(state, summon_loadout_service, owner_id)
         options = ["Equip Summon", "Unequip Summon", "Reorder Summons", "Back"]
         render_menu("Summon Options", options)
         choice = _prompt_menu_index(len(options))
@@ -1768,11 +1854,11 @@ def _run_summons_menu(summon_loadout_service: SummonLoadoutService, state: GameS
             if selection == len(entries) - 1:
                 continue
             try:
-                summon_loadout_service.equip_summon(state, known_defs[selection].id)
+                summon_loadout_service.equip_summon(state, owner_id, known_defs[selection].id)
             except ValueError as exc:
                 print(str(exc))
         elif choice == 1:
-            equipped = summon_loadout_service.get_equipped_summons(state)
+            equipped = summon_loadout_service.get_equipped_summons(state, owner_id)
             if not equipped:
                 print("No summons equipped.")
                 continue
@@ -1783,11 +1869,11 @@ def _run_summons_menu(summon_loadout_service: SummonLoadoutService, state: GameS
             if selection == len(entries) - 1:
                 continue
             try:
-                summon_loadout_service.unequip_summon(state, selection)
+                summon_loadout_service.unequip_summon(state, owner_id, selection)
             except ValueError as exc:
                 print(str(exc))
         elif choice == 2:
-            equipped = summon_loadout_service.get_equipped_summons(state)
+            equipped = summon_loadout_service.get_equipped_summons(state, owner_id)
             if len(equipped) < 2:
                 print("Not enough summons to reorder.")
                 continue
@@ -1802,7 +1888,9 @@ def _run_summons_menu(summon_loadout_service: SummonLoadoutService, state: GameS
             if to_choice == len(entries) - 1:
                 continue
             try:
-                summon_loadout_service.move_equipped_summon(state, from_choice, to_choice)
+                summon_loadout_service.move_equipped_summon(
+                    state, owner_id, from_choice, to_choice
+                )
             except ValueError as exc:
                 print(str(exc))
         else:
@@ -1822,11 +1910,9 @@ def _run_member_equipment_menu(
         render_heading(f"{member.name}'s Equipment")
         _display_weapon_slots(weapon_slots)
         _display_armour_slots(armour_slots)
-        if member.is_player:
-            _render_summon_loadout_summary(state, summon_loadout_service)
+        _render_summon_loadout_summary(state, summon_loadout_service, member.member_id)
         options = ["Manage Weapons", "Manage Armour", "View Attributes"]
-        if member.is_player and _has_known_summons(state, summon_loadout_service):
-            options.append("Manage Summons")
+        options.append("Manage Summons")
         options.append("Back")
         render_menu("Equipment Options", options)
         choice = _prompt_menu_index(len(options))
@@ -1836,12 +1922,10 @@ def _run_member_equipment_menu(
             _run_armour_menu(member, inventory_service, state)
         elif choice == 2:
             _render_member_attributes(member, inventory_service, state)
-        elif (
-            member.is_player
-            and _has_known_summons(state, summon_loadout_service)
-            and choice == 3
-        ):
-            _run_summons_menu(summon_loadout_service, state)
+        elif choice == 3:
+            _run_summons_menu(
+                summon_loadout_service, state, member.member_id, member.name
+            )
         else:
             return
 
@@ -1869,11 +1953,11 @@ def _build_attribute_lines(breakdown: AttributeScalingBreakdown) -> List[str]:
     attributes = breakdown.attributes
     contributions = breakdown.contributions
     return [
-        f"STR: {attributes.STR:>3} (+{contributions.attack:>2} ATK)",
-        f"DEX: {attributes.DEX:>3} (+{contributions.speed:>2} INIT)",
-        f"INT: {attributes.INT:>3} (+{contributions.max_mp:>2} MAX MP)",
-        f"VIT: {attributes.VIT:>3} (+{contributions.max_hp:>2} MAX HP)",
-        f"BOND:{attributes.BOND:>3} (Summons only)",
+        f"STR: {attributes.STR:>3} (+{contributions.attack:>2} ATK) - increases Attack",
+        f"DEX: {attributes.DEX:>3} (+{contributions.speed:>2} INIT) - increases Initiative/Speed",
+        f"INT: {attributes.INT:>3} (+{contributions.max_mp:>2} MAX MP) - increases Max MP",
+        f"VIT: {attributes.VIT:>3} (+{contributions.max_hp:>2} MAX HP) - increases Max HP",
+        f"BOND:{attributes.BOND:>3} - increases summon capacity and scaling",
     ]
 
 
@@ -2332,6 +2416,8 @@ def _format_battle_event_lines(events: List[BattleEvent]) -> List[str]:
             lines.append(f"- {event.combatant_name} is defeated.")
         elif isinstance(event, PartyTalkEvent):
             lines.append(f"- {event.text}")
+        elif isinstance(event, SummonSpawnedEvent):
+            lines.append(f"- {event.summon_name} is summoned.")
         elif isinstance(event, SkillUsedEvent):
             lines.append(
                 f"- {event.attacker_name} uses {event.skill_name} on {event.target_name} for {event.damage} damage."

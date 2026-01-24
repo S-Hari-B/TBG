@@ -8,6 +8,7 @@ from tbg.data.repositories import (
     ArmourRepository,
     ClassesRepository,
     ItemsRepository,
+    PartyMembersRepository,
     WeaponsRepository,
 )
 
@@ -82,6 +83,20 @@ def test_validation_rejects_unknown_field(tmp_path: Path) -> None:
     repo = ItemsRepository(base_path=definitions_dir)
     with pytest.raises(DataValidationError):
         repo.all()
+
+
+def test_bond_baseline_for_classes_and_party_members() -> None:
+    classes_repo = ClassesRepository()
+    party_repo = PartyMembersRepository()
+
+    assert classes_repo.get("warrior").starting_attributes.BOND == 5
+    assert classes_repo.get("rogue").starting_attributes.BOND == 5
+    assert classes_repo.get("mage").starting_attributes.BOND == 5
+    assert classes_repo.get("commoner").starting_attributes.BOND == 5
+    assert classes_repo.get("beastmaster").starting_attributes.BOND == 10
+
+    assert party_repo.get("emma").starting_attributes.BOND == 5
+    assert party_repo.get("niale").starting_attributes.BOND == 5
 
 
 def test_validation_rejects_wrong_type(tmp_path: Path) -> None:

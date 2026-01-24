@@ -131,6 +131,12 @@ Attributes now deterministically feed into derived combat stats. They remain fla
 - VIT: increases max HP by +3 per point.
 - BOND: summon-only stat reserved for future summon systems (no current combat effect).
 
+Attribute allocation v1:
+
+- Player-only, via Camp Menu.
+- Available points are derived from `(current_level - starting_level)` with 1 point per level.
+- Points are not awarded on level-up events; they are computed deterministically from level.
+
 Base vs final stats:
 
 - **Base stats** are computed from class/level baselines plus equipment (attack/defense from equipped gear).
