@@ -130,7 +130,9 @@ def test_auto_spawn_equipped_summons_respects_bond_capacity() -> None:
     assert [summon.source_id for summon in summons] == ["micro_raptor", "micro_raptor"]
     assert [summon.bond_cost for summon in summons] == [5, 5]
     summon_def = SummonsRepository().get("micro_raptor")
-    expected_attack = summon_def.attack + state.player.attributes.BOND * summon_def.bond_scaling.atk_per_bond
+    expected_attack = int(
+        summon_def.attack + state.player.attributes.BOND * summon_def.bond_scaling.atk_per_bond
+    )
     assert summons[0].stats.attack == expected_attack
     assert sum(isinstance(evt, SummonSpawnedEvent) for evt in events) == 2
 
