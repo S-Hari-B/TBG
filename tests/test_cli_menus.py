@@ -6,10 +6,15 @@ from tbg.presentation.cli.app import (
     _build_camp_menu_entries,
     _build_town_menu_entries,
     _filter_location_npcs,
+    _information_menu_options,
     _main_menu_options,
+    _print_main_menu_header,
+    _print_startup_banner,
     _prompt_index_batch,
     _play_node_with_auto_resume,
+    _run_information_menu,
     _run_shop_menu,
+    _show_placeholder_screen,
     _warp_to_checkpoint_location,
 )
 from tbg.services.shop_service import ShopSummaryView, ShopView
@@ -156,8 +161,65 @@ def test_camp_menu_does_not_include_summons() -> None:
 def test_main_menu_includes_load_but_not_save() -> None:
     options = _main_menu_options()
     labels = [label for label, _ in options]
-    assert "Load Game" in labels
+    assert labels == [
+        "New Game",
+        "Load Game",
+        "Options",
+        "Information",
+        "Quit",
+    ]
     assert "Save Game" not in labels
+
+
+def test_startup_banner_includes_name_and_version(capsys) -> None:
+    _print_startup_banner()
+    output = capsys.readouterr().out
+    assert "Echoes of the Cycle" in output
+    assert "v0.0.1" in output
+    assert "Demo" in output
+
+
+def test_main_menu_header_includes_name_and_version(capsys) -> None:
+    _print_main_menu_header()
+    output = capsys.readouterr().out
+    assert "Echoes of the Cycle" in output
+    assert "v0.0.1" in output
+
+
+def test_placeholder_screens_return_safely(monkeypatch, capsys) -> None:
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    _show_placeholder_screen("Options", ["Placeholder"])
+    _show_placeholder_screen("Information", ["Placeholder"])
+    output = capsys.readouterr().out
+    assert "Options" in output
+    assert "Information" in output
+
+
+def test_information_menu_has_required_entries() -> None:
+    labels = [label for label, _ in _information_menu_options()]
+    assert labels == [
+        "About This Demo",
+        "Available Content",
+        "Locked / Future Content",
+        "How to Progress",
+        "Save & Replay Expectations",
+        "Credits & Version",
+        "Back",
+    ]
+
+
+def test_information_menu_sections_render_and_return(monkeypatch, capsys) -> None:
+    # Choose each section, then Back.
+    selections = iter(["1", "", "2", "", "3", "", "4", "", "5", "", "6", "", "7"])
+    monkeypatch.setattr("builtins.input", lambda _: next(selections))
+    _run_information_menu()
+    output = capsys.readouterr().out
+    assert "About This Demo" in output
+    assert "Available Content" in output
+    assert "Locked / Future Content" in output
+    assert "How to Progress" in output
+    assert "Save & Replay Expectations" in output
+    assert "Credits & Version" in output
 
 
 def test_camp_menu_debug_option_hidden_without_flag(monkeypatch) -> None:
@@ -242,7 +304,7 @@ def test_town_menu_shops_dispatch(monkeypatch) -> None:
         calls["count"] += 1
 
     def fake_menu_entries(_state, _summon_service):
-        return [("Shops", "shops"), ("Quit to Main Menu", "quit")]
+        return [("Shops", "shops"), ("Quit Game", "quit")]
 
     choices = iter([0, 1])
 
@@ -339,7 +401,7 @@ def test_town_menu_allocate_attributes_flow(monkeypatch) -> None:
 
     last_menu: dict[str, list[str] | str] = {}
     choices = {
-        "Town Menu": ["Allocate Attributes", "Quit to Main Menu"],
+        "Town Menu": ["Allocate Attributes", "Quit Game"],
         "Allocation Options": ["STR", "Back"],
     }
 

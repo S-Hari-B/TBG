@@ -105,6 +105,7 @@ from tbg.services.inventory_service import (
 )
 from .render import (
     debug_enabled,
+    render_bullet_lines,
     render_choices,
     render_events_header,
     render_heading,
@@ -114,7 +115,20 @@ from .render import (
 )
 from .save_slots import SaveSlotStore, SlotMetadata
 
-MenuAction = Literal["new_game", "load_game", "quit"]
+MenuAction = Literal["new_game", "load_game", "options", "information", "quit"]
+InfoAction = Literal[
+    "about",
+    "content",
+    "locked",
+    "progress",
+    "saves",
+    "credits",
+    "back",
+]
+
+GAME_NAME = "Echoes of the Cycle"
+GAME_VERSION = "v0.0.1"
+DEMO_MESSAGE = "Demo build — content is limited; reaching an ending is expected."
 _MAX_RANDOM_SEED = 2**31 - 1
 _MENU_TALK_LINES = {
     "emma": [
@@ -351,8 +365,127 @@ def _main_menu_options() -> List[tuple[str, MenuAction]]:
     return [
         ("New Game", "new_game"),
         ("Load Game", "load_game"),
+        ("Options", "options"),
+        ("Information", "information"),
         ("Quit", "quit"),
     ]
+
+
+def _print_startup_banner() -> None:
+    print(f"=== {GAME_NAME} {GAME_VERSION} ===")
+    print(DEMO_MESSAGE)
+
+
+def _print_main_menu_header() -> None:
+    print(f"Main Menu — {GAME_NAME} {GAME_VERSION}")
+
+
+def _show_placeholder_screen(title: str, lines: Sequence[str]) -> None:
+    render_heading(title)
+    for line in lines:
+        print(line)
+    input("\nPress Enter to return to the main menu...")
+
+
+def _information_menu_options() -> List[tuple[str, InfoAction]]:
+    return [
+        ("About This Demo", "about"),
+        ("Available Content", "content"),
+        ("Locked / Future Content", "locked"),
+        ("How to Progress", "progress"),
+        ("Save & Replay Expectations", "saves"),
+        ("Credits & Version", "credits"),
+        ("Back", "back"),
+    ]
+
+
+def _info_about_demo() -> None:
+    render_heading("About This Demo")
+    lines = [
+        "This is a demo / vertical slice of Echoes of the Cycle.",
+        "Content is intentionally limited to showcase early systems, tone, and structure.",
+        "Reaching an ending is expected in this demo.",
+    ]
+    render_bullet_lines(lines)
+    input("\nPress Enter to return to Information...")
+
+
+def _info_available_content() -> None:
+    render_heading("Available Content")
+    lines = [
+        "Chapter 00 tutorial slice.",
+        "Core mechanics: combat, travel, towns, and party management.",
+        "A complete demo ending is included.",
+    ]
+    render_bullet_lines(lines)
+    input("\nPress Enter to return to Information...")
+
+
+def _info_locked_content() -> None:
+    render_heading("Locked / Future Content")
+    lines = [
+        "Additional chapters and areas are intentionally unavailable in this demo.",
+        "Missing content is not caused by player failure or skipped actions.",
+        "This demo focuses on a small, complete slice of the experience.",
+    ]
+    render_bullet_lines(lines)
+    input("\nPress Enter to return to Information...")
+
+
+def _info_how_to_progress() -> None:
+    render_heading("How to Progress")
+    lines = [
+        "\"No pending story nodes\" means there is no immediate scripted scene.",
+        "Travel is the primary way to discover new content and encounters.",
+        "Some states are natural pauses or the end of available demo content.",
+    ]
+    render_bullet_lines(lines)
+    input("\nPress Enter to return to Information...")
+
+
+def _info_save_replay() -> None:
+    render_heading("Save & Replay Expectations")
+    lines = [
+        "Saves are manual and stored in slots.",
+        "Saving to a slot overwrites its previous contents.",
+        "Replay is expected and safe in a demo context.",
+        "Future versions may change save compatibility.",
+    ]
+    render_bullet_lines(lines)
+    input("\nPress Enter to return to Information...")
+
+
+def _info_credits_version() -> None:
+    render_heading("Credits & Version")
+    lines = [
+        f"Game: {GAME_NAME}",
+        f"Version: {GAME_VERSION}",
+        "Author: TBG Project",
+        "Thank you for playing.",
+    ]
+    render_bullet_lines(lines)
+    input("\nPress Enter to return to Information...")
+
+
+def _run_information_menu() -> None:
+    while True:
+        render_menu("Information", [label for label, _ in _information_menu_options()])
+        choice = _prompt_menu_index(len(_information_menu_options()))
+        action = _information_menu_options()[choice][1]
+        if action == "back":
+            return
+        if action == "about":
+            _info_about_demo()
+        elif action == "content":
+            _info_available_content()
+        elif action == "locked":
+            _info_locked_content()
+        elif action == "progress":
+            _info_how_to_progress()
+        elif action == "saves":
+            _info_save_replay()
+        elif action == "credits":
+            _info_credits_version()
 
 
 def _build_camp_menu_entries(
@@ -369,7 +502,7 @@ def _build_camp_menu_entries(
     if state.party_members:
         entries.append(("Party Talk", "talk"))
     entries.append(("Save Game", "save"))
-    entries.append(("Quit to Main Menu", "quit"))
+    entries.append(("Quit Game", "quit"))
     return entries
 
 
@@ -390,7 +523,7 @@ def _build_town_menu_entries(
     if state.party_members:
         entries.append(("Party Talk", "talk"))
     entries.append(("Save Game", "save"))
-    entries.append(("Quit to Main Menu", "quit"))
+    entries.append(("Quit Game", "quit"))
     return entries
 
 
@@ -455,12 +588,24 @@ def main() -> None:
         attribute_service,
     ) = _build_services()
     slot_store = SaveSlotStore()
-    print("=== Text Based Game (To be renamed) ===")
+    _print_startup_banner()
     running = True
     while running:
         action = _main_menu_loop()
         if action == "quit":
             running = False
+            continue
+        if action == "options":
+            _show_placeholder_screen(
+                "Options",
+                [
+                    "Options are not available in this demo.",
+                    "More settings will be added in a future update.",
+                ],
+            )
+            continue
+        if action == "information":
+            _run_information_menu()
             continue
         if action == "load_game":
             game_state = _load_game_flow(save_service, slot_store)
@@ -492,7 +637,7 @@ def main() -> None:
 def _main_menu_loop() -> MenuAction:
     while True:
         print()
-        print("Main Menu")
+        _print_main_menu_header()
         options = _main_menu_options()
         for index, (label, _) in enumerate(options, start=1):
             print(f"{index}. {label}")
