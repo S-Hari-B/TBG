@@ -11,6 +11,11 @@
         "npc_id": "dana",
         "talk_node_id": "threshold_inn_hub_router",
         "quest_hub_node_id": "dana_turn_in_check"
+      },
+      {
+        "npc_id": "cerel",
+        "talk_node_id": "cerel_inn_converse_router",
+        "quest_hub_node_id": null
       }
     ],
     "connections": [
@@ -87,6 +92,48 @@
         "to": "goblin_cave_entrance",
         "label": "Follow the road to the goblin cave",
         "progresses_story": true
+      },
+      {
+        "to": "northern_ridge",
+        "label": "Head toward the northern ridge",
+        "progresses_story": false
+      }
+    ]
+  },
+  "northern_ridge": {
+    "name": "Northern Ridge",
+    "description": "Steep stone rises over the plains. Smoke stains the air, and crude totems mark goblin territory.",
+    "floor_id": "floor_one",
+    "type": "story",
+    "tags": ["ridge", "floor_one", "story"],
+    "entry_story_node_id": "northern_ridge_approach",
+    "connections": [
+      {
+        "to": "northern_ridge_path",
+        "label": "Press on up the ridge",
+        "progresses_story": false,
+        "show_if_flag_true": "flag_cerel_returned_to_inn"
+      },
+      {
+        "to": "open_plains",
+        "label": "Return to the Open Plains",
+        "progresses_story": false
+      }
+    ]
+  },
+  "northern_ridge_path": {
+    "name": "Northern Ridge Path",
+    "description": "A narrow trail climbs toward a rocky clearing marked by fresh totems.",
+    "floor_id": "floor_one",
+    "type": "story",
+    "tags": ["ridge", "floor_one", "story"],
+    "entry_story_node_id": "northern_ridge_path_router",
+    "entry_story_repeatable": true,
+    "connections": [
+      {
+        "to": "northern_ridge",
+        "label": "Return to the ridge",
+        "progresses_story": false
       }
     ]
   },

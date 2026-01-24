@@ -15,8 +15,9 @@ from tbg.data.repositories import (
     QuestsRepository,
 )
 from tbg.services.battle_service import BattleService
+from tbg.services.area_service_v2 import AreaServiceV2
 from tbg.services.inventory_service import InventoryService
-from tbg.services.story_service import StoryService
+from tbg.services.story_service import BattleRequestedEvent, StoryService
 from tbg.services.quest_service import QuestService
 
 
@@ -71,6 +72,9 @@ def _build_services() -> tuple[StoryService, BattleService, QuestService]:
 
 def _make_state_with_player(story_service: StoryService):
     state = story_service.start_new_game(seed=111, player_name="Hero")
+    view = story_service.get_current_node_view(state)
+    if view.node_id == "inn_orientation_choice":
+        story_service.choose(state, 1)  # Continue
     story_service.choose(state, 0)  # warrior
     state.story_checkpoint_node_id = None
     state.story_checkpoint_location_id = None
@@ -161,7 +165,7 @@ def test_cerel_kill_quest_turn_in_flow() -> None:
 
 
 def test_protoquest_turn_in_rewards_once() -> None:
-    story_service, battle_service, _quest_service = _build_services()
+    story_service, _battle_service, quest_service = _build_services()
     state = _make_state_with_player(story_service)
 
     starting_gold = state.gold
@@ -169,12 +173,23 @@ def test_protoquest_turn_in_rewards_once() -> None:
     # Completing ruins should only set ready flag, no gold.
     story_service.play_node(state, "protoquest_offer")
     story_service.play_node(state, "protoquest_accept")
+    assert state.flags.get("flag_protoquest_accepted") is True
     story_service.resume_pending_flow(state)
-    battle_state, _ = battle_service.start_battle("goblin_grunt", state)
-    battle_service.apply_victory_rewards(battle_state, state)
+
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
+    area_service = AreaServiceV2(
+        floors_repo=floors_repo,
+        locations_repo=locations_repo,
+        quest_service=quest_service,
+    )
+    state.current_location_id = "threshold_inn"
+    area_service.travel_to(state, "shoreline_ruins")
+
     assert state.flags.get("flag_protoquest_ready") is True
     assert state.flags.get("flag_protoquest_completed") is not True
     gold_after_battle = state.gold
+    potions_before_turn_in = state.inventory.items.get("potion_hp_small", 0)
 
     # Turn in to Dana for reward.
     story_service.play_node(state, "dana_protoquest_turn_in_check")
@@ -182,7 +197,8 @@ def test_protoquest_turn_in_rewards_once() -> None:
     story_service.resume_pending_flow(state)
     assert state.flags.get("flag_protoquest_completed") is True
     assert state.flags.get("flag_protoquest_ready") is False
-    assert state.gold == gold_after_battle + 10
+    assert state.gold == gold_after_battle + 30
+    assert state.inventory.items.get("potion_hp_small", 0) == potions_before_turn_in + 1
 
     # Turn in again should not grant more gold.
     gold_after = state.gold
@@ -190,3 +206,129 @@ def test_protoquest_turn_in_rewards_once() -> None:
     story_service.resume_pending_flow(state)
     story_service.resume_pending_flow(state)
     assert state.gold == gold_after
+    assert state.inventory.items.get("potion_hp_small", 0) == potions_before_turn_in + 1
+
+
+def test_protoquest_not_ready_from_tide_cave_but_ready_after_ruins() -> None:
+    story_service, battle_service, quest_service = _build_services()
+    state = _make_state_with_player(story_service)
+
+    story_service.play_node(state, "protoquest_offer")
+    story_service.play_node(state, "protoquest_accept")
+    story_service.resume_pending_flow(state)
+
+    story_service.play_node(state, "tide_cave_router")
+    battle_state, _ = battle_service.start_battle("cave_sentry_pair", state)
+    battle_service.apply_victory_rewards(battle_state, state)
+
+    assert state.flags.get("flag_protoquest_ready") is not True
+
+    story_service.play_node(state, "threshold_inn_hub_router")
+    while state.pending_story_node_id:
+        story_service.resume_pending_flow(state)
+    assert "Turn in: Dana's rumor reward" not in story_service.get_current_node_view(state).choices
+
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
+    area_service = AreaServiceV2(
+        floors_repo=floors_repo,
+        locations_repo=locations_repo,
+        quest_service=quest_service,
+    )
+    state.current_location_id = "threshold_inn"
+    area_service.travel_to(state, "shoreline_ruins")
+    assert state.flags.get("flag_protoquest_ready") is True
+
+    story_service.play_node(state, "threshold_inn_hub_router")
+    while state.pending_story_node_id:
+        story_service.resume_pending_flow(state)
+    assert "Turn in: Dana's rumor reward" in story_service.get_current_node_view(state).choices
+
+
+def test_tide_cave_reward_grants_debuff_items_once() -> None:
+    story_service, battle_service, _quest_service = _build_services()
+    state = _make_state_with_player(story_service)
+
+    story_service.play_node(state, "tide_cave_router")
+    events: list[object] = []
+    while state.pending_story_node_id:
+        events.extend(story_service.resume_pending_flow(state))
+        if any(isinstance(evt, BattleRequestedEvent) for evt in events):
+            break
+    battle_state, _ = battle_service.start_battle("cave_sentry_pair", state)
+    battle_service.apply_victory_rewards(battle_state, state)
+
+    vials_before_turn_in = state.inventory.items.get("weakening_vial", 0)
+    powder_before_turn_in = state.inventory.items.get("armor_sunder_powder", 0)
+
+    story_service.play_node(state, "tide_cave_report_solo")
+    story_service.resume_pending_flow(state)
+
+    assert state.inventory.items.get("weakening_vial", 0) == vials_before_turn_in + 1
+    assert state.inventory.items.get("armor_sunder_powder", 0) == powder_before_turn_in + 1
+
+    story_service.play_node(state, "tide_cave_report_solo")
+    story_service.resume_pending_flow(state)
+
+    assert state.inventory.items.get("weakening_vial", 0) == vials_before_turn_in + 1
+    assert state.inventory.items.get("armor_sunder_powder", 0) == powder_before_turn_in + 1
+
+
+def test_tide_cave_router_blocks_after_completion() -> None:
+    story_service, _battle_service, _quest_service = _build_services()
+    state = _make_state_with_player(story_service)
+    state.flags["flag_tide_cave_completed"] = True
+
+    events = story_service.play_node(state, "tide_cave_router")
+    events.extend(story_service.resume_pending_flow(state))
+    assert "tide_cave_cache" not in state.quests_active
+    assert not any(isinstance(evt, BattleRequestedEvent) for evt in events)
+    assert state.current_node_id == "tide_cave_already_cleared"
+
+
+def test_tide_cave_router_happy_path_starts_battle() -> None:
+    story_service, _battle_service, _quest_service = _build_services()
+    state = _make_state_with_player(story_service)
+
+    events = story_service.play_node(state, "tide_cave_router")
+    while state.pending_story_node_id:
+        events.extend(story_service.resume_pending_flow(state))
+        if any(isinstance(evt, BattleRequestedEvent) for evt in events):
+            break
+    assert "tide_cave_cache" in state.quests_active
+    assert any(isinstance(evt, BattleRequestedEvent) for evt in events)
+
+
+def test_rampager_quest_reward_grants_bundle_once() -> None:
+    story_service, battle_service, _quest_service = _build_services()
+    state = _make_state_with_player(story_service)
+
+    state.flags["flag_sq_cerel_rampager_offered"] = True
+    story_service.play_node(state, "cerel_rampager_quest_accept")
+    story_service.resume_pending_flow(state)
+
+    battle_state, _ = battle_service.start_battle("goblin_rampager", state)
+    battle_service.apply_victory_rewards(battle_state, state)
+
+    gold_before_turn_in = state.gold
+    hp_before_turn_in = state.inventory.items.get("potion_hp_small", 0)
+    energy_before_turn_in = state.inventory.items.get("potion_energy_small", 0)
+
+    assert state.flags.get("flag_sq_cerel_rampager_ready") is True
+
+    story_service.play_node(state, "cerel_rampager_turn_in_check")
+    while state.pending_story_node_id:
+        story_service.resume_pending_flow(state)
+
+    assert state.gold == gold_before_turn_in + 40
+    assert state.inventory.items.get("potion_hp_small", 0) == hp_before_turn_in + 2
+    assert state.inventory.items.get("potion_energy_small", 0) == energy_before_turn_in + 1
+
+    gold_after = state.gold
+    story_service.play_node(state, "cerel_rampager_turn_in_check")
+    while state.pending_story_node_id:
+        story_service.resume_pending_flow(state)
+
+    assert state.gold == gold_after
+    assert state.inventory.items.get("potion_hp_small", 0) == hp_before_turn_in + 2
+    assert state.inventory.items.get("potion_energy_small", 0) == energy_before_turn_in + 1

@@ -7,23 +7,44 @@
     "next": "arrival_beach_rescue"
   },
   "arrival_beach_rescue": {
-    "text": "\"Another one.\" A woman's voice, calm and practiced. \"Can you stand?\"\n\nYou nod. Two figures help you to your feet: one wears traveler's leathers, the other a worn tunic marked with faded guild symbols.\n\n\"The inn's not far,\" the woman says. \"You'll want answers. Everyone does.\"",
+    "text": "\"Another one.\" A woman's voice, calm and practiced. \"Can you stand?\"\n\nYou nod. She helps you to your feet—traveler's leathers, scarred hands, steady gaze.\n\n\"The inn's not far. You'll want answers, but first you need to survive.\"",
     "next": "inn_arrival"
   },
   "inn_arrival": {
-    "text": "The Threshold Inn sits just past the dunes, solid wood and warm light. Inside, a handful of arrivals sit nursing drinks or staring at their hands. You're shown to a table.\n\nA middle-aged man in crisp robes approaches. His smile is professional, reassuring.\n\n\"Welcome. I'm Cerel, integration specialist. You probably have a lot of questions. That's normal. Unfortunately, I can't answer them all, but I can help you learn the basics of survival here.\"",
+    "text": "The Threshold Inn sits just past the dunes. Inside, a handful of arrivals sit nursing drinks or staring at their hands.\n\nA middle-aged man in crisp robes approaches, his smile professional. \"Welcome. I'm Cerel, integration specialist. You probably have questions. Most can wait—but the basics can't.\"\n\nHe gestures to a table. \"Sit. Listen. Then we'll see if you can fight.\"",
     "next": "inn_orientation_cerel"
   },
   "inn_orientation_cerel": {
-    "text": "Cerel explains:\n\nThe Floors are layered zones, each with towns, wilderness, and a guardian gate to the next level. You're on Floor Zero—the starting point. Safe, but limited.\n\nMost arrivals can't remember their past clearly. That's normal. What matters now is forward.\n\nYou'll grow stronger through experience. Levels, skills, equipment—all real, all measurable. The system acknowledges your progress.\n\n\"Think of this as… a second chance. Or a test. Depends who you ask.\"",
+    "text": "Cerel's briefing is efficient:\n\nYou're on Floor Zero—the starting point. Safe, but limited. The Floors are layered zones with towns, wilderness, and guardians. Defeat the guardian, move up.\n\nYou'll grow stronger through experience. Levels, skills, equipment. The system tracks it all.\n\nMemory loss is normal. What matters now is forward.\n\n\"Think of this as a second chance,\" he says. \"Or a test. Depends who you ask.\"",
+    "next": "inn_orientation_choice"
+  },
+  "inn_orientation_choice": {
+    "text": "Cerel pauses, watching you.",
+    "choices": [
+      {
+        "label": "Ask about arrivals",
+        "next": "inn_lore_question_early"
+      },
+      {
+        "label": "Continue",
+        "next": "class_select"
+      }
+    ]
+  },
+  "inn_lore_question_early": {
+    "text": "Cerel's smile thins. \"No one knows for sure. You arrived like the others—washed up, disoriented, carrying fragments of a past you can't quite reach.\"\n\n\"Some say it's punishment. Some say it's selection. What I know is this: the Floors are real, the danger is real, and if you want to survive, you adapt.\"\n\nHe leans back. \"Any other philosophical questions can wait. You need to learn how to fight first.\"",
     "next": "inn_orientation_dana"
   },
+  "inn_lore_question": {
+    "text": "Cerel's smile thins. \"No one knows for sure. You arrived like the others—washed up, disoriented, carrying fragments of a past you can't quite reach.\"\n\n\"Some say it's punishment. Some say it's selection. What I know is this: the Floors are real, the danger is real, and if you want to survive, you adapt.\"\n\nHe leans back. \"Any other philosophical questions can wait. You need to learn how to fight first.\"",
+    "next": "cerel_inn_converse_router"
+  },
   "inn_orientation_dana": {
-    "text": "A scarred woman at the bar interjects, not looking up from her drink.\n\n\"Cerel makes it sound clean. It's not. Floors get harder. Monsters get meaner. Parties help, but they also slow you down—shared rewards, shared risk.\"\n\nShe finally glances your way. \"Name's Dana. Been here since the start. My advice? Pick your class carefully. You can't change it later. And don't rush Floor One alone—if you plan on surviving, bring at least one companion.\"",
+    "text": "A scarred woman at the bar interjects, not looking up from her drink.\n\n\"Cerel makes it sound clean. It's not. Floors get harder. Monsters get meaner. Parties help, but they also slow you down—shared rewards, shared risk.\"\n\nShe finally glances your way. \"Name's Dana. Been here since the start. My advice? Pick your class carefully. You can't change it. And don't rush Floor One alone—unless you're stupid or very, very good.\"",
     "next": "class_overview"
   },
   "class_overview": {
-    "text": "Cerel nods. \"Class selection is permanent for most. It shapes your combat style, your growth, your role in a party.\"\n\nHe gestures to a worn chart on the wall:\n\n**Warrior**: Frontline durability. High HP, solid defense. Reliable damage, shield skills.\n\n**Rogue**: Speed and precision. Lower HP, high evasion. Strong single-target burst.\n\n**Mage**: Ranged magic. Fragile, but devastating area attacks. MP-hungry.\n\n**Beastmaster**: Command of allies. Balanced stats, bonded summons, flexible support.\n\n**Commoner**: Unspecialized. Balanced stats, no clear strengths. A challenge run for veterans.\n\n\"Take your time. This choice matters.\"",
+    "text": "Cerel nods. \"Class selection is permanent. It shapes your combat style, your growth, your role in a party.\"\n\nHe gestures to a worn chart on the wall:\n\n**Warrior**: Frontline durability. High HP, solid defense. Reliable damage, shield skills.\n\n**Rogue**: Speed and precision. Lower HP, high evasion. Strong single-target burst.\n\n**Mage**: Ranged magic. Fragile, but devastating area attacks. MP-hungry.\n\n**Beastmaster**: Command of allies. Balanced stats, bonded summons, flexible support.\n\n**Commoner**: Unspecialized. Balanced stats, no clear strengths. A challenge run for veterans.\n\n\"Take your time. This choice matters.\"",
     "next": "class_select"
   },
   "class_select": {
@@ -31,7 +52,7 @@
     "choices": [
       { 
         "label": "Warrior", 
-        "next": "class_confirm",
+        "next": "class_confirm_router",
         "effects": [
           { "type": "set_class", "class_id": "warrior" },
           { "type": "set_flag", "flag_id": "flag_class_selected_warrior", "value": true }
@@ -39,7 +60,7 @@
       },
       { 
         "label": "Rogue", 
-        "next": "class_confirm",
+        "next": "class_confirm_router",
         "effects": [
           { "type": "set_class", "class_id": "rogue" },
           { "type": "set_flag", "flag_id": "flag_class_selected_rogue", "value": true }
@@ -47,7 +68,7 @@
       },
       { 
         "label": "Mage", 
-        "next": "class_confirm",
+        "next": "class_confirm_router",
         "effects": [
           { "type": "set_class", "class_id": "mage" },
           { "type": "set_flag", "flag_id": "flag_class_selected_mage", "value": true }
@@ -55,7 +76,7 @@
       },
       { 
         "label": "Commoner", 
-        "next": "class_confirm",
+        "next": "class_confirm_router",
         "effects": [
           { "type": "set_class", "class_id": "commoner" },
           { "type": "set_flag", "flag_id": "flag_class_selected_commoner", "value": true }
@@ -63,7 +84,7 @@
       },
       { 
         "label": "Beastmaster", 
-        "next": "class_confirm",
+        "next": "class_confirm_router",
         "effects": [
           { "type": "set_class", "class_id": "beastmaster" },
           { "type": "set_flag", "flag_id": "flag_class_selected_beastmaster", "value": true }
@@ -71,12 +92,76 @@
       }
     ]
   },
-  "class_confirm": {
-    "text": "A pulse runs through you—recognition, alignment. Your body feels… defined. Solid. Real.\n\nCerel smiles. \"Good. Now let's see if you can use it.\"",
+  "class_confirm_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_class_selected_warrior",
+        "expected": true,
+        "next_on_true": "class_confirm_warrior",
+        "next_on_false": "class_confirm_router_rogue"
+      }
+    ]
+  },
+  "class_confirm_router_rogue": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_class_selected_rogue",
+        "expected": true,
+        "next_on_true": "class_confirm_rogue",
+        "next_on_false": "class_confirm_router_mage"
+      }
+    ]
+  },
+  "class_confirm_router_mage": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_class_selected_mage",
+        "expected": true,
+        "next_on_true": "class_confirm_mage",
+        "next_on_false": "class_confirm_router_commoner"
+      }
+    ]
+  },
+  "class_confirm_router_commoner": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_class_selected_commoner",
+        "expected": true,
+        "next_on_true": "class_confirm_commoner",
+        "next_on_false": "class_confirm_beastmaster"
+      }
+    ]
+  },
+  "class_confirm_warrior": {
+    "text": "You chose Warrior.\n\nA pulse runs through you—recognition, alignment. Your body feels… defined. Solid. Real.\n\nCerel nods. \"Good. Now let's see if you can use it.\"",
+    "next": "trial_setup"
+  },
+  "class_confirm_rogue": {
+    "text": "You chose Rogue.\n\nA pulse runs through you—recognition, alignment. Your body feels… defined. Solid. Real.\n\nCerel nods. \"Good. Now let's see if you can use it.\"",
+    "next": "trial_setup"
+  },
+  "class_confirm_mage": {
+    "text": "You chose Mage.\n\nA pulse runs through you—recognition, alignment. Your body feels… defined. Solid. Real.\n\nCerel nods. \"Good. Now let's see if you can use it.\"",
+    "next": "trial_setup"
+  },
+  "class_confirm_commoner": {
+    "text": "You chose Commoner.\n\nA pulse runs through you—recognition, alignment. Your body feels… defined. Solid. Real.\n\nCerel nods. \"Good. Now let's see if you can use it.\"",
+    "next": "trial_setup"
+  },
+  "class_confirm_beastmaster": {
+    "text": "You chose Beastmaster.\n\nA pulse runs through you—recognition, alignment. Your body feels… defined. Solid. Real.\n\nCerel nods. \"Good. Now let's see if you can use it.\"",
     "next": "trial_setup"
   },
   "trial_setup": {
-    "text": "Cerel leads you outside, past the inn's training yard. A small fenced enclosure holds a single goblin scavenger, teeth bared, eyes wild.\n\n\"Standard trial. One-on-one. I'll observe, but I won't intervene. Defeat it, and we'll talk about what comes next.\"\n\nHe steps back. The gate opens.\n\n\"Your move.\"",
+    "text": "Cerel leads you outside to a fenced training yard. A single goblin scavenger paces inside, teeth bared, eyes wild.\n\n\"Standard trial. One-on-one. I'll observe, but I won't intervene. Defeat it, and we move forward.\"\n\nThe gate opens.\n\n\"Your move.\"",
     "next": "battle_trial_1v1"
   },
   "battle_trial_1v1": {
@@ -87,14 +172,14 @@
     "next": "trial_victory_reflect"
   },
   "trial_victory_reflect": {
-    "text": "The creature collapses. You're breathing hard, adrenaline fading. Then—\n\n**Level 2.**\n\nThe sensation is immediate: clarity, strength, capacity. Your wounds knit slightly. Your energy stabilizes.\n\nCerel nods. \"There it is. Growth. Each level makes you more resilient, more capable. But the curve flattens quickly—Level 10 takes far longer than Level 2.\"\n\nDana calls from the doorway. \"And your MP resets after every fight. Convenient, right? HP doesn't. Plan accordingly.\"",
+    "text": "The creature collapses. You're breathing hard, adrenaline fading. Then—\n\n**Level 2.**\n\nThe sensation is immediate: clarity, strength, capacity. Your wounds knit slightly. Your energy stabilizes.\n\nCerel nods. \"There it is. Growth. Each level makes you more resilient, more capable. But the curve flattens—Level 10 takes far longer than Level 2.\"\n\nDana calls from the doorway. \"And MP resets after every fight. HP doesn't. Plan accordingly.\"",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_trial_completed", "value": true }
     ],
     "next": "party_intro"
   },
   "party_intro": {
-    "text": "Cerel gestures you back inside. Two figures wait at your table.\n\nThe first is a young woman with a fire staff slung across her back. She offers a small, confident nod. \"Emma. Mage. I handle crowds and blast the critters from a distance.\"\n\nThe second is a lean man in dark leather, daggers sheathed at his belt. He grins. \"Niale. Rogue. I handle... problems. Quietly.\"\n\nCerel explains: \"Most Floor Zero exits are done in pairs or trios. Parties share rewards, but they also share risk. You'll split experience, but you'll survive encounters that would flatten you solo.\"\n\nDana adds from across the room: \"And someone can watch your back while you drink a potion. Don't underestimate that.\"\n\nEmma and Niale both look at you expectantly.\n\nCerel: \"Your call. Pick one for now. The other will be around if you need them later.\"",
+    "text": "Cerel gestures you back inside. Two figures wait at your table.\n\nThe first is a young woman with a fire staff slung across her back. She offers a small, confident nod. \"Emma. Mage. I handle crowds and blast things from a distance.\"\n\nThe second is a lean man in dark leather, daggers at his belt. He grins. \"Niale. Rogue. I handle... problems. Quietly.\"\n\nCerel explains: \"Most Floor Zero exits are done in pairs or trios. Parties share rewards, but they also survive encounters that would flatten you solo.\"\n\nDana: \"And someone can watch your back while you drink a potion. Don't underestimate that.\"\n\nCerel: \"Your call. Pick one for now, or go it alone. The other will be around if you need them later.\"",
     "next": "companion_choice"
   },
   "companion_choice": {
@@ -119,25 +204,25 @@
     ]
   },
   "companion_solo": {
-    "text": "\"I'll handle this alone,\" you say.\n\nEmma shrugs. \"Your call. We'll be around.\"\n\nNiale nods. \"Good luck.\"\n\nCerel frowns slightly. \"Ambitious. Solo runs are riskier, but you'll keep all the rewards. Just remember: parties exist for a reason. You can recruit later if you change your mind.\"\n\nDana calls out: \"And don't forget—knowledge is still valuable even solo. Study your enemies. Learn their patterns.\"",
+    "text": "\"I'll handle this alone,\" you say.\n\nEmma shrugs. \"Your call. We'll be around.\"\n\nNiale nods. \"Good luck.\"\n\nCerel frowns slightly. \"Ambitious. Solo runs are riskier, but you keep all the rewards. Parties exist for a reason, though. You can recruit later if you change your mind.\"\n\nDana calls out: \"And study your enemies. Knowledge is survival—even more so when you're alone.\"",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_companion_none", "value": true }
     ],
     "next": "solo_path_skip_party_battle"
   },
   "solo_path_skip_party_battle": {
-    "text": "Cerel decides to skip the multi-enemy training exercise. \"You've proven you can handle yourself one-on-one. For a solo run, that's the core skill. Multi-enemy encounters will be tougher without backup, but you'll learn through experience.\"\n\nHe gestures toward the inn. \"Let's talk strategy instead.\"",
+    "text": "Cerel skips the multi-enemy exercise. \"You've proven you can handle yourself one-on-one. For a solo run, that's the core skill. Multi-enemy encounters will be tougher without backup, but you'll learn.\"\n\nHe gestures toward the inn. \"Let's talk strategy instead.\"",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_party_battle_completed", "value": true }
     ],
     "next": "solo_knowledge_intro"
   },
   "solo_knowledge_intro": {
-    "text": "Inside, Dana offers some advice.\n\n\"Solo means no Party Talk in combat, but you can still learn. Pay attention to enemy behavior. HP estimates, attack patterns, weaknesses—it all matters. Some enemies telegraph their moves. Use that.\"\n\nCerel nods. \"Knowledge is survival. Even more so when you're alone. Floors have libraries, wandering scholars, other adventurers willing to share intel. Always worth the investment.\"",
+    "text": "Inside, Dana offers advice.\n\n\"Solo means no Party Talk in combat, but you can still learn. Pay attention to enemy behavior. HP estimates, attack patterns, weaknesses. Some enemies telegraph their moves. Use that.\"\n\nCerel nods. \"Knowledge is survival. Even more so when you're alone. Floors have libraries, wandering scholars, other adventurers willing to share intel. Always worth it.\"",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_knowledge_intro_seen", "value": true }
     ],
-    "next": "protoquest_offer"
+    "next": "protoquest_offer_router"
   },
   "companion_emma_join": {
     "text": "Emma grins. \"Good choice. Let's not die.\"\n\nNiale shrugs. \"Fair. I'll be around if you change your mind.\"\n\nCerel: \"Excellent. Let's test the synergy.\"",
@@ -148,7 +233,7 @@
     "next": "battle_party_setup"
   },
   "companion_niale_join": {
-    "text": "Niale nods. \"Smart. I won't slow you down.\"\n\nEmma raises an eyebrow. \"Your funeral. I'll be at the bar if you need a real damage dealer.\"\n\nCerel: \"Alright. Let's see how you work together.\"",
+    "text": "Niale nods. \"Smart. I won't slow you down.\"\n\nEmma raises an eyebrow. \"Your funeral. I'll be at the bar if you need real firepower.\"\n\nCerel: \"Alright. Let's see how you work together.\"",
     "effects": [
       { "type": "add_party_member", "member_id": "niale" },
       { "type": "set_flag", "flag_id": "flag_companion_niale", "value": true }
@@ -176,7 +261,7 @@
     "next": "party_after_battle"
   },
   "party_after_battle": {
-    "text": "The last creature falls. You're winded, but intact. Your companions catch their breath.\n\nCerel approaches. \"Well done. That's the foundation: solo capability, party coordination, and growth through conflict.\"\n\nDana joins him. \"And if you're smart, you'll use that Party Talk option in fights. Your companions might know enemy weaknesses, behavior patterns, or tactical advice. It's free intel and doesn't cost your turn.\"",
+    "text": "The last creature falls. You're winded, but intact. Your companions catch their breath.\n\nCerel approaches. \"Well done. That's the foundation: solo capability, party coordination, and growth through conflict.\"\n\nDana joins him. \"And if you're smart, you'll use that Party Talk option in fights. Your companions might know enemy weaknesses, behavior patterns, or tactical advice. Free intel. Doesn't cost a turn.\"",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_party_battle_completed", "value": true }
     ],
@@ -187,7 +272,182 @@
     "effects": [
       { "type": "set_flag", "flag_id": "flag_knowledge_intro_seen", "value": true }
     ],
-    "next": "protoquest_offer"
+    "next": "protoquest_offer_router"
+  },
+  "beach_side_area_intro": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "beach_side_area_intro_solo",
+        "next_on_false": "beach_side_area_intro_party"
+      }
+    ]
+  },
+  "beach_side_area_intro_solo": {
+    "text": "Cerel glances toward the cliffs. \"Before we open the Floor One gate, there's something you should see. Or maybe you shouldn't.\"\n\nDana follows his gaze. \"There's an old tide cave up the coast. Used to be a smuggler's cache, back when this place had smugglers. Now it's just... hollow. Quiet. Too quiet.\"\n\nShe looks at you. \"A few scavengers went in yesterday. Didn't come back. Could be goblins. Could be something else. You're not required to check it out, but if you do, be ready.\"",
+    "choices": [
+      {
+        "label": "Investigate the tide cave",
+        "next": "tide_cave_router"
+      },
+      {
+        "label": "Skip it. What's next?",
+        "next": "skip_tide_cave"
+      }
+    ]
+  },
+  "beach_side_area_intro_party": {
+    "text": "Cerel glances toward the cliffs. \"Before we open the Floor One gate, there's something you should see. Or maybe you shouldn't.\"\n\nDana follows his gaze. \"There's an old tide cave up the coast. Used to be a smuggler's cache, back when this place had smugglers. Now it's just... hollow. Quiet. Too quiet.\"\n\nYour companion shifts. \"I've heard stories. A few scavengers went in yesterday. Didn't come back.\"\n\nDana looks at you. \"Could be goblins. Could be something else. You're not required to check it out, but if you do, be ready.\"",
+    "choices": [
+      {
+        "label": "Investigate the tide cave",
+        "next": "tide_cave_router"
+      },
+      {
+        "label": "Skip it. What's next?",
+        "next": "skip_tide_cave"
+      }
+    ]
+  },
+  "tide_cave_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_tide_cave_completed",
+        "expected": true,
+        "next_on_true": "tide_cave_already_cleared",
+        "next_on_false": "tide_cave_entry_router"
+      }
+    ]
+  },
+  "tide_cave_entry_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "tide_cave_entry_solo",
+        "next_on_false": "tide_cave_entry_party"
+      }
+    ]
+  },
+  "tide_cave_already_cleared": {
+    "text": "The tide cave is quiet now. Whatever cache was here has been picked clean.\n\nNothing left but damp stone and old footprints.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "The tide cave has already been cleared. Return to the inn when ready."
+      }
+    ],
+    "next": "threshold_inn_hub_router"
+  },
+  "tide_cave_entry_solo": {
+    "text": "The tide cave yawns open, dark and damp. Salt-crusted walls, broken crates, old bloodstains. The air is still.\n\nYou move carefully, listening.\n\nA scrape. A shuffle. Something's here.\n\nYou turn—\n\nTwo goblins drop from the shadows, weapons raised. Ambush.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_tide_cave_visited", "value": true },
+      { "type": "quest", "action": "accept", "quest_id": "tide_cave_cache" }
+    ],
+    "next": "tide_cave_ambush"
+  },
+  "tide_cave_entry_party": {
+    "text": "The tide cave yawns open, dark and damp. Salt-crusted walls, broken crates, old bloodstains. The air is still.\n\nYour companion whispers, \"Stay sharp. This feels wrong.\"\n\nA scrape. A shuffle.\n\n\"Above!\" your companion shouts.\n\nTwo goblins drop from the shadows—ambush.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_tide_cave_visited", "value": true },
+      { "type": "quest", "action": "accept", "quest_id": "tide_cave_cache" }
+    ],
+    "next": "tide_cave_ambush"
+  },
+  "tide_cave_ambush": {
+    "text": "The goblins attack with frenzied precision. This isn't random—they were waiting.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "cave_sentry_pair" }
+    ],
+    "next": "tide_cave_aftermath"
+  },
+  "tide_cave_aftermath": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "tide_cave_aftermath_solo",
+        "next_on_false": "tide_cave_aftermath_party"
+      }
+    ]
+  },
+  "tide_cave_aftermath_solo": {
+    "text": "The goblins fall. You catch your breath, scanning the cave.\n\nIn the back, a small stash: vials, cloth wraps, sealed pouches. Debuff consumables—paralytic toxins, blinding powder. Smuggler's tools.\n\nYou pocket them. Useful.\n\nBut the ambush was deliberate. Organized. That's new.\n\nYou leave the cave and head back to the inn.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_tide_cave_completed", "value": true }
+    ],
+    "next": "tide_cave_report"
+  },
+  "tide_cave_aftermath_party": {
+    "text": "The goblins fall. Your companion exhales. \"That was coordinated. They knew we were coming.\"\n\nYou scan the cave. In the back: vials, cloth wraps, sealed pouches. Debuff consumables—paralytic toxins, blinding powder. Smuggler's tools.\n\nYour companion: \"Grab those. Could be useful later.\"\n\nYou pocket them and head back to the inn, uneasy.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_tide_cave_completed", "value": true }
+    ],
+    "next": "tide_cave_report"
+  },
+  "tide_cave_report": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "tide_cave_report_solo",
+        "next_on_false": "tide_cave_report_party"
+      }
+    ]
+  },
+  "tide_cave_report_solo": {
+    "text": "You report back to Dana.\n\n\"Ambush, huh?\" She frowns. \"That's not normal scavenger behavior. Goblins don't usually coordinate like that on Floor Zero.\"\n\nCerel overhears. \"It's been escalating. More sightings. More aggression. Something's pushing them.\"\n\nDana: \"Keep your guard up. If the goblins are organizing, Floor One's going to be worse.\"",
+    "effects": [
+      { "type": "quest", "action": "turn_in", "quest_id": "tide_cave_cache" }
+    ],
+    "next": "threshold_inn_hub_router"
+  },
+  "tide_cave_report_party": {
+    "text": "You report back to Dana.\n\nYour companion adds, \"They were waiting for us. Coordinated.\"\n\nDana frowns. \"That's not normal scavenger behavior. Goblins don't usually plan ambushes on Floor Zero.\"\n\nCerel overhears. \"It's been escalating. More sightings. More aggression. Something's pushing them.\"\n\nDana: \"Keep your guard up. If the goblins are organizing, Floor One's going to be worse.\"",
+    "effects": [
+      { "type": "quest", "action": "turn_in", "quest_id": "tide_cave_cache" }
+    ],
+    "next": "threshold_inn_hub_router"
+  },
+  "skip_tide_cave": {
+    "text": "\"I'll pass for now,\" you say.\n\nDana shrugs. \"Your call. Just know it's there.\"",
+    "next": "protoquest_offer_router"
+  },
+  "protoquest_offer_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_protoquest_declined",
+        "expected": true,
+        "next_on_true": "floor1_open_handoff",
+        "next_on_false": "protoquest_offer_check_completed"
+      }
+    ]
+  },
+  "protoquest_offer_check_completed": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_protoquest_completed",
+        "expected": true,
+        "next_on_true": "floor1_open_handoff",
+        "next_on_false": "protoquest_offer"
+      }
+    ]
   },
   "protoquest_offer": {
     "text": "",
@@ -203,27 +463,27 @@
     ]
   },
   "protoquest_offer_solo": {
-    "text": "Dana leans against the doorway. \"There's a rumor. Shoreline ruins, not far from here. Someone said they saw a supply cache—potions, maybe a weapon. Could be worth checking before you head to Floor One.\"\n\nShe looks at you directly. \"Optional. But free loot is free loot.\"\n\nCerel: \"Entirely your call. The Floor One gate is open when you're ready. No rush.\"\n\nDo you pursue the rumor?",
+    "text": "Dana leans against the bar. \"There's one more thing. Shoreline ruins, not far from here. Someone reported a supply cache—potions, maybe a weapon. Could be worth checking before you head to Floor One.\"\n\nShe looks at you directly. \"But it's optional. And if you're going, go soon. The window closes.\"\n\nCerel: \"The Floor One gate is open when you're ready. No rush.\"\n\nDo you pursue the rumor?",
     "choices": [
       {
-        "label": "Investigate the ruins (optional)",
+        "label": "Investigate the ruins (proto quest, one-time offer)",
         "next": "protoquest_accept"
       },
       {
-        "label": "Head straight to Floor One",
+        "label": "Pass. I'm ready for Floor One.",
         "next": "protoquest_decline"
       }
     ]
   },
   "protoquest_offer_party": {
-    "text": "Dana leans against the doorway. \"There's a rumor. Shoreline ruins, not far from here. Someone said they saw a supply cache—potions, maybe a weapon. Could be worth checking before you head to Floor One.\"\n\nYour companion glances at you. \"Optional. We don't need it, but free loot is free loot.\"\n\nCerel: \"Entirely your call. The Floor One gate is open when you're ready. No rush.\"\n\nDo you pursue the rumor?",
+    "text": "Dana leans against the bar. \"There's one more thing. Shoreline ruins, not far from here. Someone reported a supply cache—potions, maybe a weapon. Could be worth checking before you head to Floor One.\"\n\nYour companion glances at you. \"Optional. We don't need it, but free loot is free loot.\"\n\nDana: \"But if you're going, go soon. The window closes.\"\n\nCerel: \"The Floor One gate is open when you're ready. No rush.\"\n\nDo you pursue the rumor?",
     "choices": [
       {
-        "label": "Investigate the ruins (optional)",
+        "label": "Investigate the ruins (proto quest, one-time offer)",
         "next": "protoquest_accept"
       },
       {
-        "label": "Head straight to Floor One",
+        "label": "Pass. I'm ready for Floor One.",
         "next": "protoquest_decline"
       }
     ]
@@ -231,6 +491,7 @@
   "protoquest_accept": {
     "text": "\"Alright, I'll check it out,\" you say.\n\nDana nods. \"Smart. I'll mark it on your map. Don't take too long—ruins attract scavengers.\"",
     "effects": [
+      { "type": "set_flag", "flag_id": "flag_protoquest_accepted", "value": true },
       { "type": "quest", "action": "accept", "quest_id": "dana_shoreline_rumor" },
       {
         "type": "enter_game_menu",
@@ -330,7 +591,7 @@
         "message": "Objective complete. Return to Dana at the Threshold Inn for your reward."
       }
     ],
-    "next": "floor1_open_handoff"
+    "next": "threshold_inn_hub_router"
   },
   "protoquest_complete_party": {
     "text": "The scavenger falls. Behind it, a weathered chest. Inside: a small potion and a handful of gold.\n\nYou pocket the loot. \"Not bad. Let's head back.\"\n\nIf you want to report in, Dana is waiting at the inn.",
@@ -340,7 +601,7 @@
         "message": "Objective complete. Return to Dana at the Threshold Inn for your reward."
       }
     ],
-    "next": "floor1_open_handoff"
+    "next": "threshold_inn_hub_router"
   },
   "threshold_inn_hub_router": {
     "text": "",
@@ -390,8 +651,12 @@
         "next": "floor1_gate_prompt"
       },
       {
-        "label": "Return to camp menu",
-        "next": "threshold_inn_return"
+        "label": "Investigate the tide cave (optional)",
+        "next": "tide_cave_router"
+      },
+      {
+        "label": "Return to town menu",
+        "next": "threshold_inn_return_router"
       }
     ]
   },
@@ -411,8 +676,12 @@
         "next": "floor1_gate_prompt"
       },
       {
-        "label": "Return to camp menu",
-        "next": "threshold_inn_return"
+        "label": "Investigate the tide cave (optional)",
+        "next": "tide_cave_router"
+      },
+      {
+        "label": "Return to town menu",
+        "next": "threshold_inn_return_router"
       }
     ]
   },
@@ -432,8 +701,12 @@
         "next": "floor1_gate_prompt"
       },
       {
-        "label": "Return to camp menu",
-        "next": "threshold_inn_return"
+        "label": "Investigate the tide cave (optional)",
+        "next": "tide_cave_router"
+      },
+      {
+        "label": "Return to town menu",
+        "next": "threshold_inn_return_router"
       }
     ]
   },
@@ -457,17 +730,137 @@
         "next": "floor1_gate_prompt"
       },
       {
-        "label": "Return to camp menu",
-        "next": "threshold_inn_return"
+        "label": "Investigate the tide cave (optional)",
+        "next": "tide_cave_router"
+      },
+      {
+        "label": "Return to town menu",
+        "next": "threshold_inn_return_router"
       }
     ]
   },
-  "threshold_inn_return": {
-    "text": "You take a moment to breathe, then prepare to move.",
+  "cerel_inn_converse_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_rampager_ready",
+        "expected": true,
+        "next_on_true": "cerel_inn_converse_ready",
+        "next_on_false": "cerel_inn_converse_basic"
+      }
+    ]
+  },
+  "cerel_inn_converse_basic": {
+    "text": "Cerel looks up from his notes. \"What is it?\"",
+    "choices": [
+      {
+        "label": "Ask about arrivals",
+        "next": "inn_lore_question"
+      },
+      {
+        "label": "Ask about the goblin problem",
+        "next": "cerel_goblin_escalation_quest_offer"
+      },
+      {
+        "label": "Back to town menu",
+        "next": "threshold_inn_return_router"
+      }
+    ]
+  },
+  "cerel_inn_converse_ready": {
+    "text": "Cerel watches you closely. \"Back already?\"",
+    "choices": [
+      {
+        "label": "Turn in: Rampager hunt",
+        "next": "cerel_rampager_turn_in_check"
+      },
+      {
+        "label": "Ask about arrivals",
+        "next": "inn_lore_question"
+      },
+      {
+        "label": "Ask about the goblin problem",
+        "next": "cerel_goblin_escalation_quest_offer"
+      },
+      {
+        "label": "Back to town menu",
+        "next": "threshold_inn_return_router"
+      }
+    ]
+  },
+  "threshold_inn_return_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_protoquest_accepted",
+        "expected": true,
+        "next_on_true": "threshold_inn_return_active_check",
+        "next_on_false": "threshold_inn_return_offer_check"
+      }
+    ]
+  },
+  "threshold_inn_return_active_check": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_protoquest_completed",
+        "expected": true,
+        "next_on_true": "threshold_inn_return_no_rumor",
+        "next_on_false": "threshold_inn_return_active"
+      }
+    ]
+  },
+  "threshold_inn_return_offer_check": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_protoquest_completed",
+        "expected": true,
+        "next_on_true": "threshold_inn_return_no_rumor",
+        "next_on_false": "threshold_inn_return_declined_check"
+      }
+    ]
+  },
+  "threshold_inn_return_declined_check": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_protoquest_declined",
+        "expected": true,
+        "next_on_true": "threshold_inn_return_no_rumor",
+        "next_on_false": "threshold_inn_return_offerable"
+      }
+    ]
+  },
+  "threshold_inn_return_active": {
+    "text": "You take a moment to breathe, then prepare to move.\n\nThe shoreline ruins are still open if you want to follow up on Dana's rumor.",
     "effects": [
       {
         "type": "enter_game_menu",
         "message": "Use Travel to enter Floor One or explore the shoreline ruins."
+      }
+    ]
+  },
+  "threshold_inn_return_offerable": {
+    "text": "You take a moment to breathe, then prepare to move.\n\nIf you want more work, ask around at the inn before heading out.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Use Travel to enter Floor One or check in with the inn first."
+      }
+    ]
+  },
+  "threshold_inn_return_no_rumor": {
+    "text": "You take a moment to breathe, then prepare to move.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Use Travel to enter Floor One when you're ready."
       }
     ]
   },
@@ -576,6 +969,38 @@
     "text": "Dana nods. \"You've already been paid for that one.\"",
     "next": "threshold_inn_hub_router"
   },
+  "cerel_goblin_escalation_quest_offer": {
+    "text": "Cerel's expression darkens. \"The goblin activity has been escalating. We've had reports of a larger one—bigger, meaner, coordinating the others. Locals are calling it the 'Rampager.'\"\n\nHe looks at you seriously. \"It's been spotted near the northern ridge, past the plains. If you're feeling capable, I'd pay well to have it dealt with. But this isn't like the trial grunts. This one fights back.\"\n\nDana adds from across the room: \"If that thing is organizing the goblins, taking it down might buy Floor Zero some breathing room. Worth considering.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_sq_cerel_rampager_offered", "value": true }
+    ],
+    "choices": [
+      {
+        "label": "Accept: hunt the Goblin Rampager",
+        "next": "cerel_rampager_quest_accept"
+      },
+      {
+        "label": "Not yet. I need to prepare more.",
+        "next": "cerel_rampager_quest_decline"
+      }
+    ]
+  },
+  "cerel_rampager_quest_accept": {
+    "text": "Cerel nods grimly. \"Good. The Rampager has been spotted near the northern ridge. Follow the trail past the Open Plains. Be ready—this one's a fighter.\"\n\nDana: \"And bring backup if you have it. This isn't a solo job unless you're very confident.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_sq_cerel_rampager_accepted", "value": true },
+      { "type": "quest", "action": "accept", "quest_id": "cerel_rampager_hunt" },
+      {
+        "type": "enter_game_menu",
+        "message": "New quest: Hunt the Goblin Rampager. Travel to the Northern Ridge when ready."
+      }
+    ],
+    "next": "threshold_inn_hub_router"
+  },
+  "cerel_rampager_quest_decline": {
+    "text": "Cerel nods. \"Smart to know your limits. Come back when you're ready.\"",
+    "next": "cerel_inn_converse_router"
+  },
   "floor1_gate_prompt": {
     "text": "You step outside. The Floor One gate shimmers, waiting.",
     "effects": [
@@ -637,7 +1062,23 @@
     "next": "plains_offroad_after_battle"
   },
   "plains_offroad_after_battle": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "plains_offroad_after_battle_solo",
+        "next_on_false": "plains_offroad_after_battle_party"
+      }
+    ]
+  },
+  "plains_offroad_after_battle_solo": {
     "text": "The grass settles. You take stock of your supplies.",
+    "next": "plains_offroad_intro"
+  },
+  "plains_offroad_after_battle_party": {
+    "text": "The grass settles. Your companion wipes their blade. \"Good fight. Let's keep moving.\"",
     "next": "plains_offroad_intro"
   },
   "plains_offroad_leave": {
@@ -645,18 +1086,163 @@
     "effects": [
       {
         "type": "enter_game_menu",
-        "message": "Back on the road. Use Travel to head toward the goblin cave."
+        "message": "Back on the road. Use Travel to head toward the goblin cave or the northern ridge."
       }
     ]
+  },
+  "northern_ridge_approach": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_story_goblin_cave_reached",
+        "expected": true,
+        "next_on_true": "northern_ridge_rampager_gate",
+        "next_on_false": "northern_ridge_need_cerel"
+      }
+    ]
+  },
+  "northern_ridge_need_cerel": {
+    "text": "The northern ridge looms ahead, rocky and foreboding. A crude totem marks the trail—goblin territory.\n\nYou should speak with Cerel at the Goblin Cave Entrance first.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Northern Ridge is blocked. Travel to the Goblin Cave Entrance and speak with Cerel there."
+      }
+    ]
+  },
+  "northern_ridge_rampager_gate": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_rampager_accepted",
+        "expected": true,
+        "next_on_true": "northern_ridge_rampager_hunt",
+        "next_on_false": "northern_ridge_locked"
+      }
+    ]
+  },
+  "northern_ridge_locked": {
+    "text": "The northern ridge looms ahead, rocky and foreboding. A crude totem marks the trail—goblin territory.\n\nYou should return to the Threshold Inn and speak with Cerel.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Northern Ridge is blocked. Return to the inn and speak with Cerel."
+      }
+    ]
+  },
+  "northern_ridge_path_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_rampager_defeated",
+        "expected": true,
+        "next_on_true": "northern_ridge_cleared",
+        "next_on_false": "northern_ridge_rampager_gate"
+      }
+    ]
+  },
+  "northern_ridge_cleared": {
+    "text": "The ridge clearing is quiet now. Scattered totems sway in the wind, but the threat is gone.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "The ridge is quiet now. Return to the plains when you're ready."
+      }
+    ]
+  },
+  "northern_ridge_rampager_hunt": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "northern_ridge_rampager_hunt_solo",
+        "next_on_false": "northern_ridge_rampager_hunt_party"
+      }
+    ]
+  },
+  "northern_ridge_rampager_hunt_solo": {
+    "text": "The northern ridge is steep and broken. Crude totems line the trail, and the air smells of smoke and rot.\n\nYou climb carefully.\n\nAt the summit, a clearing. And in the center—\n\nThe Rampager.\n\nLarger than the others, scarred, armored in scavenged plates. It turns, sees you, and roars.\n\nThis is it.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_rampager_encountered", "value": true }
+    ],
+    "next": "rampager_boss_battle"
+  },
+  "northern_ridge_rampager_hunt_party": {
+    "text": "The northern ridge is steep and broken. Crude totems line the trail, and the air smells of smoke and rot.\n\nYour companion mutters, \"This place reeks of it. Stay sharp.\"\n\nYou climb carefully.\n\nAt the summit, a clearing. And in the center—\n\nThe Rampager.\n\nLarger than the others, scarred, armored in scavenged plates. It turns, sees you, and roars.\n\nYour companion readies their weapon. \"Here we go.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_rampager_encountered", "value": true }
+    ],
+    "next": "rampager_boss_battle"
+  },
+  "rampager_boss_battle": {
+    "text": "The Goblin Rampager charges.",
+    "effects": [
+      { "type": "start_battle", "enemy_id": "goblin_rampager" }
+    ],
+    "next": "rampager_victory"
+  },
+  "rampager_victory": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "rampager_victory_solo",
+        "next_on_false": "rampager_victory_party"
+      }
+    ]
+  },
+  "rampager_victory_solo": {
+    "text": "The Rampager collapses, its roar fading to a gurgle. You're battered, breathing hard, but alive.\n\nThe ridge is silent now. Whatever it was coordinating, it's over.\n\nYou take what you can carry and head back down the trail.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_rampager_defeated", "value": true }
+    ],
+    "next": "rampager_aftermath"
+  },
+  "rampager_victory_party": {
+    "text": "The Rampager collapses, its roar fading to a gurgle. You're battered, your companion is winded, but you're both standing.\n\n\"That... was something,\" your companion says, catching their breath. \"Good fight.\"\n\nThe ridge is silent now. Whatever it was coordinating, it's over.\n\nYou take what you can carry and head back down the trail.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_rampager_defeated", "value": true }
+    ],
+    "next": "rampager_aftermath"
+  },
+  "rampager_aftermath": {
+    "text": "The ridge falls silent. Whatever it was coordinating is gone.\n\nYou should return to the Threshold Inn and report to Cerel.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Rampager defeated. Return to the Threshold Inn and speak with Cerel."
+      }
+    ],
+    "next": "threshold_inn_hub_router"
   },
   "goblin_cave_entrance_intro": {
     "text": "The ridge opens into a shallow cave mouth. Smoke curls from inside, and crude totems hang from the rocks.\n\nCerel waits near the entrance, arms folded. \"You made it. This is the goblin cave—Floor One's first real hurdle.\"",
     "effects": [
-      { "type": "set_flag", "flag_id": "flag_story_goblin_cave_reached", "value": true }
+      { "type": "set_flag", "flag_id": "flag_story_goblin_cave_reached", "value": true },
+      { "type": "set_flag", "flag_id": "flag_cerel_returned_to_inn", "value": true }
     ],
     "next": "cave_entrance_router"
   },
   "cave_entrance_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_declined",
+        "expected": true,
+        "next_on_true": "cave_entrance_declined",
+        "next_on_false": "cave_entrance_offer_router"
+      }
+    ]
+  },
+  "cave_entrance_offer_router": {
     "text": "",
     "effects": [
       {
@@ -672,7 +1258,7 @@
     "text": "Cerel eyes the path ahead. \"The camp inside is open hunting. The deeper tunnels are harder and more dangerous. Choose your pace.\"\n\nHe gestures toward the cave mouth. \"If you want extra work, ask.\"",
     "choices": [
       {
-        "label": "Speak with Cerel about work",
+        "label": "Speak with Cerel about work (proto quest, one-time offer)",
         "next": "cerel_kill_quest_offer"
       },
       {
@@ -685,7 +1271,7 @@
     "text": "Cerel eyes the path ahead. \"The camp inside is open hunting. The deeper tunnels are harder and more dangerous. Choose your pace.\"\n\nHe gestures toward the cave mouth. \"If you want extra work, ask.\"",
     "choices": [
       {
-        "label": "Speak with Cerel about work",
+        "label": "Speak with Cerel about work (proto quest, one-time offer)",
         "next": "cerel_kill_quest_offer"
       },
       {
@@ -698,10 +1284,20 @@
       }
     ]
   },
+  "cave_entrance_declined": {
+    "text": "Cerel watches the cave in silence.",
+    "choices": [
+      {
+        "label": "Step back and prepare",
+        "next": "cave_entrance_exit"
+      }
+    ]
+  },
   "cerel_kill_quest_offer": {
-    "text": "\"Kill counts matter down here,\" Cerel says. \"Clear out ten goblin grunts and five half-orcs. Bring me proof and I'll pay. You'll learn their patterns along the way.\"\n\nHe adds: \"It's optional. But it'll sharpen you.\"",
+    "text": "\"Kill counts matter down here,\" Cerel says. \"Clear out ten goblin grunts and five half-orcs. Bring me proof and I'll pay. You'll learn their patterns along the way.\"\n\nHe adds: \"It's optional. But it'll sharpen you. This is a one-time offer.\"\n\nHe turns toward the inn. \"I'll head back after this.\"",
     "effects": [
-      { "type": "set_flag", "flag_id": "flag_sq_cerel_offered", "value": true }
+      { "type": "set_flag", "flag_id": "flag_sq_cerel_offered", "value": true },
+      { "type": "set_flag", "flag_id": "flag_cerel_returned_to_inn", "value": true }
     ],
     "choices": [
       {
@@ -709,7 +1305,7 @@
         "next": "cerel_kill_quest_accept"
       },
       {
-        "label": "Decline for now",
+        "label": "Decline (one-time)",
         "next": "cerel_kill_quest_decline"
       }
     ]
@@ -722,7 +1318,10 @@
     "next": "cave_entrance_exit"
   },
   "cerel_kill_quest_decline": {
-    "text": "Cerel shrugs. \"If you change your mind, I'll be here.\"",
+    "text": "Cerel nods. \"Understood. I won't ask again.\"",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_sq_cerel_declined", "value": true }
+    ],
     "next": "cave_entrance_exit"
   },
   "cerel_turn_in_check": {
@@ -763,6 +1362,45 @@
   "cerel_turn_in_completed": {
     "text": "Cerel nods. \"You've already been paid. Don't get complacent.\"",
     "next": "cave_entrance_exit"
+  },
+  "cerel_rampager_turn_in_check": {
+    "text": "Cerel waits for your report.",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_rampager_completed",
+        "expected": true,
+        "next_on_true": "cerel_rampager_turn_in_completed",
+        "next_on_false": "cerel_rampager_turn_in_ready_check"
+      }
+    ]
+  },
+  "cerel_rampager_turn_in_ready_check": {
+    "text": "Cerel listens, eyes narrowed.",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_rampager_ready",
+        "expected": true,
+        "next_on_true": "cerel_rampager_turn_in_success",
+        "next_on_false": "cerel_rampager_turn_in_not_ready"
+      }
+    ]
+  },
+  "cerel_rampager_turn_in_success": {
+    "text": "Cerel nods, relief flickering in his expression. \"Good work. That thing was organizing the attacks. With it gone, Floor Zero will quiet down—for a while.\"\n\nHe hands you a pouch of gold and a small bundle. \"You've earned this. And you've earned a warning: Floor One is where things get serious. The Rampager was a taste. The real threats are ahead.\"",
+    "effects": [
+      { "type": "quest", "action": "turn_in", "quest_id": "cerel_rampager_hunt" }
+    ],
+    "next": "threshold_inn_hub_router"
+  },
+  "cerel_rampager_turn_in_not_ready": {
+    "text": "Cerel shakes his head. \"If the Rampager is still out there, don't come back empty-handed.\"",
+    "next": "threshold_inn_hub_router"
+  },
+  "cerel_rampager_turn_in_completed": {
+    "text": "Cerel exhales. \"We've already settled that. Focus on what's ahead.\"",
+    "next": "threshold_inn_hub_router"
   },
   "cave_entrance_exit": {
     "text": "The cave mouth yawns ahead. The air smells of smoke and damp stone.",
@@ -805,7 +1443,23 @@
     "next": "goblin_camp_after_battle"
   },
   "goblin_camp_after_battle": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "goblin_camp_after_battle_solo",
+        "next_on_false": "goblin_camp_after_battle_party"
+      }
+    ]
+  },
+  "goblin_camp_after_battle_solo": {
     "text": "The camp quiets after the clash. Smoke and ash hang in the air.",
+    "next": "goblin_camp_hub"
+  },
+  "goblin_camp_after_battle_party": {
+    "text": "The camp quiets after the clash. Your companion wipes their blade. \"Efficient. Let's keep moving.\"",
     "next": "goblin_camp_hub"
   },
   "goblin_camp_leave": {
@@ -839,7 +1493,43 @@
     "next": "cave_guardian_foreshadow"
   },
   "cave_guardian_foreshadow": {
-    "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nA lock mechanism glows faintly, unresponsive. The guardian's chamber. Not yet.\n\nYou turn back, the warning etched into your memory.",
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_rampager_defeated",
+        "expected": true,
+        "next_on_true": "cave_guardian_post_rampager_router",
+        "next_on_false": "cave_guardian_foreshadow_router"
+      }
+    ]
+  },
+  "cave_guardian_foreshadow_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "cave_guardian_foreshadow_solo",
+        "next_on_false": "cave_guardian_foreshadow_party"
+      }
+    ]
+  },
+  "cave_guardian_post_rampager_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "cave_guardian_post_rampager_solo",
+        "next_on_false": "cave_guardian_post_rampager_party"
+      }
+    ]
+  },
+  "cave_guardian_foreshadow_solo": {
+    "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nA lock mechanism glows faintly, unresponsive. The guardian's chamber. Not yet.\n\nThis isn't the Rampager's path. You'll need to return to the plains and head to the northern ridge after speaking with Cerel.\n\nYou turn back, the warning etched into your memory.",
     "effects": [
       { "type": "set_flag", "flag_id": "flag_story_guardian_foreshadowed", "value": true },
       {
@@ -847,7 +1537,64 @@
         "message": "Guardian chamber locked. Return when stronger."
       }
     ],
-    "next": "floor1_ready"
+    "next": "floor1_ready_router"
+  },
+  "cave_guardian_foreshadow_party": {
+    "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nYour companion whispers, \"That's the guardian. We're not ready.\"\n\nA lock mechanism glows faintly, unresponsive. Not yet.\n\nThis isn't the Rampager's path. You'll need to return to the plains and head to the northern ridge after speaking with Cerel.\n\nYou turn back, the warning etched into your memory.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_guardian_foreshadowed", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "Guardian chamber locked. Return when stronger."
+      }
+    ],
+    "next": "floor1_ready_router"
+  },
+  "cave_guardian_post_rampager_solo": {
+    "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nA lock mechanism glows faintly, unresponsive. The guardian's chamber. Still sealed.\n\nYou've handled the worst of Floor One for now. Time to regroup at the inn or finish any remaining work.\n\nYou turn back, the warning etched into your memory.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_guardian_foreshadowed", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "Guardian chamber locked. Return when stronger."
+      }
+    ],
+    "next": "floor1_ready_router"
+  },
+  "cave_guardian_post_rampager_party": {
+    "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nYour companion whispers, \"That's the guardian. We're not ready.\"\n\nA lock mechanism glows faintly, unresponsive. Still sealed.\n\nThis is as far as you can go for now. Regroup at the inn or finish any remaining work.\n\nYou turn back, the warning etched into your memory.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_guardian_foreshadowed", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "Guardian chamber locked. Return when stronger."
+      }
+    ],
+    "next": "floor1_ready_router"
+  },
+  "floor1_ready_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_rampager_completed",
+        "expected": true,
+        "next_on_true": "chapter_00_epilogue",
+        "next_on_false": "floor1_ready_router_defeated"
+      }
+    ]
+  },
+  "floor1_ready_router_defeated": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_rampager_defeated",
+        "expected": true,
+        "next_on_true": "floor1_ready_turn_in",
+        "next_on_false": "floor1_ready"
+      }
+    ]
   },
   "floor1_ready": {
     "text": "Floor One is open. You can farm the plains, clear the goblin camp, finish side work, or prepare for the guardian.\n\nThe choice is yours—for now.",
@@ -855,12 +1602,63 @@
       { "type": "set_flag", "flag_id": "flag_story_floor1_ready", "value": true },
       {
         "type": "enter_game_menu",
-        "message": "Floor One slice complete. Explore freely."
+        "message": "Floor One slice complete. Explore freely, or tackle the Rampager if you haven't yet."
       }
     ],
-    "next": "ch00_complete"
+    "next": "ch00_complete_check"
+  },
+  "floor1_ready_turn_in": {
+    "text": "Floor One is open. The Rampager is down, but Cerel is still waiting at the inn.\n\nReturn to the Threshold Inn to report in and collect your reward.",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_story_floor1_ready", "value": true },
+      {
+        "type": "enter_game_menu",
+        "message": "Rampager defeated. Return to Cerel at the Threshold Inn."
+      }
+    ],
+    "next": "threshold_inn_hub_router"
+  },
+  "ch00_complete_check": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_rampager_completed",
+        "expected": true,
+        "next_on_true": "chapter_00_epilogue",
+        "next_on_false": "ch00_incomplete"
+      }
+    ]
+  },
+  "ch00_incomplete": {
+    "text": "Floor One exploration continues. When you're ready, tackle the Goblin Rampager to conclude Chapter 00."
+  },
+  "chapter_00_epilogue": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_companion_none",
+        "expected": true,
+        "next_on_true": "chapter_00_epilogue_solo",
+        "next_on_false": "chapter_00_epilogue_party"
+      }
+    ]
+  },
+  "chapter_00_epilogue_solo": {
+    "text": "You stand at the edge of Floor One, looking back at the Threshold Inn in the distance.\n\nYou've survived the trials, cleared threats, and proven yourself capable. The Rampager is dead. The goblins are scattered.\n\nBut the guardian still waits. And Floor Two lies beyond.\n\nCerel's words echo: \"This is where things get serious.\"\n\nYou adjust your gear. The real journey begins now.\n\n**— Chapter 00: The Threshold — Complete —**\n\n[End of current demo content. Thank you for playing! Floor One Guardian and Chapter 01 coming soon.]",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_ch00_complete", "value": true }
+    ]
+  },
+  "chapter_00_epilogue_party": {
+    "text": "You stand at the edge of Floor One with your companions, looking back at the Threshold Inn in the distance.\n\nYou've survived the trials, cleared threats, and proven yourselves capable. The Rampager is dead. The goblins are scattered.\n\nYour companion speaks: \"Good work out there. Whatever's ahead, we'll handle it.\"\n\nBut the guardian still waits. And Floor Two lies beyond.\n\nCerel's words echo: \"This is where things get serious.\"\n\nYou adjust your gear. The real journey begins now.\n\n**— Chapter 00: The Threshold — Complete —**\n\n[End of current demo content. Thank you for playing! Floor One Guardian and Chapter 01 coming soon.]",
+    "effects": [
+      { "type": "set_flag", "flag_id": "flag_ch00_complete", "value": true }
+    ]
   },
   "ch00_complete": {
-    "text": "Chapter 00 complete. The Floor One guardian still waits."
+    "text": "Chapter 00 complete. The Floor One guardian still waits.",
+    "next": "chapter_00_epilogue"
   }
 }

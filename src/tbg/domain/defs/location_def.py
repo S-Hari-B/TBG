@@ -41,4 +41,5 @@ class LocationDef:
     tags: Tuple[str, ...]
     connections: Tuple[LocationConnectionDef, ...]
     entry_story_node_id: str | None
+    entry_story_repeatable: bool = False
     npcs_present: Tuple[LocationNpcPresenceDef, ...] = ()

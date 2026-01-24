@@ -79,6 +79,11 @@ class LocationsRepository(RepositoryBase[LocationDef]):
                 entry_story_node_id = self._require_str(
                     entry_story_node_id, f"location '{location_id}' entry_story_node_id"
                 )
+            entry_story_repeatable = mapping.get("entry_story_repeatable", False)
+            if not isinstance(entry_story_repeatable, bool):
+                raise DataValidationError(
+                    f"location '{location_id}' entry_story_repeatable must be a boolean if provided."
+                )
 
             connections_data = self._require_list(
                 mapping.get("connections"), f"location '{location_id}' connections"
@@ -183,6 +188,7 @@ class LocationsRepository(RepositoryBase[LocationDef]):
                 tags=tuple(tags),
                 connections=tuple(connections),
                 entry_story_node_id=entry_story_node_id,
+                entry_story_repeatable=entry_story_repeatable,
                 npcs_present=tuple(npcs_present),
             )
         return definitions

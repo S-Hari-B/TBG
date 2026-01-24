@@ -1296,11 +1296,25 @@ def _handle_travel_menu(
         return None
 
 
+def _npc_is_available(npc_id: str, location_id: str, state: GameState) -> bool:
+    if npc_id == "cerel" and location_id == "threshold_inn":
+        return state.flags.get("flag_cerel_returned_to_inn", False)
+    return True
+
+
+def _filter_location_npcs(location_view: LocationView, state: GameState) -> List[object]:
+    return [
+        npc
+        for npc in location_view.npcs_present
+        if _npc_is_available(npc.npc_id, location_view.id, state)
+    ]
+
+
 def _handle_converse_menu(
     area_service: AreaServiceV2, story_service: StoryService, state: GameState
 ) -> List[object] | None:
     location_view = area_service.get_current_location_view(state)
-    npcs = list(location_view.npcs_present)
+    npcs = _filter_location_npcs(location_view, state)
     if not npcs:
         print("No one is available to converse here.")
         return None
@@ -1325,7 +1339,7 @@ def _handle_quests_menu(
         render_heading("Quest Journal")
         _render_quest_journal(journal)
         location_view = area_service.get_current_location_view(state)
-        turn_ins = _filter_turn_ins_for_location(journal.turn_ins, location_view)
+        turn_ins = _filter_turn_ins_for_location(journal.turn_ins, location_view, state)
         turn_ins = _order_turn_ins(turn_ins, location_view)
         options = [
             f"Turn in: {entry.name} ({entry.npc_id or 'Unknown'})" for entry in turn_ins
@@ -1583,9 +1597,13 @@ def _order_turn_ins(turn_ins: List[QuestTurnInView], location_view: LocationView
 
 
 def _filter_turn_ins_for_location(
-    turn_ins: List[QuestTurnInView], location_view: LocationView
+    turn_ins: List[QuestTurnInView], location_view: LocationView, state: GameState
 ) -> List[QuestTurnInView]:
-    npc_ids = {npc.npc_id for npc in location_view.npcs_present}
+    npc_ids = {
+        npc.npc_id
+        for npc in location_view.npcs_present
+        if _npc_is_available(npc.npc_id, location_view.id, state)
+    }
     filtered: List[QuestTurnInView] = []
     for entry in turn_ins:
         if entry.npc_id is None:

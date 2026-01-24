@@ -6,7 +6,7 @@
     "attack": 7,
     "defense": 5,
     "speed": 8,
-    "rewards_exp": 8,
+    "rewards_exp": 10,
     "rewards_gold": 3,
     "tags": ["goblin", "humanoid"],
     "equipment": {
@@ -63,7 +63,7 @@
     "attack": 9,
     "defense": 3,
     "speed": 4,
-    "rewards_exp": 10,
+    "rewards_exp": 12,
     "rewards_gold": 6,
     "tags": ["goblin", "humanoid"],
     "equipment": {
@@ -72,6 +72,26 @@
         "body": "goblin_patchwork_vest",
         "head": "goblin_bone_cap",
         "hands": "goblin_bracers"
+      }
+    }
+  },
+  "goblin_rampager": {
+    "name": "Goblin Rampager",
+    "hp": 120,
+    "mp": 0,
+    "attack": 13,
+    "defense": 6,
+    "speed": 5,
+    "rewards_exp": 18,
+    "rewards_gold": 14,
+    "tags": ["goblin", "humanoid", "rampager"],
+    "equipment": {
+      "weapons": ["goblin_spear"],
+      "armour_slots": {
+        "body": "goblin_patchwork_vest",
+        "head": "goblin_bone_cap",
+        "hands": "goblin_bracers",
+        "boots": "goblin_boots"
       }
     }
   },

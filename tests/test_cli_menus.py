@@ -5,6 +5,7 @@ from tbg.presentation.cli.app import (
     _MENU_RESELECT,
     _build_camp_menu_entries,
     _build_town_menu_entries,
+    _filter_location_npcs,
     _main_menu_options,
     _prompt_index_batch,
     _play_node_with_auto_resume,
@@ -19,10 +20,17 @@ from tbg.data.repositories import (
     ClassesRepository,
     SummonsRepository,
     WeaponsRepository,
+    ItemsRepository,
+    PartyMembersRepository,
+    QuestsRepository,
+    StoryRepository,
 )
 from tbg.services.summon_loadout_service import SummonLoadoutService
 from tbg.services.factories import create_player_from_class_id
 from tbg.services.story_service import GameMenuEnteredEvent
+from tbg.services.inventory_service import InventoryService
+from tbg.services.story_service import StoryService
+from tbg.services.quest_service import QuestService
 
 
 def _camp_state() -> GameState:
@@ -39,6 +47,41 @@ def _summon_service() -> SummonLoadoutService:
         summons_repo=summons_repo,
     )
     return SummonLoadoutService(classes_repo=classes_repo, summons_repo=summons_repo)
+
+
+def _build_story_service() -> StoryService:
+    weapons_repo = WeaponsRepository()
+    armour_repo = ArmourRepository()
+    party_repo = PartyMembersRepository()
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
+    items_repo = ItemsRepository()
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
+    story_repo = StoryRepository()
+    quests_repo = QuestsRepository(
+        items_repo=items_repo,
+        locations_repo=locations_repo,
+        story_repo=story_repo,
+    )
+    quest_service = QuestService(
+        quests_repo=quests_repo,
+        items_repo=items_repo,
+        locations_repo=locations_repo,
+        party_members_repo=party_repo,
+    )
+    return StoryService(
+        story_repo=story_repo,
+        classes_repo=ClassesRepository(weapons_repo=weapons_repo, armour_repo=armour_repo),
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+        inventory_service=inventory_service,
+        quest_service=quest_service,
+    )
 
 
 def test_camp_menu_includes_save_option() -> None:
@@ -58,6 +101,31 @@ def test_town_menu_includes_converse_and_quests() -> None:
     assert "Quests" in labels
     assert "Shops" in labels
     assert "Summons" not in labels
+
+
+def test_cerel_converse_requires_return_flag() -> None:
+    floors_repo = FloorsRepository()
+    locations_repo = LocationsRepository(floors_repo=floors_repo)
+    area_service = AreaServiceV2(floors_repo=floors_repo, locations_repo=locations_repo)
+    state = _camp_state()
+    area_service.initialize_state(state)
+    area_service.force_set_location(state, "threshold_inn")
+    location_view = area_service.get_current_location_view(state)
+
+    npcs = _filter_location_npcs(location_view, state)
+    assert [npc.npc_id for npc in npcs] == ["dana"]
+
+    story_service = _build_story_service()
+    story_service.play_node(state, "inn_arrival")
+    npcs = _filter_location_npcs(location_view, state)
+    assert [npc.npc_id for npc in npcs] == ["dana"]
+    assert state.flags.get("flag_sq_cerel_rampager_offered") is not True
+
+    story_service.play_node(state, "goblin_cave_entrance_intro")
+    npcs = _filter_location_npcs(location_view, state)
+    assert "cerel" in [npc.npc_id for npc in npcs]
+    story_service.play_node(state, "cerel_goblin_escalation_quest_offer")
+    assert state.flags.get("flag_sq_cerel_rampager_offered") is True
 
 
 def test_camp_menu_does_not_include_summons() -> None:
@@ -749,14 +817,15 @@ def test_filter_turn_ins_by_location_npcs() -> None:
     location_view = type(
         "LocationViewStub",
         (),
-        {"npcs_present": [type("Npc", (), {"npc_id": "dana"})()]},
+        {"npcs_present": [type("Npc", (), {"npc_id": "dana"})()], "id": "threshold_inn"},
     )()
     turn_ins = [
         QuestTurnInView(quest_id="q1", name="Dana Quest", npc_id="dana", node_id="node1"),
         QuestTurnInView(quest_id="q2", name="Cerel Quest", npc_id="cerel", node_id="node2"),
         QuestTurnInView(quest_id="q3", name="Unknown", npc_id=None, node_id="node3"),
     ]
-    filtered = _filter_turn_ins_for_location(turn_ins, location_view)
+    state = _camp_state()
+    filtered = _filter_turn_ins_for_location(turn_ins, location_view, state)
     assert [entry.quest_id for entry in filtered] == ["q1"]
 
 

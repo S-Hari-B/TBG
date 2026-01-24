@@ -9,17 +9,19 @@
       },
       "objectives": [
         {
-          "type": "kill_tag",
-          "tag": "goblin",
+          "type": "visit_area",
+          "area_id": "shoreline_ruins",
           "quantity": 1,
-          "label": "Clear the shoreline ruins"
+          "label": "Investigate the shoreline ruins"
         }
       ],
       "turn_in": { "node_id": "dana_protoquest_turn_in_check", "npc_id": "dana" },
       "rewards": {
-        "gold": 10,
+        "gold": 30,
         "party_exp": 0,
-        "items": [],
+        "items": [
+          { "item_id": "potion_hp_small", "quantity": 1 }
+        ],
         "set_flags": {
           "flag_protoquest_completed": true,
           "flag_protoquest_ready": false
@@ -55,6 +57,67 @@
       },
       "accept_flags": ["flag_sq_dana_accepted"],
       "complete_flags": ["flag_sq_dana_ready"]
+    },
+    "tide_cave_cache": {
+      "quest_id": "tide_cave_cache",
+      "name": "Tide Cave Cache",
+      "prereqs": {
+        "required_flags": ["flag_tide_cave_visited"],
+        "forbidden_flags": ["flag_tide_cave_rewarded"]
+      },
+      "objectives": [
+        {
+          "type": "kill_tag",
+          "tag": "goblin",
+          "quantity": 2,
+          "label": "Defeat the cave sentries"
+        }
+      ],
+      "turn_in": { "node_id": "tide_cave_report", "npc_id": "dana" },
+      "rewards": {
+        "gold": 0,
+        "party_exp": 0,
+        "items": [
+          { "item_id": "weakening_vial", "quantity": 1 },
+          { "item_id": "armor_sunder_powder", "quantity": 1 }
+        ],
+        "set_flags": {
+          "flag_tide_cave_rewarded": true
+        }
+      },
+      "accept_flags": [],
+      "complete_flags": []
+    },
+    "cerel_rampager_hunt": {
+      "quest_id": "cerel_rampager_hunt",
+      "name": "Cerel's Rampager Hunt",
+      "prereqs": {
+        "required_flags": ["flag_sq_cerel_rampager_offered"],
+        "forbidden_flags": ["flag_sq_cerel_rampager_completed"]
+      },
+      "objectives": [
+        {
+          "type": "kill_tag",
+          "tag": "rampager",
+          "quantity": 1,
+          "label": "Defeat the Goblin Rampager"
+        }
+      ],
+      "turn_in": { "node_id": "cerel_rampager_turn_in_check", "npc_id": "cerel" },
+      "rewards": {
+        "gold": 40,
+        "party_exp": 8,
+        "items": [
+          { "item_id": "potion_hp_small", "quantity": 2 },
+          { "item_id": "potion_energy_small", "quantity": 1 }
+        ],
+        "set_flags": {
+          "flag_sq_cerel_rampager_completed": true,
+          "flag_sq_cerel_rampager_ready": false
+        }
+      },
+      "accept_flags": ["flag_sq_cerel_rampager_accepted"],
+      "complete_flags": ["flag_sq_cerel_rampager_ready"]
     },
     "cerel_kill_hunt": {
       "quest_id": "cerel_kill_hunt",

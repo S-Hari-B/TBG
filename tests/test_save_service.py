@@ -101,6 +101,12 @@ def _build_test_services() -> tuple[StoryService, BattleService, InventoryServic
     return story_service, battle_service, inventory_service, save_service, area_service, repos
 
 
+def _advance_to_class_select(story_service: StoryService, state) -> None:
+    view = story_service.get_current_node_view(state)
+    if view.node_id == "inn_orientation_choice":
+        story_service.choose(state, 1)  # Continue
+
+
 def test_save_round_trip_preserves_state() -> None:
     (
         story_service,
@@ -113,6 +119,7 @@ def test_save_round_trip_preserves_state() -> None:
     state = story_service.start_new_game(seed=123, player_name="Tester")
     area_service.initialize_state(state)
     area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
     story_service.choose(state, 0)  # select first class
     state.gold = 77
     state.exp = 42
@@ -207,6 +214,7 @@ def test_missing_equipped_summons_defaults_to_empty() -> None:
     state = story_service.start_new_game(seed=321, player_name="Hero")
     area_service.initialize_state(state)
     area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
     story_service.choose(state, 0)
 
     payload = save_service.serialize(state)
@@ -230,6 +238,7 @@ def test_missing_attribute_points_spent_defaults_to_zero() -> None:
     state = story_service.start_new_game(seed=222, player_name="Hero")
     area_service.initialize_state(state)
     area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
     story_service.choose(state, 0)
     state.player_attribute_points_spent = 3
 
@@ -252,6 +261,7 @@ def test_missing_attribute_points_debug_bonus_defaults_to_zero() -> None:
     state = story_service.start_new_game(seed=333, player_name="Hero")
     area_service.initialize_state(state)
     area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
     story_service.choose(state, 0)
     state.player_attribute_points_debug_bonus = 5
 
@@ -274,6 +284,7 @@ def test_missing_owned_summons_defaults_from_class() -> None:
     state = story_service.start_new_game(seed=444, player_name="Hero")
     area_service.initialize_state(state)
     area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
     story_service.choose(state, 3)  # commoner has no summons
 
     payload = save_service.serialize(state)
@@ -284,6 +295,7 @@ def test_missing_owned_summons_defaults_from_class() -> None:
     state = story_service.start_new_game(seed=445, player_name="Hero")
     area_service.initialize_state(state)
     area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
     story_service.choose(state, 4)  # beastmaster
 
     payload = save_service.serialize(state)
@@ -305,6 +317,7 @@ def test_missing_party_member_summon_loadouts_defaults_empty() -> None:
     state = story_service.start_new_game(seed=446, player_name="Hero")
     area_service.initialize_state(state)
     area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
     story_service.choose(state, 0)
     state.party_members.append(repos["party"].all()[0].id)
 
@@ -326,6 +339,7 @@ def test_rng_determinism_survives_save_round_trip() -> None:
     state = story_service.start_new_game(seed=999, player_name="Hero")
     area_service.initialize_state(state)
     area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
     story_service.choose(state, 0)
     state.rng.randint(1, 100)  # advance RNG before saving
     payload = save_service.serialize(state)
@@ -363,6 +377,7 @@ def test_missing_attributes_default_from_definitions() -> None:
     state = story_service.start_new_game(seed=321, player_name="Hero")
     area_service.initialize_state(state)
     area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
     story_service.choose(state, 0)
     party_member_id = repos["party"].all()[0].id
     state.party_members.append(party_member_id)

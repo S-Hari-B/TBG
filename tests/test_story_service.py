@@ -80,6 +80,22 @@ def _make_battle_service() -> BattleService:
     )
 
 
+def _advance_to_class_select(service: StoryService, state) -> None:
+    view = service.get_current_node_view(state)
+    if view.node_id == "inn_orientation_choice":
+        service.choose(state, 1)  # Continue
+
+
+def _choose_class_and_reach_trial(service: StoryService, state, choice_index: int = 0):
+    result = service.choose(state, choice_index)
+    events = list(result.events)
+    while state.pending_story_node_id:
+        events.extend(service.resume_pending_flow(state))
+        if any(isinstance(evt, BattleRequestedEvent) for evt in events):
+            break
+    return events
+
+
 def test_story_repository_loads_nodes() -> None:
     repo = StoryRepository()
     class_node = repo.get("class_select")
@@ -95,31 +111,40 @@ def test_story_flow_advances_and_applies_effects() -> None:
     state = service.start_new_game(seed=12345, player_name="Tester")
     view = service.get_current_node_view(state)
 
-    assert view.node_id == "class_select"
+    assert view.node_id == "inn_orientation_choice"
     assert [segment[0] for segment in view.segments] == [
         "arrival_beach_wake",
         "arrival_beach_rescue",
         "inn_arrival",
         "inn_orientation_cerel",
-        "inn_orientation_dana",
-        "class_overview",
-        "class_select",
+        "inn_orientation_choice",
     ]
 
+    _advance_to_class_select(service, state)
+
     # Select warrior class
-    first_result = service.choose(state, 0)
+    first_events = _choose_class_and_reach_trial(service, state, 0)
     assert state.player is not None
-    assert any(isinstance(evt, PlayerClassSetEvent) for evt in first_result.events)
-    # After class selection, story auto-advances through setup to battle node
-    assert first_result.node_view.node_id == "battle_trial_1v1"
+    assert any(isinstance(evt, PlayerClassSetEvent) for evt in first_events)
+    assert state.current_node_id == "battle_trial_1v1"
 
     # The battle node triggers, so resume to handle the battle
-    battle_events = [evt for evt in first_result.events if isinstance(evt, BattleRequestedEvent)]
+    battle_events = [evt for evt in first_events if isinstance(evt, BattleRequestedEvent)]
     assert len(battle_events) > 0
     
     # Simulate victory and resume - should reach companion choice eventually
     post_trial = service.resume_pending_flow(state)
     assert state.current_node_id == "companion_choice"
+
+
+def test_inn_continue_skips_to_class_select() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=12346, player_name="Tester")
+    view = service.get_current_node_view(state)
+    assert view.node_id == "inn_orientation_choice"
+
+    result = service.choose(state, 1)  # Continue
+    assert result.node_view.node_id == "class_select"
 
 
 def test_story_determinism_with_same_seed() -> None:
@@ -128,6 +153,8 @@ def test_story_determinism_with_same_seed() -> None:
     state_b = service.start_new_game(seed=999, player_name="Hero")
 
     # Select same class for both
+    _advance_to_class_select(service, state_a)
+    _advance_to_class_select(service, state_b)
     result_a = service.choose(state_a, 0)
     result_b = service.choose(state_b, 0)
 
@@ -152,8 +179,9 @@ def test_first_and_second_battles_have_expected_party() -> None:
     state = story_service.start_new_game(seed=1234, player_name="Hero")
 
     # Select warrior
-    result = story_service.choose(state, 0)
-    battle_events = [e for e in result.events if isinstance(e, BattleRequestedEvent)]
+    _advance_to_class_select(story_service, state)
+    events = _choose_class_and_reach_trial(story_service, state, 0)
+    battle_events = [e for e in events if isinstance(e, BattleRequestedEvent)]
     assert len(battle_events) > 0
     first_battle_event = battle_events[0]
 
@@ -190,7 +218,8 @@ def test_companion_choice_affects_party() -> None:
     state = story_service.start_new_game(seed=5678, player_name="Hero")
 
     # Select class
-    story_service.choose(state, 0)  # warrior
+    _advance_to_class_select(story_service, state)
+    _choose_class_and_reach_trial(story_service, state, 0)  # warrior
     story_service.resume_pending_flow(state)  # after trial battle
 
     # Choose Niale (index 2 now, with solo=0, emma=1, niale=2, both=3)
@@ -219,7 +248,8 @@ def test_companion_choice_solo_path() -> None:
     state = story_service.start_new_game(seed=9999, player_name="Hero")
 
     # Select class
-    story_service.choose(state, 0)  # warrior
+    _advance_to_class_select(story_service, state)
+    _choose_class_and_reach_trial(story_service, state, 0)  # warrior
     story_service.resume_pending_flow(state)  # after trial battle
 
     # Choose solo (index 0)
@@ -228,7 +258,11 @@ def test_companion_choice_solo_path() -> None:
     assert len(state.party_members) == 0
     assert state.flags.get("flag_companion_none") is True
     # Should skip directly to knowledge intro without party battle
-    assert state.current_node_id == "protoquest_offer"
+    assert state.current_node_id in [
+        "protoquest_offer_router",
+        "protoquest_offer_check_completed",
+        "protoquest_offer",
+    ]
     assert state.flags.get("flag_party_battle_completed") is True  # flag set even though battle skipped
 
 
@@ -238,7 +272,8 @@ def test_companion_choice_both_companions() -> None:
     state = story_service.start_new_game(seed=7777, player_name="Hero")
 
     # Select class
-    story_service.choose(state, 0)  # warrior
+    _advance_to_class_select(story_service, state)
+    _choose_class_and_reach_trial(story_service, state, 0)  # warrior
     story_service.resume_pending_flow(state)  # after trial battle
 
     # Choose both (index 3)
@@ -255,20 +290,25 @@ def test_post_ambush_interlude_triggers_game_menu() -> None:
     state = story_service.start_new_game(seed=2024, player_name="Hero")
 
     # Select class
-    story_service.choose(state, 0)
+    _advance_to_class_select(story_service, state)
+    _choose_class_and_reach_trial(story_service, state, 0)
     story_service.resume_pending_flow(state)  # trial
     
     # Choose companion (Emma, index 1)
     result = story_service.choose(state, 1)
-    # The battle happens, so we need to resume multiple times
-    story_service.resume_pending_flow(state)  # party battle setup
-    story_service.resume_pending_flow(state)  # battle happens
-    story_service.resume_pending_flow(state)  # after party battle (victory assumed)
-    story_service.resume_pending_flow(state)  # knowledge intro
-    story_service.resume_pending_flow(state)  # advance to proto-quest
+    # Resume through the party battle flow and into the proto-quest offer.
+    if any(isinstance(e, BattleRequestedEvent) for e in result.events):
+        story_service.resume_pending_flow(state)
+    while state.pending_story_node_id:
+        story_service.resume_pending_flow(state)
     
     # Should reach proto-quest offer node (router will then branch to party variant)
-    assert state.current_node_id in ["protoquest_offer", "protoquest_offer_party"]
+    assert state.current_node_id in [
+        "protoquest_offer_router",
+        "protoquest_offer_check_completed",
+        "protoquest_offer",
+        "protoquest_offer_party",
+    ]
 
 
 def test_rewind_to_checkpoint_retries_failed_battle() -> None:
@@ -276,7 +316,8 @@ def test_rewind_to_checkpoint_retries_failed_battle() -> None:
     state = story_service.start_new_game(seed=303, player_name="Hero")
 
     # Select class and complete trial
-    story_service.choose(state, 0)  # class
+    _advance_to_class_select(story_service, state)
+    _choose_class_and_reach_trial(story_service, state, 0)  # class
     story_service.resume_pending_flow(state)  # trial
     
     # Choose Emma (index 1)
@@ -307,7 +348,8 @@ def test_resume_pending_flow_honors_checkpoint_even_without_pending() -> None:
     state = story_service.start_new_game(seed=404, player_name="Hero")
 
     # Get to party battle
-    story_service.choose(state, 0)  # class
+    _advance_to_class_select(story_service, state)
+    _choose_class_and_reach_trial(story_service, state, 0)  # class
     story_service.resume_pending_flow(state)  # trial
     story_service.choose(state, 1)  # choose Emma (index 1)
     story_service.resume_pending_flow(state)  # hit party battle checkpoint
@@ -325,7 +367,8 @@ def test_checkpoint_records_location() -> None:
     state = story_service.start_new_game(seed=515, player_name="Hero")
 
     # Get to party battle
-    story_service.choose(state, 0)  # class
+    _advance_to_class_select(story_service, state)
+    _choose_class_and_reach_trial(story_service, state, 0)  # class
     story_service.resume_pending_flow(state)  # trial
     result = story_service.choose(state, 1)  # choose Emma (index 1)
     
@@ -346,10 +389,12 @@ def test_checkpoint_clear_only_when_thread_matches() -> None:
     state = story_service.start_new_game(seed=616, player_name="Hero")
     
     # Get to party battle
-    story_service.choose(state, 0)  # class
+    _advance_to_class_select(story_service, state)
+    _choose_class_and_reach_trial(story_service, state, 0)  # class
     story_service.resume_pending_flow(state)  # trial
-    story_service.choose(state, 1)  # choose Emma (index 1)
-    story_service.resume_pending_flow(state)  # party battle
+    result = story_service.choose(state, 1)  # choose Emma (index 1)
+    if not any(isinstance(e, BattleRequestedEvent) for e in result.events):
+        story_service.resume_pending_flow(state)  # party battle
 
     state.story_checkpoint_thread_id = "quest_bandits"
     story_service.clear_checkpoint(state, thread_id="main_story")
@@ -469,4 +514,144 @@ def test_cave_entrance_turn_in_choice_gating() -> None:
         service.resume_pending_flow(state)
     choices = service.get_current_node_view(state).choices
     assert "Return to Cerel (kill-count turn-in)" in choices
+
+
+def test_cave_entrance_decline_removes_offer() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=508, player_name="Hero")
+    state.flags["flag_sq_cerel_declined"] = True
+
+    service.play_node(state, "cave_entrance_router")
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
+    choices = service.get_current_node_view(state).choices
+    assert "Speak with Cerel about work (proto quest, one-time offer)" not in choices
+    assert "Step back and prepare" in choices
+
+
+def test_rampager_boss_battle_uses_rampager_enemy() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=507, player_name="Hero")
+
+    events = service.play_node(state, "rampager_boss_battle")
+    battle_events = [evt for evt in events if isinstance(evt, BattleRequestedEvent)]
+
+    assert battle_events
+    assert battle_events[0].enemy_id == "goblin_rampager"
+
+
+def test_rampager_decline_returns_to_cerel_context() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=512, player_name="Hero")
+    service.play_node(state, "cerel_rampager_quest_decline")
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
+    assert state.current_node_id in [
+        "cerel_inn_converse_basic",
+        "cerel_inn_converse_ready",
+    ]
+
+
+def test_class_selection_sets_class_and_confirms_choice() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=515, player_name="Hero")
+
+    service.play_node(state, "class_select")
+    _choose_class_and_reach_trial(service, state, 0)  # Warrior
+
+    assert state.player is not None
+    assert state.player.class_id == "warrior"
+    segments = [text for _, text in state.pending_narration]
+    assert any("You chose Warrior." in segment for segment in segments)
+
+
+def test_cerel_arrivals_returns_to_cerel_context() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=513, player_name="Hero")
+
+    service.play_node(state, "cerel_inn_converse_basic")
+    view = service.get_current_node_view(state)
+    service.choose(state, view.choices.index("Ask about arrivals"))
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
+    assert state.current_node_id in [
+        "cerel_inn_converse_basic",
+        "cerel_inn_converse_ready",
+    ]
+
+
+def test_guardian_foreshadow_post_rampager_text() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=514, player_name="Hero")
+    state.flags["flag_rampager_defeated"] = True
+
+    service.play_node(state, "cave_guardian_foreshadow")
+    service.resume_pending_flow(state)
+    service.resume_pending_flow(state)
+    assert state.current_node_id in [
+        "cave_guardian_post_rampager_solo",
+        "cave_guardian_post_rampager_party",
+    ]
+    segments = [text for _, text in service.get_current_node_view(state).segments]
+    assert not any("Rampager" in segment for segment in segments)
+
+
+def test_floor1_ready_router_states() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=516, player_name="Hero")
+
+    service.play_node(state, "floor1_ready_router")
+    service.resume_pending_flow(state)
+    service.resume_pending_flow(state)
+    assert state.current_node_id == "floor1_ready"
+
+    state.flags["flag_rampager_defeated"] = True
+    service.play_node(state, "floor1_ready_router")
+    service.resume_pending_flow(state)
+    service.resume_pending_flow(state)
+    assert state.current_node_id == "floor1_ready_turn_in"
+
+    state.flags["flag_sq_cerel_rampager_completed"] = True
+    service.play_node(state, "floor1_ready_router")
+    service.resume_pending_flow(state)
+    service.resume_pending_flow(state)
+    assert state.current_node_id in [
+        "chapter_00_epilogue_solo",
+        "chapter_00_epilogue_party",
+    ]
+
+
+def test_protoquest_decline_skips_offer_on_revisit() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=509, player_name="Hero")
+    state.flags["flag_protoquest_declined"] = True
+
+    service.play_node(state, "protoquest_offer_router")
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
+    assert state.current_node_id == "threshold_inn_hub_basic"
+
+
+def test_northern_ridge_requires_cerel_at_cave() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=510, player_name="Hero")
+
+    service.play_node(state, "northern_ridge_approach")
+    while state.pending_story_node_id:
+        service.resume_pending_flow(state)
+    assert state.current_node_id == "northern_ridge_need_cerel"
+
+
+def test_northern_ridge_path_triggers_rampager_after_accept() -> None:
+    service = _make_story_service()
+    state = service.start_new_game(seed=511, player_name="Hero")
+    state.flags["flag_cerel_returned_to_inn"] = True
+    state.flags["flag_sq_cerel_rampager_accepted"] = True
+
+    events = service.play_node(state, "northern_ridge_path_router")
+    while state.pending_story_node_id:
+        events.extend(service.resume_pending_flow(state))
+    battle_events = [evt for evt in events if isinstance(evt, BattleRequestedEvent)]
+    assert battle_events
+    assert battle_events[0].enemy_id == "goblin_rampager"
 

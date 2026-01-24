@@ -102,7 +102,7 @@ def test_dana_shoreline_rumor_quest_flow() -> None:
     assert update is not None and update.accepted is True
     assert "dana_shoreline_rumor" in state.quests_active
 
-    quest_service.record_battle_victory(state, [["goblin"]])
+    quest_service.record_area_visit(state, "shoreline_ruins")
     assert "dana_shoreline_rumor" in state.quests_completed
     assert state.flags.get("flag_protoquest_ready") is True
 

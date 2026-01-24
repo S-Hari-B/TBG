@@ -185,13 +185,17 @@ class AreaServiceV2:
         checkpoint_thread = state.story_checkpoint_thread_id or "main_story"
         checkpoint_active = bool(state.story_checkpoint_node_id and checkpoint_thread == "main_story")
         if not checkpoint_active:
-            entry_seen = state.location_entry_seen.get(destination_def.id)
-            if entry_seen is None:
-                entry_seen = destination_def.entry_story_node_id is None
-                state.location_entry_seen[destination_def.id] = entry_seen
-            if destination_def.entry_story_node_id and not entry_seen:
+            if destination_def.entry_story_repeatable and destination_def.entry_story_node_id:
                 entry_story_node_id = destination_def.entry_story_node_id
-                state.location_entry_seen[destination_def.id] = True
+                state.location_entry_seen.setdefault(destination_def.id, False)
+            else:
+                entry_seen = state.location_entry_seen.get(destination_def.id)
+                if entry_seen is None:
+                    entry_seen = destination_def.entry_story_node_id is None
+                    state.location_entry_seen[destination_def.id] = entry_seen
+                if destination_def.entry_story_node_id and not entry_seen:
+                    entry_story_node_id = destination_def.entry_story_node_id
+                    state.location_entry_seen[destination_def.id] = True
 
         location_view = self._build_location_view(destination_def, state)
         events: List[object] = [

@@ -7,6 +7,7 @@ from tbg.data.errors import DataReferenceError, DataValidationError
 from tbg.data.repositories import (
     ArmourRepository,
     ClassesRepository,
+    EnemiesRepository,
     ItemsRepository,
     PartyMembersRepository,
     WeaponsRepository,
@@ -115,6 +116,14 @@ def test_validation_rejects_wrong_type(tmp_path: Path) -> None:
     repo = WeaponsRepository(base_path=definitions_dir)
     with pytest.raises(DataValidationError):
         repo.all()
+
+
+def test_enemies_repo_loads_goblin_rampager() -> None:
+    repo = EnemiesRepository()
+    enemy = repo.get("goblin_rampager")
+
+    assert enemy.name == "Goblin Rampager"
+    assert "rampager" in enemy.tags
 
 
 def test_classes_repo_reference_validation_fails_when_weapon_missing(tmp_path: Path) -> None:
