@@ -52,6 +52,9 @@ def test_definition_integrity_and_references(definitions_dir: Path) -> None:
     skills = _validate_skills(definitions_dir)
     classes = _validate_classes(definitions_dir, weapons, armour, items)
     enemies = _validate_enemies(definitions_dir, weapons, armour)
+    _validate_party_members(definitions_dir, weapons, armour)
+    _validate_summons(definitions_dir)
+    _validate_knowledge(definitions_dir)
     _validate_loot_tables(definitions_dir, items)
     story_node_ids = _validate_story(definitions_dir, classes, enemies)
     _validate_abilities(definitions_dir)
@@ -750,10 +753,13 @@ def _validate_loot_tables(definitions_dir: Path, item_ids: set[str]) -> None:
         return
     data = load_json(path)
     assert isinstance(data, list), "loot_tables.json must contain a list."
+    seen_ids: set[str] = set()
     for index, entry in enumerate(data):
         context = f"loot_tables[{index}]"
         mapping = _require_mapping(entry, context)
-        _require_str(mapping.get("id"), f"{context}.id")
+        table_id = _require_str(mapping.get("id"), f"{context}.id")
+        assert table_id not in seen_ids, f"{context}.id '{table_id}' is duplicated"
+        seen_ids.add(table_id)
         _require_str_list(mapping.get("required_enemy_tags", []), f"{context}.required_enemy_tags")
         _require_str_list(mapping.get("forbidden_enemy_tags", []), f"{context}.forbidden_enemy_tags")
         drops = _require_list(mapping.get("drops"), f"{context}.drops")
@@ -782,5 +788,101 @@ def _require_float(value: Any, context: str) -> float:
 def _require_number(value: Any, context: str) -> float:
     assert isinstance(value, (int, float)) and not isinstance(value, bool), f"{context} must be a number."
     return float(value)
+
+
+def _validate_party_members(
+    definitions_dir: Path,
+    weapon_ids: set[str],
+    armour_ids: set[str],
+) -> set[str]:
+    path = definitions_dir / "party_members.json"
+    if not path.exists():
+        return set()
+    data = load_json(path)
+    assert isinstance(data, dict), "party_members.json must contain an object."
+    member_ids: set[str] = set()
+    for member_id, payload in data.items():
+        _require_str(member_id, "party member id")
+        mapping = _require_mapping(payload, f"party member '{member_id}'")
+        _require_str(mapping.get("name"), f"party member '{member_id}' name")
+        base_stats = _require_mapping(mapping.get("base_stats"), f"party member '{member_id}' base_stats")
+        _require_int(base_stats.get("max_hp"), f"party member '{member_id}' base_stats.max_hp")
+        _require_int(base_stats.get("max_mp"), f"party member '{member_id}' base_stats.max_mp")
+        _require_int(base_stats.get("speed"), f"party member '{member_id}' base_stats.speed")
+        _require_int(mapping.get("starting_level"), f"party member '{member_id}' starting_level")
+        equipment = _require_mapping(mapping.get("equipment"), f"party member '{member_id}' equipment")
+        weapons = _require_str_list(
+            equipment.get("weapons", []), f"party member '{member_id}' equipment.weapons"
+        )
+        for weapon_id in weapons:
+            assert weapon_id in weapon_ids, f"party member '{member_id}' references unknown weapon '{weapon_id}'"
+        armour_id = equipment.get("armour")
+        if armour_id is not None:
+            armour_id = _require_str(armour_id, f"party member '{member_id}' equipment.armour")
+            assert armour_id in armour_ids, f"party member '{member_id}' references unknown armour '{armour_id}'"
+        armour_slots = equipment.get("armour_slots", {})
+        armour_slots_map = _require_mapping(
+            armour_slots, f"party member '{member_id}' equipment.armour_slots"
+        )
+        for slot, slot_armour_id in armour_slots_map.items():
+            _require_str(slot, f"party member '{member_id}' equipment.armour_slots slot")
+            slot_armour_id = _require_str(
+                slot_armour_id, f"party member '{member_id}' equipment.armour_slots.{slot}"
+            )
+            assert (
+                slot_armour_id in armour_ids
+            ), f"party member '{member_id}' references unknown armour '{slot_armour_id}'"
+        member_ids.add(member_id)
+    return member_ids
+
+
+def _validate_summons(definitions_dir: Path) -> set[str]:
+    path = definitions_dir / "summons.json"
+    if not path.exists():
+        return set()
+    data = load_json(path)
+    assert isinstance(data, dict), "summons.json must contain an object."
+    summon_ids: set[str] = set()
+    for summon_id, payload in data.items():
+        _require_str(summon_id, "summon id")
+        mapping = _require_mapping(payload, f"summon '{summon_id}'")
+        _require_str(mapping.get("name"), f"summon '{summon_id}' name")
+        _require_int(mapping.get("max_hp"), f"summon '{summon_id}' max_hp")
+        _require_int(mapping.get("max_mp"), f"summon '{summon_id}' max_mp")
+        _require_int(mapping.get("attack"), f"summon '{summon_id}' attack")
+        _require_int(mapping.get("defense"), f"summon '{summon_id}' defense")
+        _require_int(mapping.get("speed"), f"summon '{summon_id}' speed")
+        _require_int(mapping.get("bond_cost"), f"summon '{summon_id}' bond_cost")
+        if "bond_scaling" in mapping:
+            scaling = _require_mapping(mapping.get("bond_scaling"), f"summon '{summon_id}' bond_scaling")
+            _require_number(scaling.get("hp_per_bond"), f"summon '{summon_id}' bond_scaling.hp_per_bond")
+            _require_number(scaling.get("atk_per_bond"), f"summon '{summon_id}' bond_scaling.atk_per_bond")
+            _require_number(scaling.get("def_per_bond"), f"summon '{summon_id}' bond_scaling.def_per_bond")
+            _require_number(scaling.get("init_per_bond"), f"summon '{summon_id}' bond_scaling.init_per_bond")
+        summon_ids.add(summon_id)
+    return summon_ids
+
+
+def _validate_knowledge(definitions_dir: Path) -> None:
+    path = definitions_dir / "knowledge.json"
+    if not path.exists():
+        return
+    data = load_json(path)
+    assert isinstance(data, dict), "knowledge.json must contain an object."
+    for member_id, payload in data.items():
+        _require_str(member_id, "knowledge member id")
+        mapping = _require_mapping(payload, f"knowledge '{member_id}'")
+        entries = _require_list(mapping.get("known_enemies", []), f"knowledge '{member_id}' known_enemies")
+        for index, entry in enumerate(entries):
+            entry_map = _require_mapping(entry, f"knowledge '{member_id}' entry[{index}]")
+            _require_str_list(entry_map.get("enemy_tags", []), f"knowledge '{member_id}' entry[{index}].enemy_tags")
+            revealed = _require_mapping(
+                entry_map.get("revealed_fields", {}), f"knowledge '{member_id}' entry[{index}].revealed_fields"
+            )
+            if "hp_range" in revealed:
+                hp_range = _require_list(revealed.get("hp_range"), f"knowledge '{member_id}' entry[{index}].hp_range")
+                assert len(hp_range) == 2, f"knowledge '{member_id}' entry[{index}].hp_range must have 2 values"
+                _require_int(hp_range[0], f"knowledge '{member_id}' entry[{index}].hp_range[0]")
+                _require_int(hp_range[1], f"knowledge '{member_id}' entry[{index}].hp_range[1]")
 
 

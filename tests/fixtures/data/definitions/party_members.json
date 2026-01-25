@@ -1,0 +1,25 @@
+{
+  "emma": {
+    "name": "Emma",
+    "tags": ["mage"],
+    "base_stats": {
+      "max_hp": 24,
+      "max_mp": 12,
+      "speed": 5
+    },
+    "starting_attributes": {
+      "STR": 2,
+      "DEX": 3,
+      "INT": 5,
+      "VIT": 3,
+      "BOND": 5
+    },
+    "equipment": {
+      "weapons": ["test_staff"],
+      "armour_slots": {
+        "body": "test_cloth"
+      }
+    },
+    "starting_level": 1
+  }
+}

@@ -47,7 +47,7 @@
     "drops": [
       {
         "item_id": "wolf_tooth",
-        "chance": 0.6,
+        "chance": 0.3,
         "min_qty": 1,
         "max_qty": 1
       }

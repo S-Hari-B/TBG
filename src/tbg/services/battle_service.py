@@ -41,6 +41,11 @@ from tbg.services.errors import FactoryError
 from tbg.services.factories import create_enemy_instance, create_summon_combatant, make_instance_id
 from tbg.services.quest_service import QuestService
 
+ANTI_REPEAT_MULTIPLIER = 0.8  # Reduce threat for repeat targets when eligible.
+ANTI_REPEAT_IGNORE_GAP = 10  # Ignore repeat penalty if top threat exceeds runner-up by this amount.
+AGGRO_BASE_DIVISOR = 5  # Smaller base seed so damage quickly dominates.
+AGGRO_HIT_BONUS = 2  # Flat bonus so low-damage hits still build aggro.
+
 
 @dataclass(slots=True)
 class BattleView:
@@ -80,6 +85,16 @@ class BattleStartedEvent(BattleEvent):
     scaling_attack_per_level: int | None = None
     scaling_defense_per_level: int | None = None
     scaling_speed_per_level: int | None = None
+
+
+@dataclass(slots=True)
+class EnemyTargetingDebugEvent(BattleEvent):
+    attacker_id: str
+    attacker_name: str
+    target_id: str
+    target_name: str
+    top_value: int
+    anti_repeat_applied: bool
 
 
 @dataclass(slots=True)
@@ -323,6 +338,8 @@ class BattleService:
             )
         ]
         events.extend(self._auto_spawn_equipped_summons(state, battle_state))
+        self._initialize_enemy_aggro(battle_state)
+        self._initialize_party_threat(battle_state)
         self._rebuild_turn_queue(battle_state)
         if battle_state.turn_queue:
             battle_state.current_actor_id = battle_state.turn_queue[0]
@@ -389,6 +406,8 @@ class BattleService:
             rng=state.rng,
         )
         battle_state.allies.append(summon)
+        self._seed_aggro_for_ally(battle_state, summon)
+        self._seed_party_threat_for_ally(battle_state, summon)
         self._rebuild_turn_queue(battle_state)
         return [
             SummonSpawnedEvent(
@@ -504,7 +523,9 @@ class BattleService:
     def basic_attack(self, battle_state: BattleState, attacker_id: str, target_id: str) -> List[BattleEvent]:
         attacker = self._get_combatant(battle_state, attacker_id)
         target = self._get_combatant(battle_state, target_id)
-        damage, debuff_events = self._resolve_damage(attacker, target, bonus_power=0, minimum=1)
+        damage, debuff_events = self._resolve_damage(
+            battle_state, attacker, target, bonus_power=0, minimum=1
+        )
 
         events: List[BattleEvent] = [
             AttackResolvedEvent(
@@ -565,7 +586,7 @@ class BattleService:
         if skill.effect_type == "damage":
             for target in resolved_targets:
                 damage, debuff_events = self._resolve_damage(
-                    attacker, target, bonus_power=skill.base_power, minimum=1
+                    battle_state, attacker, target, bonus_power=skill.base_power, minimum=1
                 )
                 events.append(
                     SkillUsedEvent(
@@ -741,12 +762,20 @@ class BattleService:
         living_allies = [ally for ally in battle_state.allies if ally.is_alive]
         if not living_allies:
             return self._finalize_defeat(battle_state)
-        target_index = rng.randint(0, len(living_allies) - 1)
-        events = self.basic_attack(battle_state, actor.instance_id, living_allies[target_index].instance_id)
-        return events
+        target, anti_repeat_applied = self._select_enemy_target(battle_state, actor, living_allies, rng)
+        aggro_value = battle_state.enemy_aggro.get(actor.instance_id, {}).get(target.instance_id, 0)
+        events = self.basic_attack(battle_state, actor.instance_id, target.instance_id)
+        debug_event = EnemyTargetingDebugEvent(
+            attacker_id=actor.instance_id,
+            attacker_name=actor.display_name,
+            target_id=target.instance_id,
+            target_name=target.display_name,
+            top_value=aggro_value,
+            anti_repeat_applied=anti_repeat_applied,
+        )
+        return [debug_event, *events]
 
     def run_ally_ai_turn(self, battle_state: BattleState, actor_id: str, rng: RNG) -> List[BattleEvent]:
-        del rng  # ally AI is deterministic
         actor = self._get_combatant(battle_state, actor_id)
         living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
         if not living_enemies:
@@ -756,25 +785,35 @@ class BattleService:
         for skill in available_skills:
             if actor.stats.mp < skill.mp_cost:
                 continue
-            target_ids = self._select_ai_skill_targets(skill, actor, living_enemies)
+            target_ids = self._select_ai_skill_targets(battle_state, skill, actor, living_enemies, rng)
             if target_ids is None:
                 continue
             return self.use_skill(battle_state, actor_id, skill.id, target_ids)
 
-        target = living_enemies[0]
+        target = self._select_party_target(battle_state, actor, living_enemies, rng)
         return self.basic_attack(battle_state, actor_id, target.instance_id)
 
     def _select_ai_skill_targets(
-        self, skill: SkillDef, actor: Combatant, living_enemies: List[Combatant]
+        self,
+        battle_state: BattleState,
+        skill: SkillDef,
+        actor: Combatant,
+        living_enemies: List[Combatant],
+        rng: RNG,
     ) -> List[str] | None:
         if skill.target_mode == "self":
             return []
         if not living_enemies:
             return None
         if skill.target_mode == "single_enemy":
-            return [living_enemies[0].instance_id]
+            target = self._select_party_target(battle_state, actor, living_enemies, rng)
+            return [target.instance_id]
         if skill.target_mode == "multi_enemy":
-            return [enemy.instance_id for enemy in living_enemies[: skill.max_targets]]
+            if len(living_enemies) < 2:
+                return None
+            ordered = self._order_enemies_by_party_threat(battle_state, actor, living_enemies, rng)
+            targets = [enemy.instance_id for enemy in ordered[: skill.max_targets]]
+            return targets if len(targets) >= 2 else None
         return None
 
     # -----------------------
@@ -861,6 +900,43 @@ class BattleService:
         yield from battle_state.allies
         yield from battle_state.enemies
 
+    def _initialize_enemy_aggro(self, battle_state: BattleState) -> None:
+        battle_state.enemy_aggro = {}
+        battle_state.last_target = {}
+        living_allies = [ally for ally in battle_state.allies if ally.is_alive]
+        for enemy in battle_state.enemies:
+            aggro_map: Dict[str, int] = {}
+            for ally in living_allies:
+                aggro_map[ally.instance_id] = self._base_threat_for_target(ally)
+            battle_state.enemy_aggro[enemy.instance_id] = aggro_map
+            battle_state.last_target[enemy.instance_id] = None
+
+    def _initialize_party_threat(self, battle_state: BattleState) -> None:
+        battle_state.party_threat = {}
+        living_enemies = [enemy for enemy in battle_state.enemies if enemy.is_alive]
+        for ally in battle_state.allies:
+            threat_map: Dict[str, int] = {}
+            for enemy in living_enemies:
+                threat_map[enemy.instance_id] = self._base_threat_for_target(enemy)
+            battle_state.party_threat[ally.instance_id] = threat_map
+
+    def _seed_aggro_for_ally(self, battle_state: BattleState, ally: Combatant) -> None:
+        for enemy in battle_state.enemies:
+            aggro_map = battle_state.enemy_aggro.setdefault(enemy.instance_id, {})
+            aggro_map.setdefault(ally.instance_id, self._base_threat_for_target(ally))
+            battle_state.last_target.setdefault(enemy.instance_id, None)
+
+    def _seed_party_threat_for_ally(self, battle_state: BattleState, ally: Combatant) -> None:
+        threat_map = battle_state.party_threat.setdefault(ally.instance_id, {})
+        for enemy in battle_state.enemies:
+            threat_map.setdefault(enemy.instance_id, self._base_threat_for_target(enemy))
+
+    @staticmethod
+    def _base_threat_for_target(target: Combatant) -> int:
+        # Base threat uses a small fraction of max HP + DEF as a starting nudge.
+        base = (target.stats.max_hp + target.stats.defense) // AGGRO_BASE_DIVISOR
+        return max(1, base)
+
     def _rebuild_turn_queue(self, battle_state: BattleState) -> None:
         living = [c for c in self._iter_combatants(battle_state) if c.is_alive]
         living.sort(key=lambda c: (-c.stats.speed, c.instance_id))
@@ -905,6 +981,87 @@ class BattleService:
 
         battle_state.current_actor_id = next_actor_id
         return events
+
+    def _select_enemy_target(
+        self,
+        battle_state: BattleState,
+        enemy: Combatant,
+        living_allies: List[Combatant],
+        rng: RNG,
+    ) -> tuple[Combatant, bool]:
+        threat_map = battle_state.enemy_aggro.setdefault(enemy.instance_id, {})
+        for ally in living_allies:
+            threat_map.setdefault(ally.instance_id, self._base_threat_for_target(ally))
+
+        last_target_id = battle_state.last_target.get(enemy.instance_id)
+        base_threats = {ally.instance_id: threat_map.get(ally.instance_id, 0) for ally in living_allies}
+        top_threat = max(base_threats.values())
+        top_ids = [target_id for target_id, value in base_threats.items() if value == top_threat]
+        second_threat = None
+        if len(base_threats) > 1:
+            sorted_values = sorted(base_threats.values(), reverse=True)
+            second_threat = sorted_values[1]
+        ignore_repeat = (
+            last_target_id in base_threats
+            and len(living_allies) > 1
+            and len(top_ids) == 1
+            and top_ids[0] == last_target_id
+            and second_threat is not None
+            and top_threat - second_threat >= ANTI_REPEAT_IGNORE_GAP
+        )
+
+        effective: Dict[str, int] = {}
+        for ally in living_allies:
+            base_value = base_threats[ally.instance_id]
+            if ally.instance_id == last_target_id and len(living_allies) > 1 and not ignore_repeat:
+                effective[ally.instance_id] = int(base_value * ANTI_REPEAT_MULTIPLIER)
+            else:
+                effective[ally.instance_id] = base_value
+
+        max_effective = max(effective.values())
+        tied = [ally for ally in living_allies if effective[ally.instance_id] == max_effective]
+        if len(tied) == 1:
+            target = tied[0]
+        else:
+            target = tied[rng.randint(0, len(tied) - 1)]
+        anti_repeat_applied = (
+            target.instance_id == last_target_id and len(living_allies) > 1 and not ignore_repeat
+        )
+        return target, anti_repeat_applied
+
+    def _select_party_target(
+        self,
+        battle_state: BattleState,
+        ally: Combatant,
+        living_enemies: List[Combatant],
+        rng: RNG,
+    ) -> Combatant:
+        ordered = self._order_enemies_by_party_threat(battle_state, ally, living_enemies, rng)
+        return ordered[0]
+
+    def _order_enemies_by_party_threat(
+        self,
+        battle_state: BattleState,
+        ally: Combatant,
+        living_enemies: List[Combatant],
+        rng: RNG,
+    ) -> List[Combatant]:
+        threat_map = battle_state.party_threat.setdefault(ally.instance_id, {})
+        for enemy in living_enemies:
+            threat_map.setdefault(enemy.instance_id, self._base_threat_for_target(enemy))
+        threat_values: Dict[str, int] = {
+            enemy.instance_id: threat_map.get(enemy.instance_id, 0) for enemy in living_enemies
+        }
+        grouped: Dict[int, List[Combatant]] = {}
+        for enemy in living_enemies:
+            grouped.setdefault(threat_values[enemy.instance_id], []).append(enemy)
+        ordered: List[Combatant] = []
+        for threat_value in sorted(grouped.keys(), reverse=True):
+            group = grouped[threat_value]
+            if len(group) > 1:
+                rng.shuffle(group)
+            ordered.extend(group)
+        return ordered
 
     def _update_victory(self, battle_state: BattleState) -> BattleResolvedEvent | None:
         if all(not enemy.is_alive for enemy in battle_state.enemies):
@@ -1104,7 +1261,13 @@ class BattleService:
         return self.estimate_damage(attacker, target, bonus_power=bonus_power, minimum=minimum)
 
     def _resolve_damage(
-        self, attacker: Combatant, target: Combatant, *, bonus_power: int, minimum: int
+        self,
+        battle_state: BattleState,
+        attacker: Combatant,
+        target: Combatant,
+        *,
+        bonus_power: int,
+        minimum: int,
     ) -> tuple[int, List[BattleEvent]]:
         effective_attack = compute_effective_attack(attacker.stats, attacker.debuffs)
         effective_defense = compute_effective_defense(target.stats, target.debuffs)
@@ -1119,6 +1282,18 @@ class BattleService:
         debuff_events: List[BattleEvent] = []
         if not target.is_alive and target.debuffs:
             target.debuffs = []
+
+        if damage > 0 and attacker.side == "allies" and target.side == "enemies":
+            aggro_map = battle_state.enemy_aggro.setdefault(target.instance_id, {})
+            if attacker.instance_id not in aggro_map:
+                aggro_map[attacker.instance_id] = self._base_threat_for_target(attacker)
+            aggro_map[attacker.instance_id] += damage + AGGRO_HIT_BONUS
+            threat_map = battle_state.party_threat.setdefault(attacker.instance_id, {})
+            if target.instance_id not in threat_map:
+                threat_map[target.instance_id] = self._base_threat_for_target(target)
+            threat_map[target.instance_id] += damage + AGGRO_HIT_BONUS
+        elif damage > 0 and attacker.side == "enemies" and target.side == "allies":
+            battle_state.last_target[attacker.instance_id] = target.instance_id
 
         return damage, debuff_events
 

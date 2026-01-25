@@ -517,7 +517,8 @@ def test_state_panel_shows_enemy_hp_with_debug(monkeypatch, capsys) -> None:
     # Debug mode now shows [15/15|D1] format including defense
     assert "[15/15|D1]" in out
     assert ">  1" in out
-    assert "2 Emma" in out
+    assert "Emma" in out
+    assert "AGG:" in out
     assert "  3" in out
 
 
@@ -916,7 +917,7 @@ def test_party_talk_prints_once(monkeypatch, capsys) -> None:
         PartyTalkEvent(
             speaker_id="party_emma",
             speaker_name="Emma",
-            text="Emma: Goblins typically have 18-26 HP."
+            text="Emma: Goblins are dangerous."
         )
     ]
     lines = _format_battle_event_lines(events)
@@ -926,7 +927,7 @@ def test_party_talk_prints_once(monkeypatch, capsys) -> None:
     # Should contain exactly one RESULTS panel
     assert out.count("| RESULTS") == 1
     # Should contain the talk line exactly once
-    assert out.count("Emma: Goblins typically have 18-26 HP.") == 1
+    assert out.count("Emma: Goblins are dangerous.") == 1
 
 
 def test_battle_id_heading_only_in_debug(monkeypatch, capsys) -> None:

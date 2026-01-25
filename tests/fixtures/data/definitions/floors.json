@@ -1,0 +1,13 @@
+{
+  "floor_zero": {
+    "name": "Floor Zero",
+    "level": 0,
+    "starting_location_id": "threshold_inn",
+    "next_floor_id": "floor_one"
+  },
+  "floor_one": {
+    "name": "Floor One",
+    "level": 1,
+    "starting_location_id": "floor_one_gate"
+  }
+}

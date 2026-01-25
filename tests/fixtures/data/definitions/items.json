@@ -1,0 +1,30 @@
+{
+  "potion_hp_small": {
+    "name": "Small HP Potion",
+    "kind": "consumable",
+    "value": 5,
+    "heal_hp": 10,
+    "targeting": "ally"
+  },
+  "potion_energy_small": {
+    "name": "Small Energy Potion",
+    "kind": "consumable",
+    "value": 6,
+    "restore_energy": 5,
+    "targeting": "ally"
+  },
+  "weakening_vial": {
+    "name": "Weakening Vial",
+    "kind": "consumable",
+    "value": 4,
+    "debuff_attack_flat": 2,
+    "targeting": "enemy"
+  },
+  "armor_sunder_powder": {
+    "name": "Armor Sunder Powder",
+    "kind": "consumable",
+    "value": 4,
+    "debuff_defense_flat": 2,
+    "targeting": "enemy"
+  }
+}

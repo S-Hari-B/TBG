@@ -1,0 +1,52 @@
+{
+  "warrior": {
+    "name": "Warrior",
+    "base_hp": 30,
+    "base_mp": 10,
+    "speed": 5,
+    "starting_weapon": "test_sword",
+    "starting_armour": "test_cloth",
+    "starting_attributes": {
+      "STR": 5,
+      "DEX": 3,
+      "INT": 1,
+      "VIT": 5,
+      "BOND": 0
+    },
+    "starting_items": {
+      "potion_hp_small": 1
+    }
+  },
+  "mage": {
+    "name": "Mage",
+    "base_hp": 22,
+    "base_mp": 18,
+    "speed": 5,
+    "starting_weapon": "test_staff",
+    "starting_armour": "test_cloth",
+    "starting_attributes": {
+      "STR": 2,
+      "DEX": 3,
+      "INT": 6,
+      "VIT": 3,
+      "BOND": 0
+    }
+  },
+  "beastmaster": {
+    "name": "Beastmaster",
+    "base_hp": 26,
+    "base_mp": 12,
+    "speed": 5,
+    "starting_weapon": "test_sword",
+    "starting_armour": "test_cloth",
+    "starting_attributes": {
+      "STR": 4,
+      "DEX": 3,
+      "INT": 2,
+      "VIT": 4,
+      "BOND": 0
+    },
+    "known_summons": ["micro_raptor", "black_hawk"],
+    "default_equipped_summons": ["micro_raptor"]
+  }
+}

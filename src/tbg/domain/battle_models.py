@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Literal, Tuple
+from typing import Dict, List, Literal, Tuple
 
 from tbg.domain.entities import Stats
 from tbg.domain.debuffs import ActiveDebuff
@@ -47,6 +47,9 @@ class BattleState:
     battle_id: str
     allies: List[Combatant]
     enemies: List[Combatant]
+    enemy_aggro: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    party_threat: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    last_target: Dict[str, str | None] = field(default_factory=dict)
     turn_queue: List[str] = field(default_factory=list)
     current_actor_id: str | None = None
     is_over: bool = False

@@ -1,0 +1,8 @@
+{
+  "test_cloth": {
+    "name": "Test Cloth",
+    "slot": "body",
+    "defense": 2,
+    "value": 5
+  }
+}

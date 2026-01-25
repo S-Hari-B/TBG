@@ -35,6 +35,18 @@
     "effect_type": "damage",
     "gold_value": 18
   },
+  "skill_backstab": {
+    "name": "Backstab",
+    "description": "A quick stab from behind that exploits the enemy's lack of awareness.",
+    "tags": ["skill", "dagger"],
+    "required_weapon_tags": ["dagger"],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 3,
+    "base_power": 5,
+    "effect_type": "damage",
+    "gold_value": 20
+  },
   "skill_skull_thump": {
     "name": "Skull Thump",
     "description": "A crushing club blow meant to stagger foes.",
@@ -55,7 +67,7 @@
     "target_mode": "single_enemy",
     "max_targets": 1,
     "mp_cost": 4,
-    "base_power": 5,
+    "base_power": 9,
     "effect_type": "damage",
     "gold_value": 25
   },
@@ -67,7 +79,7 @@
     "target_mode": "multi_enemy",
     "max_targets": 3,
     "mp_cost": 6,
-    "base_power": 3,
+    "base_power": 7,
     "effect_type": "damage",
     "gold_value": 32
   },

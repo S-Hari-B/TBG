@@ -42,10 +42,10 @@
       "speed": 7
     },
     "starting_attributes": {
-      "STR": 4,
-      "DEX": 8,
+      "STR": 6,
+      "DEX": 10,
       "INT": 4,
-      "VIT": 4,
+      "VIT": 5,
       "BOND": 5
     },
     "equipment": {
@@ -58,6 +58,9 @@
       }
     },
     "starting_level": 3,
-    "starting_abilities": []
+    "starting_abilities": [
+      "backstab",
+      "quick_stab"
+    ]
   }
 }

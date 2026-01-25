@@ -13,7 +13,7 @@ def test_summons_repo_loads_defs() -> None:
 
     assert summon.id == "micro_raptor"
     assert summon.name == "Micro Raptor"
-    assert summon.bond_cost == 5
+    assert summon.bond_cost > 0
 
 
 def test_summons_repo_rejects_extra_fields(tmp_path: Path) -> None:

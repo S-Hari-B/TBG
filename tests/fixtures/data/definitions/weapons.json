@@ -1,0 +1,14 @@
+{
+  "test_sword": {
+    "name": "Test Sword",
+    "attack": 5,
+    "value": 10,
+    "tags": ["sword"]
+  },
+  "test_staff": {
+    "name": "Test Staff",
+    "attack": 3,
+    "value": 8,
+    "tags": ["staff"]
+  }
+}

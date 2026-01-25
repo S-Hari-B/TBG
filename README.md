@@ -61,4 +61,12 @@ Delete the config/saves directory listed above to reset:
 pytest
 ```
 
-Pytest will pick up tests from the `tests/` folder, including data-layer suites that rely on `tmp_path` overrides so the real JSON files remain untouched.
+Pytest will pick up tests from the `tests/` folder. Behavior tests should assert invariants and logic without hardcoding production balance values.
+
+Behavior test fixtures live under `tests/fixtures/data/definitions/` and provide a minimal, stable dataset for service/domain tests.
+
+Balance snapshot tests (if added) should be marked with `@pytest.mark.balance_snapshot`. These are excluded by default; run them intentionally with:
+
+```bash
+pytest -m balance_snapshot
+```

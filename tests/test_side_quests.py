@@ -111,7 +111,7 @@ def test_dana_side_quest_turn_in_flow() -> None:
     assert state.flags.get("flag_sq_dana_completed") is True
     assert state.flags.get("flag_sq_dana_ready") is False
     assert state.inventory.items.get("wolf_tooth", 0) == 0
-    assert state.gold >= starting_gold + 18
+    assert state.gold > starting_gold
 
     gold_after = state.gold
     story_service.play_node(state, "dana_turn_in_check")
@@ -155,7 +155,7 @@ def test_cerel_kill_quest_turn_in_flow() -> None:
     story_service.resume_pending_flow(state)
     assert state.flags.get("flag_sq_cerel_completed") is True
     assert state.flags.get("flag_sq_cerel_ready") is False
-    assert state.gold >= starting_gold + 30
+    assert state.gold > starting_gold
 
     gold_after = state.gold
     story_service.play_node(state, "cerel_turn_in_check")
@@ -197,8 +197,9 @@ def test_protoquest_turn_in_rewards_once() -> None:
     story_service.resume_pending_flow(state)
     assert state.flags.get("flag_protoquest_completed") is True
     assert state.flags.get("flag_protoquest_ready") is False
-    assert state.gold == gold_after_battle + 30
-    assert state.inventory.items.get("potion_hp_small", 0) == potions_before_turn_in + 1
+    assert state.gold > gold_after_battle
+    assert state.inventory.items.get("potion_hp_small", 0) > potions_before_turn_in
+    potions_after_turn_in = state.inventory.items.get("potion_hp_small", 0)
 
     # Turn in again should not grant more gold.
     gold_after = state.gold
@@ -206,7 +207,7 @@ def test_protoquest_turn_in_rewards_once() -> None:
     story_service.resume_pending_flow(state)
     story_service.resume_pending_flow(state)
     assert state.gold == gold_after
-    assert state.inventory.items.get("potion_hp_small", 0) == potions_before_turn_in + 1
+    assert state.inventory.items.get("potion_hp_small", 0) == potions_after_turn_in
 
 
 def test_protoquest_not_ready_from_tide_cave_but_ready_after_ruins() -> None:
@@ -264,14 +265,16 @@ def test_tide_cave_reward_grants_debuff_items_once() -> None:
     story_service.play_node(state, "tide_cave_report_solo")
     story_service.resume_pending_flow(state)
 
-    assert state.inventory.items.get("weakening_vial", 0) == vials_before_turn_in + 1
-    assert state.inventory.items.get("armor_sunder_powder", 0) == powder_before_turn_in + 1
+    assert state.inventory.items.get("weakening_vial", 0) > vials_before_turn_in
+    assert state.inventory.items.get("armor_sunder_powder", 0) > powder_before_turn_in
+    vials_after_turn_in = state.inventory.items.get("weakening_vial", 0)
+    powder_after_turn_in = state.inventory.items.get("armor_sunder_powder", 0)
 
     story_service.play_node(state, "tide_cave_report_solo")
     story_service.resume_pending_flow(state)
 
-    assert state.inventory.items.get("weakening_vial", 0) == vials_before_turn_in + 1
-    assert state.inventory.items.get("armor_sunder_powder", 0) == powder_before_turn_in + 1
+    assert state.inventory.items.get("weakening_vial", 0) == vials_after_turn_in
+    assert state.inventory.items.get("armor_sunder_powder", 0) == powder_after_turn_in
 
 
 def test_tide_cave_router_blocks_after_completion() -> None:
@@ -320,9 +323,11 @@ def test_rampager_quest_reward_grants_bundle_once() -> None:
     while state.pending_story_node_id:
         story_service.resume_pending_flow(state)
 
-    assert state.gold == gold_before_turn_in + 40
-    assert state.inventory.items.get("potion_hp_small", 0) == hp_before_turn_in + 2
-    assert state.inventory.items.get("potion_energy_small", 0) == energy_before_turn_in + 1
+    assert state.gold > gold_before_turn_in
+    assert state.inventory.items.get("potion_hp_small", 0) > hp_before_turn_in
+    assert state.inventory.items.get("potion_energy_small", 0) > energy_before_turn_in
+    hp_after_turn_in = state.inventory.items.get("potion_hp_small", 0)
+    energy_after_turn_in = state.inventory.items.get("potion_energy_small", 0)
 
     gold_after = state.gold
     story_service.play_node(state, "cerel_rampager_turn_in_check")
@@ -330,5 +335,5 @@ def test_rampager_quest_reward_grants_bundle_once() -> None:
         story_service.resume_pending_flow(state)
 
     assert state.gold == gold_after
-    assert state.inventory.items.get("potion_hp_small", 0) == hp_before_turn_in + 2
-    assert state.inventory.items.get("potion_energy_small", 0) == energy_before_turn_in + 1
+    assert state.inventory.items.get("potion_hp_small", 0) == hp_after_turn_in
+    assert state.inventory.items.get("potion_energy_small", 0) == energy_after_turn_in

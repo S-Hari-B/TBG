@@ -1,0 +1,38 @@
+{
+  "skill_power_slash": {
+    "name": "Power Slash",
+    "description": "A heavy strike.",
+    "tags": ["attack"],
+    "required_weapon_tags": ["sword"],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 3,
+    "base_power": 5,
+    "effect_type": "damage",
+    "gold_value": 10
+  },
+  "skill_brace": {
+    "name": "Brace",
+    "description": "Raise your guard.",
+    "tags": ["guard"],
+    "required_weapon_tags": ["sword"],
+    "target_mode": "self",
+    "max_targets": 1,
+    "mp_cost": 2,
+    "base_power": 4,
+    "effect_type": "guard",
+    "gold_value": 5
+  },
+  "skill_ember_wave": {
+    "name": "Ember Wave",
+    "description": "Hits up to three enemies.",
+    "tags": ["attack"],
+    "required_weapon_tags": ["staff"],
+    "target_mode": "multi_enemy",
+    "max_targets": 3,
+    "mp_cost": 6,
+    "base_power": 1,
+    "effect_type": "damage",
+    "gold_value": 12
+  }
+}

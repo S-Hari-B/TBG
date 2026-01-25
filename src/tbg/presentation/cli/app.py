@@ -83,6 +83,7 @@ from tbg.services.battle_service import (
     CombatantDefeatedEvent,
     DebuffAppliedEvent,
     DebuffExpiredEvent,
+    EnemyTargetingDebugEvent,
     GuardAppliedEvent,
     ItemUsedEvent,
     LootAcquiredEvent,
@@ -271,9 +272,20 @@ def _build_turn_order_map(battle_state: BattleState) -> dict[str, int]:
     return {instance_id: idx + 1 for idx, instance_id in enumerate(queue)}
 
 
+def _max_enemy_aggro_by_ally(battle_state: BattleState) -> dict[str, int]:
+    threat_by_ally: dict[str, int] = {}
+    for ally in battle_state.allies:
+        max_threat = 0
+        for enemy_map in battle_state.enemy_aggro.values():
+            max_threat = max(max_threat, enemy_map.get(ally.instance_id, 0))
+        threat_by_ally[ally.instance_id] = max_threat
+    return threat_by_ally
+
+
 def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, active_id: str | None) -> None:
     debug_enabled = _debug_enabled()
     turn_order = _build_turn_order_map(battle_state) if debug_enabled else {}
+    threat_by_ally = _max_enemy_aggro_by_ally(battle_state) if debug_enabled else {}
     _, left_width, right_width = _battle_state_layout()
     allies_lines: List[str] = []
     for ally in view.allies:
@@ -285,6 +297,7 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
         if combatant is not None:
             mp_text = f"{combatant.stats.mp}/{combatant.stats.max_mp}"
         hp_display = ally.hp_display if ally.is_alive else "DOWN"
+        threat_value = threat_by_ally.get(ally.instance_id) if debug_enabled else None
         allies_lines.append(
             _format_battle_state_ally_line(
                 marker=marker,
@@ -293,6 +306,7 @@ def _render_battle_state_panel(view: BattleView, battle_state: BattleState, *, a
                 hp_display=hp_display,
                 mp_text=mp_text,
                 width=left_width,
+                threat_value=threat_value,
             )
         )
     enemies_lines: List[str] = []
@@ -2632,6 +2646,14 @@ def _format_battle_event_lines(events: List[BattleEvent]) -> List[str]:
     loot_order: List[str] = []
     loot_totals: dict[str, tuple[str, int]] = {}
     for event in events:
+        if isinstance(event, EnemyTargetingDebugEvent):
+            if _debug_enabled():
+                applied_text = "yes" if event.anti_repeat_applied else "no"
+                lines.append(
+                    f"(AI) {event.attacker_name} targets {event.target_name}: "
+                    f"top aggro={event.top_value} (anti-repeat: {applied_text})"
+                )
+            continue
         if isinstance(event, SummonAutoSpawnDebugEvent):
             continue
         if isinstance(event, LootAcquiredEvent):
@@ -3107,14 +3129,22 @@ def _format_battle_state_ally_line(
     hp_display: str,
     mp_text: str,
     width: int,
+    threat_value: int | None,
 ) -> str:
-    suffix = f"HP {hp_display} MP {mp_text}"
+    suffix_parts = [f"HP {hp_display}", f"MP {mp_text}"]
+    if threat_value is not None:
+        suffix_parts.append(f"AGG:{threat_value}")
+    suffix = " ".join(suffix_parts)
     prefix = f"{marker} {order_prefix}"
     line_prefix = prefix
     space = " "
     if len(line_prefix) + len(space) + len(suffix) > width:
         line_prefix = ""
         space = ""
+    available = width - len(line_prefix) - len(space) - len(suffix)
+    if available <= 0 and threat_value is not None:
+        suffix_parts = [f"HP {hp_display}", f"AGG:{threat_value}"]
+        suffix = " ".join(suffix_parts)
     available = width - len(line_prefix) - len(space) - len(suffix)
     if available < 0:
         available = 0

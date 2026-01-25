@@ -35,7 +35,7 @@
     "starting_attributes": {
       "STR": 4,
       "DEX": 8,
-      "INT": 4,
+      "INT": 6,
       "VIT": 4,
       "BOND": 5
     },

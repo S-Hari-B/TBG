@@ -1,0 +1,15 @@
+{
+  "emma": {
+    "known_enemies": [
+      {
+        "enemy_tags": ["goblin"],
+        "max_level": 5,
+        "revealed_fields": {
+          "hp_range": [8, 12],
+          "speed_hint": "Quick enough.",
+          "behavior": "They rush in groups."
+        }
+      }
+    ]
+  }
+}

@@ -301,8 +301,11 @@ def test_missing_owned_summons_defaults_from_class() -> None:
     payload = save_service.serialize(state)
     del payload["state"]["owned_summons"]
     restored = save_service.deserialize(payload)
-    assert restored.owned_summons.get("micro_raptor") == 2
-    assert restored.owned_summons.get("black_hawk") == 1
+    class_def = ClassesRepository().get("beastmaster")
+    expected_summons = set(class_def.known_summons) | set(class_def.default_equipped_summons)
+    assert expected_summons
+    for summon_id in expected_summons:
+        assert restored.owned_summons.get(summon_id, 0) > 0
 
 
 def test_missing_party_member_summon_loadouts_defaults_empty() -> None:

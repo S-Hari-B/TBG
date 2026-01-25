@@ -1,0 +1,18 @@
+{
+  "threshold_inn": {
+    "name": "Threshold Inn",
+    "description": "A safe rest stop.",
+    "floor_id": "floor_zero",
+    "type": "town",
+    "tags": ["town"],
+    "connections": []
+  },
+  "floor_one_gate": {
+    "name": "Floor One Gate",
+    "description": "A boundary to the first floor.",
+    "floor_id": "floor_one",
+    "type": "gate",
+    "tags": ["gate"],
+    "connections": []
+  }
+}

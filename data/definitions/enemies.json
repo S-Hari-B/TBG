@@ -1,13 +1,13 @@
 {
   "goblin_grunt": {
     "name": "Goblin Grunt",
-    "hp": 29,
+    "hp": 32,
     "mp": 0,
     "attack": 7,
     "defense": 5,
-    "speed": 8,
+    "speed": 7,
     "rewards_exp": 10,
-    "rewards_gold": 3,
+    "rewards_gold": 5,
     "tags": ["goblin", "humanoid"],
     "equipment": {
       "weapons": ["goblin_shiv"],
@@ -24,7 +24,7 @@
   },
   "goblin_archer": {
     "name": "Goblin Archer",
-    "hp": 22,
+    "hp": 25,
     "mp": 0,
     "attack": 10,
     "defense": 2,
@@ -41,7 +41,7 @@
   },
   "goblin_skirmisher": {
     "name": "Goblin Skirmisher",
-    "hp": 20,
+    "hp": 24,
     "mp": 0,
     "attack": 6,
     "defense": 1,
@@ -77,7 +77,7 @@
   },
   "goblin_rampager": {
     "name": "Goblin Rampager",
-    "hp": 120,
+    "hp": 125,
     "mp": 0,
     "attack": 13,
     "defense": 6,

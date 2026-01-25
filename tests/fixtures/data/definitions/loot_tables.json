@@ -1,0 +1,14 @@
+[
+  {
+    "id": "goblin_drops",
+    "required_enemy_tags": ["goblin"],
+    "drops": [
+      {
+        "item_id": "potion_energy_small",
+        "chance": 1.0,
+        "min_qty": 1,
+        "max_qty": 1
+      }
+    ]
+  }
+]

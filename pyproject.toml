@@ -22,5 +22,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = "-m \"not balance_snapshot\""
+markers = [
+  "balance_snapshot: tests asserting exact balance numbers",
+]
 
 

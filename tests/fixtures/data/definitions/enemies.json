@@ -1,0 +1,18 @@
+{
+  "goblin_grunt": {
+    "name": "Goblin Grunt",
+    "hp": 12,
+    "mp": 0,
+    "attack": 4,
+    "defense": 1,
+    "speed": 3,
+    "rewards_exp": 10,
+    "rewards_gold": 5,
+    "tags": ["goblin"]
+  },
+  "goblin_pack_3": {
+    "name": "Goblin Pack",
+    "enemy_ids": ["goblin_grunt", "goblin_grunt", "goblin_grunt"],
+    "tags": ["goblin"]
+  }
+}
