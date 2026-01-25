@@ -22,5 +22,6 @@ class EnemyDef:
     weapon_ids: tuple[str, ...] = ()
     armour_id: str | None = None
     armour_slots: dict[str, str] = field(default_factory=dict)
+    enemy_skill_ids: tuple[str, ...] = ()
 
 

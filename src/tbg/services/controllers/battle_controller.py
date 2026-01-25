@@ -202,8 +202,14 @@ class BattleController:
         *,
         bonus_power: int = 0,
         minimum: int = 1,
+        skill_tags: Sequence[str] | None = None,
     ) -> int:
         """Estimate damage without mutating battle state."""
         return self._service.estimate_damage_for_ids(
-            battle_state, attacker_id, target_id, bonus_power=bonus_power, minimum=minimum
+            battle_state,
+            attacker_id,
+            target_id,
+            bonus_power=bonus_power,
+            minimum=minimum,
+            skill_tags=skill_tags,
         )

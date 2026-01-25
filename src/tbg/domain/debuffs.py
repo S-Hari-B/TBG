@@ -42,6 +42,11 @@ def compute_effective_attack(stats: Stats, debuffs: Sequence[ActiveDebuff]) -> i
     return max(1, stats.attack - penalty)
 
 
+def compute_effective_action_attack(action_attack: int, debuffs: Sequence[ActiveDebuff]) -> int:
+    penalty = sum(debuff.amount for debuff in debuffs if debuff.debuff_type == "attack_down")
+    return max(1, action_attack - penalty)
+
+
 def compute_effective_defense(stats: Stats, debuffs: Sequence[ActiveDebuff]) -> int:
     penalty = sum(debuff.amount for debuff in debuffs if debuff.debuff_type == "defense_down")
     return max(0, stats.defense - penalty)

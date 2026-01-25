@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Sequence
 
 from tbg.domain.entities import Attributes, BaseStats, Stats
 
@@ -9,6 +10,9 @@ VIT_HP_PER_POINT = 3
 INT_MP_PER_POINT = 2
 STR_ATK_PER_POINT = 1
 DEX_SPEED_PER_POINT = 1
+ELEMENTAL_SKILL_TAGS = {"fire"}
+PHYSICAL_SKILL_TAG = "physical"
+DEX_ATK_MULTIPLIER = 0.75
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +44,33 @@ def compute_attribute_contributions(attributes: Attributes) -> AttributeContribu
         speed=attributes.DEX * DEX_SPEED_PER_POINT,
         bond_reserved=attributes.BOND,
     )
+
+
+def _resolve_action_attack_weights(skill_tags: Sequence[str]) -> tuple[float, float]:
+    is_physical = PHYSICAL_SKILL_TAG in skill_tags
+    is_magical = bool(ELEMENTAL_SKILL_TAGS.intersection(skill_tags))
+    if is_physical and is_magical:
+        return 0.5, 0.5
+    if is_magical:
+        return 0.0, 1.0
+    return 1.0, 0.0
+
+
+def compute_action_attack(
+    base_attack: int,
+    attributes: Attributes,
+    skill_tags: Sequence[str],
+    weapon_tags: Sequence[str],
+) -> int:
+    """Compute an action-specific attack value from skill tags."""
+    str_weight, int_weight = _resolve_action_attack_weights(skill_tags)
+    physical_multiplier = DEX_ATK_MULTIPLIER if "finesse" in weapon_tags else 1.0
+    physical_attribute = attributes.DEX if "finesse" in weapon_tags else attributes.STR
+    attribute_bonus = (
+        physical_attribute * STR_ATK_PER_POINT * physical_multiplier * str_weight
+        + attributes.INT * STR_ATK_PER_POINT * int_weight
+    )
+    return max(1, base_attack + int(attribute_bonus))
 
 
 def apply_attribute_scaling(

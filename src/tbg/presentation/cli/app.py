@@ -2200,9 +2200,9 @@ def _build_attribute_lines(breakdown: AttributeScalingBreakdown) -> List[str]:
     attributes = breakdown.attributes
     contributions = breakdown.contributions
     return [
-        f"STR: {attributes.STR:>3} (+{contributions.attack:>2} ATK) - increases Attack",
-        f"DEX: {attributes.DEX:>3} (+{contributions.speed:>2} INIT) - increases Initiative/Speed",
-        f"INT: {attributes.INT:>3} (+{contributions.max_mp:>2} MAX MP) - increases Max MP",
+        f"STR: {attributes.STR:>3} (+{contributions.attack:>2} ATK) - boosts physical skill damage",
+        f"DEX: {attributes.DEX:>3} (+{contributions.speed:>2} INIT) - boosts finesse damage",
+        f"INT: {attributes.INT:>3} (+{contributions.max_mp:>2} MAX MP) - boosts magic skill damage",
         f"VIT: {attributes.VIT:>3} (+{contributions.max_hp:>2} MAX HP) - increases Max HP",
         f"BOND:{attributes.BOND:>3} - increases summon capacity and scaling",
     ]
@@ -2517,7 +2517,11 @@ def _run_player_turn(
             damage_estimator: Callable[[Combatant], int] | None = None
             if skill.effect_type == "damage":
                 damage_estimator = lambda enemy: controller.estimate_damage(
-                    battle_state, actor_id, enemy.instance_id, bonus_power=skill.base_power
+                    battle_state,
+                    actor_id,
+                    enemy.instance_id,
+                    bonus_power=skill.base_power,
+                    skill_tags=skill.tags,
                 )
             target_ids = _prompt_skill_targets(
                 skill, battle_state, damage_estimator=damage_estimator, state=state, controller=controller
@@ -2619,7 +2623,11 @@ def _build_skill_preview(
     # Can show projected damage
     if skill.target_mode == "self":
         estimate = controller.estimate_damage(
-            battle_state, actor_id, actor_id, bonus_power=skill.base_power
+            battle_state,
+            actor_id,
+            actor_id,
+            bonus_power=skill.base_power,
+            skill_tags=skill.tags,
         )
         return _format_damage_preview(estimate, suffix="", base_power=skill.base_power, is_known=True)
     
@@ -2629,7 +2637,11 @@ def _build_skill_preview(
             return ""
         estimates = [
             controller.estimate_damage(
-                battle_state, actor_id, enemy.instance_id, bonus_power=skill.base_power
+                battle_state,
+                actor_id,
+                enemy.instance_id,
+                bonus_power=skill.base_power,
+                skill_tags=skill.tags,
             )
             for enemy in living_enemies
         ]
@@ -3028,10 +3040,16 @@ def _render_battle_events(events: List[BattleEvent]) -> None:
             )
             location = f", location={event.location_id}" if event.location_id else ""
             floor = f", floor={event.floor_id}" if event.floor_id else ""
+            if source_label == "area_level":
+                source_label = "area_level (primary)"
+            elif source_label == "floor_level":
+                source_label = "floor_level (fallback)"
+            else:
+                source_label = "default"
             lines = [
                 f"Battle level: {event.battle_level} (source: {source_label}{source_value}{location}{floor})",
                 (
-                    "Per level: "
+                    "Per-level scaling: "
                     f"+{event.scaling_hp_per_level} HP, "
                     f"+{event.scaling_attack_per_level} ATK, "
                     f"+{event.scaling_defense_per_level} DEF, "
@@ -3167,10 +3185,10 @@ def _build_enemy_scaling_lines(combatant: Combatant | None, width: int) -> List[
         f"DEF {stats.defense} (Base {base.defense} +{def_delta}) "
         f"INIT {stats.speed} (Base {base.speed} +{speed_delta})"
     )
-    wrapped = _wrap_text_to_width(details, width - 2)
-    if len(wrapped) > 2:
-        wrapped = wrapped[:2]
-    return [f"  {line}" for line in wrapped]
+    indent = "  "
+    available = max(1, width - 1 - len(indent))
+    wrapped = _wrap_text_to_width(details, available)
+    return [f"{indent}{line}" for line in wrapped]
 
 
 def _render_debug_enemy_debuffs(battle_state: BattleState) -> None:

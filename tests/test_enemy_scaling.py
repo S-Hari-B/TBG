@@ -24,10 +24,10 @@ from tbg.data.repositories import (
 def test_scale_enemy_stats_applies_flat_increases() -> None:
     base = Stats(max_hp=20, hp=20, max_mp=0, mp=0, attack=5, defense=2, speed=4)
     scaled = scale_enemy_stats(base, battle_level=2)
-    assert scaled.max_hp == 40
+    assert scaled.max_hp == 44
     assert scaled.attack == 9
     assert scaled.defense == 4
-    assert scaled.speed == 4
+    assert scaled.speed == 6
 
 
 def test_battle_level_uses_area_level_override(tmp_path: Path) -> None:

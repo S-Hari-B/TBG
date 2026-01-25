@@ -20,7 +20,11 @@ from tbg.data.repositories import (
 )
 from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
 from tbg.domain.defs import ItemDef, KnowledgeEntry, LootTableDef, SkillDef
-from tbg.domain.attribute_scaling import apply_attribute_scaling
+from tbg.domain.attribute_scaling import (
+    PHYSICAL_SKILL_TAG,
+    apply_attribute_scaling,
+    compute_action_attack,
+)
 from tbg.domain.enemy_scaling import (
     ATTACK_PER_LEVEL,
     DEFENSE_PER_LEVEL,
@@ -30,6 +34,7 @@ from tbg.domain.enemy_scaling import (
 from tbg.domain.debuffs import (
     ActiveDebuff,
     apply_debuff_no_stack,
+    compute_effective_action_attack,
     compute_effective_attack,
     compute_effective_defense,
 )
@@ -460,6 +465,7 @@ class BattleService:
                 location_id=state.current_location_id or None,
                 floor_id=None,
             )
+        # area_level is the primary difficulty driver; floor level is fallback.
         if location_def.area_level is not None:
             return BattleLevelInfo(
                 level=max(0, location_def.area_level),
@@ -523,8 +529,9 @@ class BattleService:
     def basic_attack(self, battle_state: BattleState, attacker_id: str, target_id: str) -> List[BattleEvent]:
         attacker = self._get_combatant(battle_state, attacker_id)
         target = self._get_combatant(battle_state, target_id)
+        action_attack = self._action_attack_for_skill(attacker, (PHYSICAL_SKILL_TAG,))
         damage, debuff_events = self._resolve_damage(
-            battle_state, attacker, target, bonus_power=0, minimum=1
+            battle_state, attacker, target, bonus_power=0, minimum=1, action_attack=action_attack
         )
 
         events: List[BattleEvent] = [
@@ -560,6 +567,9 @@ class BattleService:
             return []
         available: List[SkillDef] = []
         for skill in self._skills_repo.all():
+            # Enemy-tagged skills are not available to allies
+            if "enemy" in skill.tags:
+                continue
             if set(skill.required_weapon_tags).issubset(set(combatant.weapon_tags)):
                 available.append(skill)
         return available
@@ -584,9 +594,15 @@ class BattleService:
         attacker.stats.mp -= skill.mp_cost
 
         if skill.effect_type == "damage":
+            action_attack = self._action_attack_for_skill(attacker, skill.tags)
             for target in resolved_targets:
                 damage, debuff_events = self._resolve_damage(
-                    battle_state, attacker, target, bonus_power=skill.base_power, minimum=1
+                    battle_state,
+                    attacker,
+                    target,
+                    bonus_power=skill.base_power,
+                    minimum=1,
+                    action_attack=action_attack,
                 )
                 events.append(
                     SkillUsedEvent(
@@ -762,6 +778,13 @@ class BattleService:
         living_allies = [ally for ally in battle_state.allies if ally.is_alive]
         if not living_allies:
             return self._finalize_defeat(battle_state)
+        
+        # Try to use a skill first
+        skill_events = self._try_enemy_skill(battle_state, actor, living_allies, rng)
+        if skill_events is not None:
+            return skill_events
+        
+        # Fall back to basic attack
         target, anti_repeat_applied = self._select_enemy_target(battle_state, actor, living_allies, rng)
         aggro_value = battle_state.enemy_aggro.get(actor.instance_id, {}).get(target.instance_id, 0)
         events = self.basic_attack(battle_state, actor.instance_id, target.instance_id)
@@ -774,6 +797,138 @@ class BattleService:
             anti_repeat_applied=anti_repeat_applied,
         )
         return [debug_event, *events]
+
+    def _try_enemy_skill(
+        self,
+        battle_state: BattleState,
+        actor: Combatant,
+        living_allies: List[Combatant],
+        rng: RNG,
+    ) -> List[BattleEvent] | None:
+        """
+        Try to use an enemy skill. Returns events if a skill was used, None otherwise.
+        
+        Iterates enemy_skill_ids in order and picks the first usable skill.
+        """
+        if not actor.source_id:
+            return None
+        
+        try:
+            enemy_def = self._enemies_repo.get(actor.source_id)
+        except KeyError:
+            return None
+        
+        if not enemy_def.enemy_skill_ids:
+            return None
+        
+        for skill_id in enemy_def.enemy_skill_ids:
+            try:
+                skill = self._skills_repo.get(skill_id)
+            except KeyError:
+                continue
+            
+            # Check MP
+            if actor.stats.mp < skill.mp_cost:
+                continue
+            
+            # Check usage cap
+            if not self._check_enemy_skill_usage_allowed(battle_state, actor.instance_id, skill_id):
+                continue
+            
+            # Check if we can target this skill
+            target_ids = self._select_enemy_skill_targets(battle_state, skill, actor, living_allies, rng)
+            if target_ids is None:
+                continue
+            
+            # Use the skill
+            events = self.use_skill(battle_state, actor.instance_id, skill_id, target_ids)
+            
+            # Track usage if skill was successful
+            if any(isinstance(evt, (SkillUsedEvent, GuardAppliedEvent)) for evt in events):
+                self._record_enemy_skill_use(battle_state, actor.instance_id, skill_id)
+            
+            return events
+        
+        return None
+
+    def _check_enemy_skill_usage_allowed(
+        self,
+        battle_state: BattleState,
+        enemy_instance_id: str,
+        skill_id: str,
+    ) -> bool:
+        """Check if an enemy can use a skill based on per-battle usage caps."""
+        # Default cap: unlimited uses (0 means no cap)
+        cap = self._get_skill_usage_cap(skill_id)
+        if cap == 0:
+            return True
+        
+        uses = battle_state.enemy_skill_uses.get(enemy_instance_id, {}).get(skill_id, 0)
+        return uses < cap
+
+    def _get_skill_usage_cap(self, skill_id: str) -> int:
+        """Return the per-battle usage cap for a skill. 0 means unlimited."""
+        # Rampager AoE skill has a cap of 2 uses per battle
+        if skill_id == "skill_rampager_cleave":
+            return 2
+        return 0
+
+    def _record_enemy_skill_use(
+        self,
+        battle_state: BattleState,
+        enemy_instance_id: str,
+        skill_id: str,
+    ) -> None:
+        """Record that an enemy used a skill in this battle."""
+        if enemy_instance_id not in battle_state.enemy_skill_uses:
+            battle_state.enemy_skill_uses[enemy_instance_id] = {}
+        
+        current = battle_state.enemy_skill_uses[enemy_instance_id].get(skill_id, 0)
+        battle_state.enemy_skill_uses[enemy_instance_id][skill_id] = current + 1
+
+    def _select_enemy_skill_targets(
+        self,
+        battle_state: BattleState,
+        skill: SkillDef,
+        actor: Combatant,
+        living_allies: List[Combatant],
+        rng: RNG,
+    ) -> List[str] | None:
+        """
+        Select targets for an enemy skill. Returns target IDs or None if targeting fails.
+        
+        Uses deterministic selection for multi_enemy to avoid new randomness.
+        """
+        if skill.target_mode == "self":
+            return []
+        
+        if not living_allies:
+            return None
+        
+        if skill.target_mode == "single_enemy":
+            # Reuse existing threat-based target selection
+            target, _ = self._select_enemy_target(battle_state, actor, living_allies, rng)
+            return [target.instance_id]
+        
+        if skill.target_mode == "multi_enemy":
+            # Deterministic multi-target: sort by threat descending, then by instance_id
+            if len(living_allies) < 2:
+                return None
+            
+            threat_map = battle_state.enemy_aggro.get(actor.instance_id, {})
+            # Build list of (ally, threat) tuples
+            ally_threats = [
+                (ally, threat_map.get(ally.instance_id, self._base_threat_for_target(ally)))
+                for ally in living_allies
+            ]
+            # Sort by threat descending, then by instance_id for determinism
+            ally_threats.sort(key=lambda x: (-x[1], x[0].instance_id))
+            
+            # Take up to max_targets
+            targets = [ally.instance_id for ally, _ in ally_threats[:skill.max_targets]]
+            return targets if len(targets) >= 2 else None
+        
+        return None
 
     def run_ally_ai_turn(self, battle_state: BattleState, actor_id: str, rng: RNG) -> List[BattleEvent]:
         actor = self._get_combatant(battle_state, actor_id)
@@ -843,6 +998,8 @@ class BattleService:
             display_name=state.player.name,
             side="allies",
             stats=state.player.stats,
+            base_stats=base_stats,
+            attributes=state.player.attributes,
             tags=(),
             weapon_tags=self._weapon_tags_for_ids(weapon_ids),
             source_id=state.player.class_id,
@@ -885,6 +1042,8 @@ class BattleService:
             display_name=member_def.name,
             side="allies",
             stats=stats,
+            base_stats=base_stats,
+            attributes=attributes,
             tags=member_def.tags,
             weapon_tags=self._weapon_tags_for_ids(weapon_ids),
             source_id=member_id,
@@ -1225,6 +1384,20 @@ class BattleService:
             total += armour_def.defense
         return total if total > 0 else max(0, fallback)
 
+    @staticmethod
+    def _base_attack_for_combatant(attacker: Combatant) -> int:
+        if attacker.base_stats is not None:
+            return attacker.base_stats.attack
+        return attacker.stats.attack
+
+    def _action_attack_for_skill(self, attacker: Combatant, skill_tags: Sequence[str] | None) -> int:
+        if not skill_tags:
+            skill_tags = (PHYSICAL_SKILL_TAG,)
+        if attacker.attributes is None:
+            return attacker.stats.attack
+        base_attack = self._base_attack_for_combatant(attacker)
+        return compute_action_attack(base_attack, attacker.attributes, skill_tags, attacker.weapon_tags)
+
     def _start_new_round(self, battle_state: BattleState) -> List[BattleEvent]:
         battle_state.round_index += 1
         events = self._expire_enemy_debuffs(battle_state)
@@ -1237,12 +1410,26 @@ class BattleService:
         else:
             battle_state.round_last_actor_id = None
 
-    @staticmethod
     def estimate_damage(
-        attacker: Combatant, target: Combatant, *, bonus_power: int = 0, minimum: int = 1
+        self,
+        attacker: Combatant,
+        target: Combatant,
+        *,
+        bonus_power: int = 0,
+        minimum: int = 1,
+        action_attack: int | None = None,
+        skill_tags: Sequence[str] | None = None,
     ) -> int:
         """Estimate damage without mutating combatants or guard values."""
-        effective_attack = compute_effective_attack(attacker.stats, attacker.debuffs)
+        if action_attack is None:
+            action_attack = self._action_attack_for_skill(
+                attacker, skill_tags or (PHYSICAL_SKILL_TAG,)
+            )
+        effective_attack = (
+            compute_effective_action_attack(action_attack, attacker.debuffs)
+            if action_attack is not None
+            else compute_effective_attack(attacker.stats, attacker.debuffs)
+        )
         effective_defense = compute_effective_defense(target.stats, target.debuffs)
         base_damage = max(minimum, effective_attack + bonus_power - effective_defense)
         return max(0, base_damage)
@@ -1255,10 +1442,17 @@ class BattleService:
         *,
         bonus_power: int = 0,
         minimum: int = 1,
+        skill_tags: Sequence[str] | None = None,
     ) -> int:
         attacker = self._get_combatant(battle_state, attacker_id)
         target = self._get_combatant(battle_state, target_id)
-        return self.estimate_damage(attacker, target, bonus_power=bonus_power, minimum=minimum)
+        return self.estimate_damage(
+            attacker,
+            target,
+            bonus_power=bonus_power,
+            minimum=minimum,
+            skill_tags=skill_tags,
+        )
 
     def _resolve_damage(
         self,
@@ -1268,8 +1462,13 @@ class BattleService:
         *,
         bonus_power: int,
         minimum: int,
+        action_attack: int | None = None,
     ) -> tuple[int, List[BattleEvent]]:
-        effective_attack = compute_effective_attack(attacker.stats, attacker.debuffs)
+        effective_attack = (
+            compute_effective_action_attack(action_attack, attacker.debuffs)
+            if action_attack is not None
+            else compute_effective_attack(attacker.stats, attacker.debuffs)
+        )
         effective_defense = compute_effective_defense(target.stats, target.debuffs)
         base_damage = max(minimum, effective_attack + bonus_power - effective_defense)
         damage = base_damage

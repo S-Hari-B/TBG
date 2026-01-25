@@ -14,5 +14,38 @@
     "name": "Goblin Pack",
     "enemy_ids": ["goblin_grunt", "goblin_grunt", "goblin_grunt"],
     "tags": ["goblin"]
+  },
+  "goblin_shaman": {
+    "name": "Goblin Shaman",
+    "hp": 40,
+    "mp": 16,
+    "attack": 8,
+    "defense": 1,
+    "speed": 5,
+    "rewards_exp": 13,
+    "rewards_gold": 8,
+    "tags": ["goblin", "humanoid"],
+    "equipment": {
+      "weapons": [],
+      "armour": "goblin_rags"
+    },
+    "enemy_skill_ids": ["skill_hex_spark"]
+  },
+  "goblin_rampager": {
+    "name": "Goblin Rampager",
+    "hp": 140,
+    "mp": 20,
+    "attack": 16,
+    "defense": 5,
+    "speed": 5,
+    "rewards_exp": 32,
+    "rewards_gold": 22,
+    "tags": ["goblin", "humanoid", "rampager", "elite"],
+    "equipment": {
+      "weapons": [],
+      "armour": "goblin_rags"
+    },
+    "enemy_skill_ids": ["skill_rampager_cleave"]
   }
 }
+

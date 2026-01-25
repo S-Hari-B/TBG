@@ -43,6 +43,9 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
             )
             armour_slots = self._parse_armour_slots(equipment.get("armour_slots"), raw_id)
             armour_id = self._require_optional_str(equipment.get("armour"), f"enemy '{raw_id}' equipment.armour")
+            enemy_skill_ids = tuple(
+                self._require_str_list(enemy_data.get("enemy_skill_ids", []), f"enemy '{raw_id}' enemy_skill_ids")
+            )
 
             enemies[raw_id] = EnemyDef(
                 id=raw_id,
@@ -58,6 +61,7 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
                 weapon_ids=weapon_ids,
                 armour_id=armour_id,
                 armour_slots=armour_slots,
+                enemy_skill_ids=enemy_skill_ids,
             )
         return enemies
 

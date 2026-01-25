@@ -2,8 +2,8 @@
   "potion_hp_small": {
     "name": "Small HP Potion",
     "kind": "consumable",
-    "value": 10,
-    "heal_hp": 25,
+    "value": 12,
+    "heal_hp": 20,
     "restore_energy": 0,
     "targeting": "ally"
   },
@@ -12,8 +12,8 @@
     "kind": "consumable",
     "value": 12,
     "heal_hp": 0,
-    "heal_mp": 15,
-    "restore_energy": 15,
+    "heal_mp": 12,
+    "restore_energy": 12,
     "targeting": "ally"
   },
   "weakening_vial": {
@@ -43,6 +43,6 @@
   "summon_micro_raptor": {
     "name": "Micro Raptor (Summon)",
     "kind": "summon",
-    "value": 60
+    "value": 100
   }
 }

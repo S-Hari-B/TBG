@@ -5,8 +5,8 @@
     "base_mp": 6,
     "speed": 4,
     "starting_attributes": {
-      "STR": 8,
-      "DEX": 4,
+      "STR": 6,
+      "DEX": 3,
       "INT": 2,
       "VIT": 6,
       "BOND": 5
@@ -35,7 +35,7 @@
     "starting_attributes": {
       "STR": 4,
       "DEX": 8,
-      "INT": 6,
+      "INT": 5,
       "VIT": 4,
       "BOND": 5
     },

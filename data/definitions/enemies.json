@@ -1,16 +1,16 @@
 {
   "goblin_grunt": {
     "name": "Goblin Grunt",
-    "hp": 32,
+    "hp": 50,
     "mp": 0,
-    "attack": 7,
-    "defense": 5,
+    "attack": 9,
+    "defense": 2,
     "speed": 7,
-    "rewards_exp": 10,
-    "rewards_gold": 5,
+    "rewards_exp": 12,
+    "rewards_gold": 6,
     "tags": ["goblin", "humanoid"],
     "equipment": {
-      "weapons": ["goblin_shiv"],
+      "weapons": ["goblin_dagger"],
       "armour_slots": {
         "body": "goblin_patchwork_vest",
         "head": "goblin_bone_cap"
@@ -24,47 +24,49 @@
   },
   "goblin_archer": {
     "name": "Goblin Archer",
-    "hp": 25,
-    "mp": 0,
-    "attack": 10,
-    "defense": 2,
-    "speed": 7,
-    "rewards_exp": 7,
-    "rewards_gold": 4,
+    "hp": 42,
+    "mp": 4,
+    "attack": 11,
+    "defense": 1,
+    "speed": 8,
+    "rewards_exp": 10,
+    "rewards_gold": 5,
     "tags": ["goblin", "humanoid"],
     "equipment": {
       "weapons": ["goblin_shortbow"],
       "armour_slots": {
         "body": "goblin_patchwork_vest"
       }
-    }
+    },
+    "enemy_skill_ids": ["skill_aimed_shot"]
   },
   "goblin_skirmisher": {
     "name": "Goblin Skirmisher",
-    "hp": 24,
-    "mp": 0,
-    "attack": 6,
-    "defense": 1,
-    "speed": 9,
-    "rewards_exp": 7,
-    "rewards_gold": 4,
+    "hp": 38,
+    "mp": 3,
+    "attack": 8,
+    "defense": 0,
+    "speed": 10,
+    "rewards_exp": 9,
+    "rewards_gold": 5,
     "tags": ["goblin", "humanoid"],
     "equipment": {
       "weapons": ["goblin_shiv"],
       "armour_slots": {
         "boots": "goblin_boots"
       }
-    }
+    },
+    "enemy_skill_ids": ["skill_vicious_stab"]
   },
   "goblin_brute": {
     "name": "Goblin Brute",
-    "hp": 40,
+    "hp": 72,
     "mp": 0,
-    "attack": 9,
-    "defense": 3,
+    "attack": 12,
+    "defense": 2,
     "speed": 4,
-    "rewards_exp": 12,
-    "rewards_gold": 6,
+    "rewards_exp": 18,
+    "rewards_gold": 9,
     "tags": ["goblin", "humanoid"],
     "equipment": {
       "weapons": ["goblin_spear"],
@@ -77,14 +79,14 @@
   },
   "goblin_rampager": {
     "name": "Goblin Rampager",
-    "hp": 125,
-    "mp": 0,
-    "attack": 13,
-    "defense": 6,
+    "hp": 140,
+    "mp": 20,
+    "attack": 16,
+    "defense": 5,
     "speed": 5,
-    "rewards_exp": 18,
-    "rewards_gold": 14,
-    "tags": ["goblin", "humanoid", "rampager"],
+    "rewards_exp": 32,
+    "rewards_gold": 22,
+    "tags": ["goblin", "humanoid", "rampager", "elite"],
     "equipment": {
       "weapons": ["goblin_spear"],
       "armour_slots": {
@@ -93,47 +95,50 @@
         "hands": "goblin_bracers",
         "boots": "goblin_boots"
       }
-    }
+    },
+    "enemy_skill_ids": ["skill_rampager_cleave"]
   },
   "goblin_shaman": {
     "name": "Goblin Shaman",
-    "hp": 24,
-    "mp": 8,
-    "attack": 5,
+    "hp": 40,
+    "mp": 16,
+    "attack": 8,
     "defense": 1,
     "speed": 5,
-    "rewards_exp": 9,
-    "rewards_gold": 6,
+    "rewards_exp": 13,
+    "rewards_gold": 8,
     "tags": ["goblin", "humanoid"],
     "equipment": {
       "weapons": ["goblin_totem_staff"],
       "armour": "goblin_rags"
-    }
+    },
+    "enemy_skill_ids": ["skill_hex_spark"]
   },
   "wolf": {
     "name": "Forest Wolf",
-    "hp": 30,
+    "hp": 48,
     "mp": 0,
-    "attack": 8,
-    "defense": 3,
-    "speed": 8,
-    "rewards_exp": 8,
-    "rewards_gold": 5,
+    "attack": 11,
+    "defense": 1,
+    "speed": 9,
+    "rewards_exp": 11,
+    "rewards_gold": 6,
     "tags": ["beast", "wolf"],
     "equipment": {
       "weapons": [],
       "armour": "wolf_hide_cloak"
-    }
+    },
+    "enemy_skill_ids": ["skill_savage_bite"]
   },
   "great_boar": {
     "name": "Great Boar",
-    "hp": 42,
+    "hp": 80,
     "mp": 0,
-    "attack": 10,
-    "defense": 5,
+    "attack": 13,
+    "defense": 3,
     "speed": 4,
-    "rewards_exp": 10,
-    "rewards_gold": 6,
+    "rewards_exp": 16,
+    "rewards_gold": 9,
     "tags": ["beast"],
     "equipment": {
       "weapons": [],
@@ -142,13 +147,13 @@
   },
   "bandit_scout": {
     "name": "Bandit Scout",
-    "hp": 34,
-    "mp": 6,
-    "attack": 9,
-    "defense": 4,
-    "speed": 6,
-    "rewards_exp": 12,
-    "rewards_gold": 9,
+    "hp": 54,
+    "mp": 10,
+    "attack": 12,
+    "defense": 2,
+    "speed": 7,
+    "rewards_exp": 16,
+    "rewards_gold": 11,
     "tags": ["bandit", "humanoid"],
     "equipment": {
       "weapons": ["bandit_hatchet"],
@@ -161,13 +166,13 @@
   },
   "spore_slime": {
     "name": "Spore Slime",
-    "hp": 38,
+    "hp": 58,
     "mp": 4,
-    "attack": 7,
-    "defense": 2,
+    "attack": 10,
+    "defense": 1,
     "speed": 3,
-    "rewards_exp": 9,
-    "rewards_gold": 5,
+    "rewards_exp": 12,
+    "rewards_gold": 7,
     "tags": ["slime", "ooze"],
     "equipment": {
       "weapons": [],
@@ -176,13 +181,13 @@
   },
   "half_orc_raider": {
     "name": "Half-Orc Raider",
-    "hp": 46,
+    "hp": 76,
     "mp": 0,
-    "attack": 12,
-    "defense": 5,
-    "speed": 4,
-    "rewards_exp": 14,
-    "rewards_gold": 10,
+    "attack": 15,
+    "defense": 3,
+    "speed": 5,
+    "rewards_exp": 20,
+    "rewards_gold": 14,
     "tags": ["orc", "humanoid"],
     "equipment": {
       "weapons": ["orc_bone_club"],

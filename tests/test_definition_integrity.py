@@ -362,6 +362,10 @@ def _validate_enemies(
     data = _load_required_dict(definitions_dir, "enemies.json")
     ids: set[str] = set()
     group_members: dict[str, list[str]] = {}
+    
+    # Load skill IDs for validation
+    skill_ids = _validate_skills(definitions_dir)
+    
     for enemy_id, payload in data.items():
         _require_str(enemy_id, "enemy id")
         mapping = _require_mapping(payload, f"enemy '{enemy_id}'")
@@ -390,7 +394,7 @@ def _validate_enemies(
                     "rewards_exp",
                     "rewards_gold",
                 },
-                optional={"tags", "equipment"},
+                optional={"tags", "equipment", "enemy_skill_ids"},
                 context=f"enemy '{enemy_id}'",
             )
             _require_str(mapping["name"], f"enemy '{enemy_id}' name")
@@ -422,6 +426,14 @@ def _validate_enemies(
                     assert (
                         armour_id in armour_ids
                     ), f"enemy '{enemy_id}' references missing armour '{armour_id}'"
+            if "enemy_skill_ids" in mapping:
+                enemy_skill_ids = _require_str_list(
+                    mapping["enemy_skill_ids"], f"enemy '{enemy_id}' enemy_skill_ids"
+                )
+                for skill_id in enemy_skill_ids:
+                    assert (
+                        skill_id in skill_ids
+                    ), f"enemy '{enemy_id}' references missing skill '{skill_id}'"
         ids.add(enemy_id)
     single_and_group_ids = set(data.keys())
     for group_id, members in group_members.items():

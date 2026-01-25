@@ -1,7 +1,7 @@
 {
   "iron_sword": {
     "name": "Iron Sword",
-    "attack": 8,
+    "attack": 10,
     "value": 50,
     "tags": ["sword", "slash"],
     "slot_cost": 1,
@@ -19,18 +19,18 @@
   },
   "iron_dagger": {
     "name": "Iron Dagger",
-    "attack": 5,
+    "attack": 6,
     "value": 35,
-    "tags": ["dagger", "pierce"],
+    "tags": ["dagger", "pierce", "finesse"],
     "slot_cost": 1,
     "default_basic_attack_id": "basic_stab",
     "energy_bonus": 0
   },
   "shortbow": {
     "name": "Shortbow",
-    "attack": 6,
+    "attack": 7,
     "value": 45,
-    "tags": ["bow", "pierce"],
+    "tags": ["bow", "pierce", "finesse"],
     "slot_cost": 2,
     "default_basic_attack_id": "basic_shoot",
     "energy_bonus": 0
@@ -57,7 +57,7 @@
     "name": "Goblin Dagger",
     "attack": 4,
     "value": 8,
-    "tags": ["dagger", "pierce"],
+    "tags": ["dagger", "pierce", "finesse"],
     "slot_cost": 1,
     "default_basic_attack_id": "basic_stab",
     "energy_bonus": 0
@@ -66,7 +66,7 @@
     "name": "Goblin Shiv",
     "attack": 3,
     "value": 6,
-    "tags": ["dagger", "pierce"],
+    "tags": ["dagger", "pierce", "finesse"],
     "slot_cost": 1,
     "default_basic_attack_id": "basic_stab",
     "energy_bonus": 0
@@ -75,7 +75,7 @@
     "name": "Goblin Shortbow",
     "attack": 4,
     "value": 12,
-    "tags": ["bow", "pierce"],
+    "tags": ["bow", "pierce", "finesse"],
     "slot_cost": 2,
     "default_basic_attack_id": "basic_shoot",
     "energy_bonus": 0

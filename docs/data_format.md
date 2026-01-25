@@ -242,7 +242,9 @@ Weapon-tag skills live in their own file (map keyed by id). Fields (v1):
 
 * `name`: string
 * `description`: string
-* `tags`: list[string] (classification helpers such as `"skill"`, `"starter"`, `"staff"`)
+* `tags`: list[string] (classification helpers such as `"skill"`, `"starter"`, `"staff"`, `"physical"`, `"fire"`)
+  * Physical damage skills should include `"physical"` tag to ensure STR/DEX scaling
+  * Magic damage skills should include elemental tags (e.g., `"fire"`) to ensure INT scaling
 * `required_weapon_tags`: list[string] – every tag listed must be present on the actor’s equipped weapon/shield tags for the skill to appear in the CLI.
 * `target_mode`: `"single_enemy"` | `"multi_enemy"` | `"self"`
 * `max_targets`: int (only used for `"multi_enemy"`, but stored for all skills for future expansion)
@@ -262,9 +264,24 @@ Example:
   "target_mode": "single_enemy",
   "max_targets": 1,
   "mp_cost": 4,
-  "base_power": 5,
+  "base_power": 9,
   "effect_type": "damage",
   "gold_value": 25
+}
+```
+
+```json
+"skill_power_slash": {
+  "name": "Power Slash",
+  "description": "A heavy sword strike that cuts past armor.",
+  "tags": ["skill", "starter", "sword", "physical"],
+  "required_weapon_tags": ["sword"],
+  "target_mode": "single_enemy",
+  "max_targets": 1,
+  "mp_cost": 3,
+  "base_power": 4,
+  "effect_type": "damage",
+  "gold_value": 20
 }
 ```
 
@@ -422,7 +439,7 @@ Fields per location:
 * `description`: string (required, may be empty)
 * `floor_id`: string (must exist in `floors.json`)
 * `type`: string enum (`town`, `open`, `side`, `story`, `secret`, `boss`, `gate`)
-* `area_level`: optional int (>= 0). When present, overrides the floor’s level for enemy stat scaling.
+* `area_level`: optional int (>= 0). Primary enemy difficulty driver; falls back to the floor’s level if omitted.
 * `tags`: list[string] — lowercase, non-empty
 * `entry_story_node_id`: string or null
 * `npcs_present`: optional list of `{ "npc_id": string, "talk_node_id": string|null, "quest_hub_node_id": string|null }`

@@ -6,13 +6,13 @@
     "tags": ["human", "mage", "adventurer"],
     "base_stats": {
       "max_hp": 26,
-      "max_mp": 18,
+      "max_mp": 16,
       "speed": 5
     },
     "starting_attributes": {
       "STR": 2,
-      "DEX": 4,
-      "INT": 10,
+      "DEX": 3,
+      "INT": 6,
       "VIT": 4,
       "BOND": 5
     },
@@ -25,10 +25,9 @@
         "boots": "cloth_boots"
       }
     },
-    "starting_level": 3,
+    "starting_level": 2,
     "starting_abilities": [
-      "firebolt",
-      "fireburst"
+      "firebolt"
     ]
   },
   "niale": {
@@ -37,15 +36,15 @@
     "description": "A quick-footed scout with a wary smile. Prefers first strike and mobility.",
     "tags": ["human", "rogue", "scout"],
     "base_stats": {
-      "max_hp": 28,
-      "max_mp": 12,
+      "max_hp": 30,
+      "max_mp": 10,
       "speed": 7
     },
     "starting_attributes": {
-      "STR": 6,
-      "DEX": 10,
-      "INT": 4,
-      "VIT": 5,
+      "STR": 4,
+      "DEX": 6,
+      "INT": 3,
+      "VIT": 4,
       "BOND": 5
     },
     "equipment": {
@@ -57,9 +56,8 @@
         "boots": "leather_boots"
       }
     },
-    "starting_level": 3,
+    "starting_level": 2,
     "starting_abilities": [
-      "backstab",
       "quick_stab"
     ]
   }

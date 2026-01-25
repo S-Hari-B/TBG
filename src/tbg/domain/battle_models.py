@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List, Literal, Tuple
 
-from tbg.domain.entities import Stats
+from tbg.domain.entities import Attributes, BaseStats, Stats
 from tbg.domain.debuffs import ActiveDebuff
 
 Side = Literal["allies", "enemies"]
@@ -18,7 +18,8 @@ class Combatant:
     display_name: str
     side: Side
     stats: Stats
-    base_stats: Stats | None = None
+    base_stats: BaseStats | Stats | None = None
+    attributes: Attributes | None = None
     tags: Tuple[str, ...] = ()
     weapon_tags: Tuple[str, ...] = ()
     guard_reduction: int = 0
@@ -57,6 +58,7 @@ class BattleState:
     player_id: str | None = None
     round_index: int = 1
     round_last_actor_id: str | None = None
+    enemy_skill_uses: Dict[str, Dict[str, int]] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

@@ -86,8 +86,17 @@ class _FakeBattleService:
         del state
         return list(self._items)
 
-    def estimate_damage_for_ids(self, battle_state, attacker_id, target_id, *, bonus_power=0, minimum=1) -> int:
-        del battle_state, attacker_id, target_id, bonus_power, minimum
+    def estimate_damage_for_ids(
+        self,
+        battle_state,
+        attacker_id,
+        target_id,
+        *,
+        bonus_power=0,
+        minimum=1,
+        skill_tags=None,
+    ) -> int:
+        del battle_state, attacker_id, target_id, bonus_power, minimum, skill_tags
         return self._player_damage
 
     def basic_attack(self, battle_state: BattleState, attacker_id: str, target_id: str):
@@ -794,16 +803,16 @@ def test_debug_scaling_panel_renders(monkeypatch, capsys) -> None:
             level_source_value=1,
             location_id="floor_one_gate",
             floor_id="floor_one",
-            scaling_hp_per_level=10,
+            scaling_hp_per_level=12,
             scaling_attack_per_level=2,
-            scaling_defense_per_level=1,
-            scaling_speed_per_level=0,
+            scaling_defense_per_level=2,
+            scaling_speed_per_level=1,
         )
     ]
     app._render_battle_events(events)
     out = capsys.readouterr().out
     assert "Battle level: 1" in out
-    assert "Per level: +10 HP, +2 ATK, +1 DEF, +0 INIT" in out
+    assert "Per-level scaling: +12 HP, +2 ATK, +2 DEF, +1 INIT" in out
 
 
 def test_enemy_debug_lines_include_base_and_scaled(monkeypatch, capsys) -> None:

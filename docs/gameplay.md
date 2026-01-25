@@ -125,9 +125,9 @@ exp
 
 Attributes now deterministically feed into derived combat stats. They remain flat (no % scaling, no caps).
 
-- STR: increases attack (ATK) by +1 per point.
-- DEX: increases initiative/speed (INIT) by +1 per point.
-- INT: increases max MP by +2 per point.
+- STR: increases attack (ATK) by +1 per point and boosts physical skill damage.
+- DEX: increases initiative/speed (INIT) by +1 per point and boosts finesse damage (+0.75 ATK per point with finesse weapons).
+- INT: increases max MP by +2 per point and boosts magic skill damage.
 - VIT: increases max HP by +3 per point.
 - BOND: summon-only stat reserved for future summon systems (no current combat effect).
 
@@ -154,7 +154,7 @@ BOND currently has no effect on combat outcomes and is stored/displayed only.
 
 ### Enemy stat scaling (deterministic)
 
-Enemy combat stats scale deterministically by battle level, derived from location context:
+Enemy combat stats scale deterministically by battle level, derived from location context (area level is the primary difficulty driver):
 
 - If `locations.json` provides `area_level`, that value is used.
 - Otherwise, the floor’s `level` from `floors.json` is used.
@@ -162,10 +162,10 @@ Enemy combat stats scale deterministically by battle level, derived from locatio
 
 Scaling (flat per level, no RNG):
 
-- max HP: +10 per level
+- max HP: +12 per level
 - ATK: +2 per level
 - DEF: +1 per level
-- INIT: unchanged
+- INIT: +1 per level
 
 Floor Zero is level 0 and uses base enemy definitions with no scaling.
 
@@ -174,6 +174,10 @@ Economy
 gold exists in v1
 
 gold is stored on `GameState`
+
+Testing note: Balance values in `data/definitions/*.json` are expected to change. Tests
+should only fail when an explicit invariant is violated. If a test fails due to balance
+tuning, update the invariant band or reclass the test to fixtures.
 
 Equipment and derived stats
 

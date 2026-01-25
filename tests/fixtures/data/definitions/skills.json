@@ -34,5 +34,42 @@
     "base_power": 1,
     "effect_type": "damage",
     "gold_value": 12
+  },
+  "skill_hex_spark": {
+    "name": "Hex Spark",
+    "description": "A bolt of malevolent energy that strikes a single foe.",
+    "tags": ["skill", "enemy", "magic", "dark"],
+    "required_weapon_tags": [],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 2,
+    "base_power": 5,
+    "effect_type": "damage",
+    "gold_value": 0
+  },
+  "skill_rampager_cleave": {
+    "name": "Rampager Cleave",
+    "description": "A devastating sweep that strikes multiple foes with brutal force.",
+    "tags": ["skill", "enemy", "elite", "physical", "aoe"],
+    "required_weapon_tags": [],
+    "target_mode": "multi_enemy",
+    "max_targets": 3,
+    "mp_cost": 8,
+    "base_power": 6,
+    "effect_type": "damage",
+    "gold_value": 0
+  },
+  "skill_savage_bite": {
+    "name": "Savage Bite",
+    "description": "A ferocious bite that tears into flesh.",
+    "tags": ["skill", "enemy", "physical", "beast"],
+    "required_weapon_tags": [],
+    "target_mode": "single_enemy",
+    "max_targets": 1,
+    "mp_cost": 0,
+    "base_power": 3,
+    "effect_type": "damage",
+    "gold_value": 0
   }
 }
+

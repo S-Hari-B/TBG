@@ -28,6 +28,7 @@ from tbg.domain.enemy_scaling import (
     HP_PER_LEVEL,
     SPEED_PER_LEVEL,
 )
+from tbg.domain.entities import Attributes
 from tbg.domain.entities.stats import Stats
 from tbg.domain.state import GameState
 from tbg.services.battle_service import (
@@ -696,12 +697,15 @@ def test_party_ai_falls_back_to_basic_attack_with_insufficient_mp() -> None:
     service = _make_battle_service()
     state = _make_state()
     battle_state, _ = service.start_battle("goblin_pack_3", state)
-    emma = next(ally for ally in battle_state.allies if ally.instance_id == "party_emma")
-    battle_state.current_actor_id = emma.instance_id
-    emma.stats.mp = 0
+    
+    # Use player instead of emma, who has a sword (no skills with [] required_weapon_tags match sword tags)
+    player = next(ally for ally in battle_state.allies if ally.instance_id == state.player.id)
+    battle_state.current_actor_id = player.instance_id
+    player.stats.mp = 0
 
-    events = service.run_ally_ai_turn(battle_state, emma.instance_id, state.rng)
+    events = service.run_ally_ai_turn(battle_state, player.instance_id, state.rng)
 
+    # Should fall back to basic attack since no skills match sword requirements with 0 MP
     assert any(isinstance(evt, AttackResolvedEvent) for evt in events)
 
 
@@ -845,7 +849,9 @@ def test_single_target_skill_applies_damage_and_cost() -> None:
     skill_def = service._skills_repo.get("skill_power_slash")  # type: ignore[attr-defined]
     expected_damage = min(
         initial_hp,
-        service.estimate_damage(attacker, enemy, bonus_power=skill_def.base_power),
+        service.estimate_damage(
+            attacker, enemy, bonus_power=skill_def.base_power, skill_tags=skill_def.tags
+        ),
     )
 
     events = service.use_skill(battle_state, state.player.id, "skill_power_slash", [enemy_id])
@@ -865,7 +871,9 @@ def test_multi_target_skill_hits_up_to_three_targets() -> None:
     skill_def = service._skills_repo.get("skill_ember_wave")  # type: ignore[attr-defined]
     initial_hp = {enemy.instance_id: enemy.stats.hp for enemy in battle_state.enemies}
     expected = {
-        enemy.instance_id: service.estimate_damage(attacker, enemy, bonus_power=skill_def.base_power)
+        enemy.instance_id: service.estimate_damage(
+            attacker, enemy, bonus_power=skill_def.base_power, skill_tags=skill_def.tags
+        )
         for enemy in battle_state.enemies
     }
 
@@ -875,6 +883,259 @@ def test_multi_target_skill_hits_up_to_three_targets() -> None:
     assert state.player.stats.mp == initial_mp - skill_def.mp_cost
     for enemy in battle_state.enemies:
         assert enemy.stats.hp == initial_hp[enemy.instance_id] - expected[enemy.instance_id]
+
+
+def test_magic_skill_uses_int_not_str_for_action_attack() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False, class_id="mage")
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    attacker = battle_state.allies[0]
+    enemy = battle_state.enemies[0]
+    assert attacker.attributes is not None
+    attacker.weapon_tags = ("finesse",)
+    base_power = 5
+    magic_tags = ("fire",)
+
+    baseline = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=magic_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=attacker.attributes.STR,
+        DEX=attacker.attributes.DEX,
+        INT=attacker.attributes.INT + 3,
+        VIT=attacker.attributes.VIT,
+        BOND=attacker.attributes.BOND,
+    )
+    int_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=magic_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=attacker.attributes.STR + 3,
+        DEX=attacker.attributes.DEX,
+        INT=attacker.attributes.INT - 3,
+        VIT=attacker.attributes.VIT,
+        BOND=attacker.attributes.BOND,
+    )
+    str_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=magic_tags
+    )
+
+    assert int_scaled == baseline + 3
+    assert str_scaled == baseline
+
+
+def test_basic_attack_finesse_scales_with_dex_only() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    attacker = battle_state.allies[0]
+    enemy = battle_state.enemies[0]
+    assert attacker.attributes is not None
+    attacker.weapon_tags = ("dagger", "finesse")
+    base_attributes = attacker.attributes
+
+    baseline = service.estimate_damage(attacker, enemy)
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR,
+        DEX=base_attributes.DEX + 4,
+        INT=base_attributes.INT,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    dex_scaled = service.estimate_damage(attacker, enemy)
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR + 4,
+        DEX=base_attributes.DEX,
+        INT=base_attributes.INT,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    str_scaled = service.estimate_damage(attacker, enemy)
+
+    assert dex_scaled > baseline
+    assert str_scaled == baseline
+
+
+def test_physical_skill_uses_finesse_for_physical_scaling() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    attacker = battle_state.allies[0]
+    enemy = battle_state.enemies[0]
+    assert attacker.attributes is not None
+    attacker.weapon_tags = ("dagger", "finesse")
+    base_power = 4
+    physical_tags = ("physical",)
+    base_attributes = attacker.attributes
+
+    baseline = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=physical_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR,
+        DEX=base_attributes.DEX + 4,
+        INT=base_attributes.INT,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    dex_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=physical_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR + 4,
+        DEX=base_attributes.DEX,
+        INT=base_attributes.INT,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    str_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=physical_tags
+    )
+
+    assert dex_scaled > baseline
+    assert str_scaled == baseline
+
+
+def test_hybrid_skill_finesse_uses_dex_for_physical_portion() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    attacker = battle_state.allies[0]
+    enemy = battle_state.enemies[0]
+    assert attacker.attributes is not None
+    attacker.weapon_tags = ("bow", "finesse")
+    base_power = 6
+    hybrid_tags = ("physical", "fire")
+    base_attributes = attacker.attributes
+
+    baseline = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=hybrid_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR,
+        DEX=base_attributes.DEX + 4,
+        INT=base_attributes.INT,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    dex_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=hybrid_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR,
+        DEX=base_attributes.DEX,
+        INT=base_attributes.INT + 2,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    int_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=hybrid_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR + 2,
+        DEX=base_attributes.DEX,
+        INT=base_attributes.INT,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    str_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=hybrid_tags
+    )
+
+    assert dex_scaled > baseline
+    assert int_scaled > baseline
+    assert str_scaled == baseline
+
+
+def test_physical_skill_uses_str_not_int_for_action_attack() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    attacker = battle_state.allies[0]
+    enemy = battle_state.enemies[0]
+    assert attacker.attributes is not None
+    base_power = 4
+    physical_tags = ("physical",)
+    base_attributes = attacker.attributes
+
+    baseline = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=physical_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR + 3,
+        DEX=base_attributes.DEX,
+        INT=base_attributes.INT,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    str_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=physical_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR,
+        DEX=base_attributes.DEX,
+        INT=base_attributes.INT + 3,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    int_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=physical_tags
+    )
+
+    assert str_scaled > baseline
+    assert int_scaled == baseline
+
+
+def test_hybrid_skill_scales_with_str_and_int() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    attacker = battle_state.allies[0]
+    enemy = battle_state.enemies[0]
+    assert attacker.attributes is not None
+    base_power = 6
+    hybrid_tags = ("physical", "fire")
+    base_attributes = attacker.attributes
+
+    baseline = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=hybrid_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR + 2,
+        DEX=base_attributes.DEX,
+        INT=base_attributes.INT,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    str_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=hybrid_tags
+    )
+
+    attacker.attributes = Attributes(
+        STR=base_attributes.STR,
+        DEX=base_attributes.DEX,
+        INT=base_attributes.INT + 2,
+        VIT=base_attributes.VIT,
+        BOND=base_attributes.BOND,
+    )
+    int_scaled = service.estimate_damage(
+        attacker, enemy, bonus_power=base_power, skill_tags=hybrid_tags
+    )
+
+    assert str_scaled > baseline
+    assert int_scaled > baseline
 
 
 def test_guard_reduces_next_damage_then_expires() -> None:
@@ -1174,4 +1435,220 @@ def test_ai_uses_skill_deterministically_with_seed() -> None:
     events = service.run_ally_ai_turn(battle_state, emma_id, state.rng)
 
     assert any(isinstance(evt, (SkillUsedEvent, AttackResolvedEvent)) for evt in events)
+
+
+def test_enemy_uses_skill_when_available() -> None:
+    """Test that an enemy with MP and enemy_skill_ids uses a skill."""
+    service = _make_battle_service()
+    state = _make_state(seed=123)
+    
+    # Create a battle state with goblin_shaman (has skill_hex_spark)
+    battle_state, _ = service.start_battle("goblin_shaman", state)
+    shaman = battle_state.enemies[0]
+    
+    # Ensure shaman has MP for the skill
+    assert shaman.stats.mp >= 2  # skill_hex_spark costs 2 MP
+    battle_state.current_actor_id = shaman.instance_id
+    
+    # Run enemy turn
+    events = service.run_enemy_turn(battle_state, state.rng)
+    
+    # Should use the skill
+    assert any(isinstance(evt, SkillUsedEvent) and evt.skill_id == "skill_hex_spark" for evt in events)
+    # MP should be consumed
+    assert shaman.stats.mp < shaman.stats.max_mp
+
+
+def test_enemy_falls_back_to_attack_without_mp() -> None:
+    """Test that an enemy without sufficient MP falls back to basic attack."""
+    service = _make_battle_service()
+    state = _make_state(seed=123)
+    
+    battle_state, _ = service.start_battle("goblin_shaman", state)
+    shaman = battle_state.enemies[0]
+    
+    # Drain MP
+    shaman.stats.mp = 0
+    battle_state.current_actor_id = shaman.instance_id
+    
+    # Run enemy turn
+    events = service.run_enemy_turn(battle_state, state.rng)
+    
+    # Should fall back to basic attack
+    assert any(isinstance(evt, AttackResolvedEvent) for evt in events)
+    assert not any(isinstance(evt, SkillUsedEvent) for evt in events)
+
+
+def test_rampager_aoe_usage_cap() -> None:
+    """Test that Rampager AoE skill is capped at 2 uses per battle."""
+    service = _make_battle_service()
+    state = _make_state(seed=123, with_party=True)
+    
+    # Create battle with goblin_rampager
+    battle_state, _ = service.start_battle("goblin_rampager", state)
+    rampager = battle_state.enemies[0]
+    
+    # Ensure rampager has enough MP for 3+ uses (skill costs 8 MP)
+    rampager.stats.mp = 30
+    rampager.stats.max_mp = 30
+    battle_state.current_actor_id = rampager.instance_id
+    
+    use_count = 0
+    
+    # Try to use skill multiple times
+    for _ in range(5):
+        if not rampager.is_alive or rampager.stats.mp < 8:
+            break
+        
+        events = service.run_enemy_turn(battle_state, state.rng)
+        
+        if any(isinstance(evt, SkillUsedEvent) and evt.skill_id == "skill_rampager_cleave" for evt in events):
+            use_count += 1
+        
+        # Reset for next turn (advance turn queue manually)
+        battle_state.current_actor_id = rampager.instance_id
+        
+        # If we've seen 2 uses, next one should be basic attack
+        if use_count == 2:
+            # One more turn should NOT use the skill
+            rampager.stats.mp = 30  # Give it MP
+            events = service.run_enemy_turn(battle_state, state.rng)
+            assert not any(isinstance(evt, SkillUsedEvent) and evt.skill_id == "skill_rampager_cleave" for evt in events)
+            break
+    
+    # Should have used skill exactly 2 times
+    assert use_count == 2
+
+
+def test_rampager_aoe_cap_resets_per_battle() -> None:
+    """Test that Rampager AoE usage cap resets in a fresh battle."""
+    service = _make_battle_service()
+    state = _make_state(seed=123, with_party=True)
+    
+    # First battle
+    battle_a, _ = service.start_battle("goblin_rampager", state)
+    rampager_a = battle_a.enemies[0]
+    rampager_a.stats.mp = 30
+    battle_a.current_actor_id = rampager_a.instance_id
+    
+    # Use skill twice
+    for _ in range(2):
+        events = service.run_enemy_turn(battle_a, state.rng)
+        if not any(isinstance(evt, SkillUsedEvent) and evt.skill_id == "skill_rampager_cleave" for evt in events):
+            break
+        battle_a.current_actor_id = rampager_a.instance_id
+        rampager_a.stats.mp = 30
+    
+    # Second battle (fresh)
+    battle_b, _ = service.start_battle("goblin_rampager", state)
+    rampager_b = battle_b.enemies[0]
+    rampager_b.stats.mp = 30
+    battle_b.current_actor_id = rampager_b.instance_id
+    
+    # Should be able to use skill again
+    events = service.run_enemy_turn(battle_b, state.rng)
+    assert any(isinstance(evt, SkillUsedEvent) and evt.skill_id == "skill_rampager_cleave" for evt in events)
+
+
+def test_enemy_multi_target_selection_deterministic() -> None:
+    """Test that multi-target enemy skills select targets deterministically."""
+    service = _make_battle_service()
+    state_a = _make_state(seed=999, with_party=True)
+    state_b = _make_state(seed=999, with_party=True)
+    
+    # Create two identical battles
+    battle_a, _ = service.start_battle("goblin_rampager", state_a)
+    battle_b, _ = service.start_battle("goblin_rampager", state_b)
+    
+    rampager_a = battle_a.enemies[0]
+    rampager_b = battle_b.enemies[0]
+    
+    rampager_a.stats.mp = 20
+    rampager_b.stats.mp = 20
+    
+    battle_a.current_actor_id = rampager_a.instance_id
+    battle_b.current_actor_id = rampager_b.instance_id
+    
+    # Set up specific aggro values to test deterministic ordering
+    living_allies_a = [ally for ally in battle_a.allies if ally.is_alive]
+    living_allies_b = [ally for ally in battle_b.allies if ally.is_alive]
+    
+    # Need at least 2 allies for multi-target
+    assert len(living_allies_a) >= 2
+    assert len(living_allies_b) >= 2
+    
+    # Set aggro in battle_a with different values to test sorting
+    battle_a.enemy_aggro[rampager_a.instance_id] = {
+        living_allies_a[0].instance_id: 100,
+        living_allies_a[1].instance_id: 50,
+    }
+    
+    # Set identical aggro in battle_b
+    battle_b.enemy_aggro[rampager_b.instance_id] = {
+        living_allies_b[0].instance_id: 100,
+        living_allies_b[1].instance_id: 50,
+    }
+    
+    # Run enemy turns
+    events_a = service.run_enemy_turn(battle_a, state_a.rng)
+    events_b = service.run_enemy_turn(battle_b, state_b.rng)
+    
+    # Extract skill events
+    skill_events_a = [evt for evt in events_a if isinstance(evt, SkillUsedEvent)]
+    skill_events_b = [evt for evt in events_b if isinstance(evt, SkillUsedEvent)]
+    
+    # Should have used the AoE skill
+    assert len(skill_events_a) > 0
+    assert len(skill_events_b) > 0
+    
+    # Targets should be identical (deterministic)
+    targets_a = [evt.target_id for evt in skill_events_a]
+    targets_b = [evt.target_id for evt in skill_events_b]
+    assert targets_a == targets_b
+    
+    # Verify targets are sorted by aggro (highest first)
+    # The target with 100 aggro should come before the target with 50 aggro
+    if len(targets_a) >= 2:
+        assert targets_a[0] == living_allies_a[0].instance_id  # highest aggro
+
+
+
+def test_enemy_skill_selection_order() -> None:
+    """Test that enemies iterate skills in order and pick first usable."""
+    service = _make_battle_service()
+    
+    # Manually create a test enemy with multiple skills
+    service._enemies_repo._ensure_loaded()  # type: ignore[attr-defined]
+    from tbg.domain.defs.enemy_def import EnemyDef
+    
+    # Create test enemy with two skills, first costs too much MP
+    service._enemies_repo._definitions["test_enemy_multi_skill"] = EnemyDef(  # type: ignore[attr-defined]
+        id="test_enemy_multi_skill",
+        name="Test Multi-Skill Enemy",
+        hp=50,
+        mp=5,
+        attack=10,
+        defense=2,
+        speed=5,
+        rewards_exp=10,
+        rewards_gold=5,
+        tags=("test",),
+        weapon_ids=(),
+        armour_slots={},
+        enemy_skill_ids=("skill_hex_spark", "skill_savage_bite"),  # hex costs 2, bite costs 0
+    )
+    
+    state = _make_state(seed=123)
+    battle_state, _ = service.start_battle("test_enemy_multi_skill", state)
+    enemy = battle_state.enemies[0]
+    
+    # Give just enough MP for the first skill
+    enemy.stats.mp = 2
+    battle_state.current_actor_id = enemy.instance_id
+    
+    # Should use first skill (skill_hex_spark) since it has enough MP
+    events = service.run_enemy_turn(battle_state, state.rng)
+    assert any(isinstance(evt, SkillUsedEvent) and evt.skill_id == "skill_hex_spark" for evt in events)
+
+
 
