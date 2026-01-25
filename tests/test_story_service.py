@@ -629,7 +629,9 @@ def test_protoquest_decline_skips_offer_on_revisit() -> None:
     service.play_node(state, "protoquest_offer_router")
     while state.pending_story_node_id:
         service.resume_pending_flow(state)
-    assert state.current_node_id == "threshold_inn_hub_basic"
+    # After declining protoquest, flow goes to floor1_open_handoff which has enter_game_menu
+    assert state.current_node_id == "floor1_open_handoff"
+    assert state.mode == "camp_menu"
 
 
 def test_northern_ridge_requires_cerel_at_cave() -> None:

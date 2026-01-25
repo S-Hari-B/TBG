@@ -180,7 +180,8 @@
       {
         "to": "deeper_cave_path",
         "label": "Take the deeper cave path",
-        "progresses_story": true
+        "progresses_story": true,
+        "show_if_flag_true": "flag_rampager_defeated"
       }
     ]
   },

@@ -343,8 +343,7 @@
         "type": "enter_game_menu",
         "message": "The tide cave has already been cleared. Return to the inn when ready."
       }
-    ],
-    "next": "threshold_inn_hub_router"
+    ]
   },
   "tide_cave_entry_solo": {
     "text": "The tide cave yawns open, dark and damp. Salt-crusted walls, broken crates, old bloodstains. The air is still.\n\nYou move carefully, listening.\n\nA scrape. A shuffle. Something's here.\n\nYou turn—\n\nTwo goblins drop from the shadows, weapons raised. Ambush.",
@@ -497,8 +496,7 @@
         "type": "enter_game_menu",
         "message": "The shoreline ruins are now accessible via Travel. Return to Floor One gate when ready."
       }
-    ],
-    "next": "floor1_open_handoff"
+    ]
   },
   "protoquest_decline": {
     "text": "",
@@ -520,8 +518,7 @@
         "type": "enter_game_menu",
         "message": "Floor One gate is now accessible via Travel. Explore at your own pace."
       }
-    ],
-    "next": "floor1_open_handoff"
+    ]
   },
   "protoquest_decline_party": {
     "text": "\"We'll pass,\" you say. \"Let's keep moving.\"\n\nDana shrugs. \"Your call. Floor One's waiting.\"\n\nYour companion nods. \"Fair. Let's go.\"",
@@ -530,8 +527,7 @@
         "type": "enter_game_menu",
         "message": "Floor One gate is now accessible via Travel. Explore at your own pace."
       }
-    ],
-    "next": "floor1_open_handoff"
+    ]
   },
   "floor1_open_handoff": {
     "text": "Cerel walks you to the edge of the settlement. Beyond, a shimmering threshold marks the boundary to Floor One.\n\n\"This is where I leave you,\" he says. \"Floor One is larger, more dangerous, and more rewarding. Towns exist, but they're farther apart. The guardian waits at the far end—defeat it, and Floor Two opens.\"\n\nYou adjust your gear, ready to move forward.",
@@ -541,8 +537,7 @@
         "type": "enter_game_menu",
         "message": "Floor One is unlocked. Use Travel to reach the gate when you're ready."
       }
-    ],
-    "next": "threshold_inn_hub_router"
+    ]
   },
   "protoquest_ruins_entry": {
     "text": "",
@@ -590,8 +585,7 @@
         "type": "enter_game_menu",
         "message": "Objective complete. Return to Dana at the Threshold Inn for your reward."
       }
-    ],
-    "next": "threshold_inn_hub_router"
+    ]
   },
   "protoquest_complete_party": {
     "text": "The scavenger falls. Behind it, a weathered chest. Inside: a small potion and a handful of gold.\n\nYou pocket the loot. \"Not bad. Let's head back.\"\n\nIf you want to report in, Dana is waiting at the inn.",
@@ -600,8 +594,7 @@
         "type": "enter_game_menu",
         "message": "Objective complete. Return to Dana at the Threshold Inn for your reward."
       }
-    ],
-    "next": "threshold_inn_hub_router"
+    ]
   },
   "threshold_inn_hub_router": {
     "text": "",
@@ -760,7 +753,7 @@
       },
       {
         "label": "Ask about the goblin problem",
-        "next": "cerel_goblin_escalation_quest_offer"
+        "next": "cerel_goblin_escalation_quest_offer_router"
       },
       {
         "label": "Back to town menu",
@@ -781,7 +774,7 @@
       },
       {
         "label": "Ask about the goblin problem",
-        "next": "cerel_goblin_escalation_quest_offer"
+        "next": "cerel_goblin_escalation_quest_offer_router"
       },
       {
         "label": "Back to town menu",
@@ -969,6 +962,79 @@
     "text": "Dana nods. \"You've already been paid for that one.\"",
     "next": "threshold_inn_hub_router"
   },
+  "cerel_goblin_escalation_quest_offer_router": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_rampager_completed",
+        "expected": true,
+        "next_on_true": "cerel_rampager_already_done",
+        "next_on_false": "cerel_goblin_escalation_quest_offer_check_accepted"
+      }
+    ]
+  },
+  "cerel_goblin_escalation_quest_offer_check_accepted": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_rampager_accepted",
+        "expected": true,
+        "next_on_true": "cerel_rampager_already_accepted",
+        "next_on_false": "cerel_goblin_escalation_quest_offer_check_offered"
+      }
+    ]
+  },
+  "cerel_goblin_escalation_quest_offer_check_offered": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_sq_cerel_rampager_offered",
+        "expected": true,
+        "next_on_true": "cerel_rampager_already_offered",
+        "next_on_false": "cerel_goblin_escalation_quest_offer_prereq_check"
+      }
+    ]
+  },
+  "cerel_goblin_escalation_quest_offer_prereq_check": {
+    "text": "",
+    "effects": [
+      {
+        "type": "branch_on_flag",
+        "flag_id": "flag_story_goblin_cave_reached",
+        "expected": true,
+        "next_on_true": "cerel_goblin_escalation_quest_offer",
+        "next_on_false": "cerel_rampager_not_ready"
+      }
+    ]
+  },
+  "cerel_rampager_not_ready": {
+    "text": "Cerel looks at you. \"The goblin problem is escalating, but you need to see it for yourself first. Head to the goblin cave entrance and we'll talk more about it there.\"",
+    "next": "cerel_inn_converse_router"
+  },
+  "cerel_rampager_already_offered": {
+    "text": "Cerel gives you a steady look. \"I already told you about the Rampager. It's at the northern ridge. Are you ready to take it on?\"",
+    "choices": [
+      {
+        "label": "Accept: hunt the Goblin Rampager",
+        "next": "cerel_rampager_quest_accept"
+      },
+      {
+        "label": "Not yet. I need to prepare more.",
+        "next": "cerel_rampager_quest_decline"
+      }
+    ]
+  },
+  "cerel_rampager_already_accepted": {
+    "text": "Cerel nods. \"The Rampager is waiting at the northern ridge. Be ready—it's dangerous.\"",
+    "next": "cerel_inn_converse_router"
+  },
+  "cerel_rampager_already_done": {
+    "text": "Cerel nods. \"The Rampager is dealt with. Floor Zero is quieter now, thanks to you.\"",
+    "next": "cerel_inn_converse_router"
+  },
   "cerel_goblin_escalation_quest_offer": {
     "text": "Cerel's expression darkens. \"The goblin activity has been escalating. We've had reports of a larger one—bigger, meaner, coordinating the others. Locals are calling it the 'Rampager.'\"\n\nHe looks at you seriously. \"It's been spotted near the northern ridge, past the plains. If you're feeling capable, I'd pay well to have it dealt with. But this isn't like the trial grunts. This one fights back.\"\n\nDana adds from across the room: \"If that thing is organizing the goblins, taking it down might buy Floor Zero some breathing room. Worth considering.\"",
     "effects": [
@@ -994,8 +1060,7 @@
         "type": "enter_game_menu",
         "message": "New quest: Hunt the Goblin Rampager. Travel to the Northern Ridge when ready."
       }
-    ],
-    "next": "threshold_inn_hub_router"
+    ]
   },
   "cerel_rampager_quest_decline": {
     "text": "Cerel nods. \"Smart to know your limits. Come back when you're ready.\"",
@@ -1219,8 +1284,7 @@
         "type": "enter_game_menu",
         "message": "Rampager defeated. Return to the Threshold Inn and speak with Cerel."
       }
-    ],
-    "next": "threshold_inn_hub_router"
+    ]
   },
   "goblin_cave_entrance_intro": {
     "text": "The ridge opens into a shallow cave mouth. Smoke curls from inside, and crude totems hang from the rocks.\n\nCerel waits near the entrance, arms folded. \"You made it. This is the goblin cave—Floor One's first real hurdle.\"",
@@ -1536,8 +1600,7 @@
         "type": "enter_game_menu",
         "message": "Guardian chamber locked. Return when stronger."
       }
-    ],
-    "next": "floor1_ready_router"
+    ]
   },
   "cave_guardian_foreshadow_party": {
     "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nYour companion whispers, \"That's the guardian. We're not ready.\"\n\nA lock mechanism glows faintly, unresponsive. Not yet.\n\nThis isn't the Rampager's path. You'll need to return to the plains and head to the northern ridge after speaking with Cerel.\n\nYou turn back, the warning etched into your memory.",
@@ -1547,8 +1610,7 @@
         "type": "enter_game_menu",
         "message": "Guardian chamber locked. Return when stronger."
       }
-    ],
-    "next": "floor1_ready_router"
+    ]
   },
   "cave_guardian_post_rampager_solo": {
     "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nA lock mechanism glows faintly, unresponsive. The guardian's chamber. Still sealed.\n\nYou've handled the worst of Floor One for now. Time to regroup at the inn or finish any remaining work.\n\nYou turn back, the warning etched into your memory.",
@@ -1558,8 +1620,7 @@
         "type": "enter_game_menu",
         "message": "Guardian chamber locked. Return when stronger."
       }
-    ],
-    "next": "floor1_ready_router"
+    ]
   },
   "cave_guardian_post_rampager_party": {
     "text": "The tunnel ends at a massive stone door etched with runes. Beyond it, you hear a low, rhythmic pulse—like a heartbeat.\n\nYour companion whispers, \"That's the guardian. We're not ready.\"\n\nA lock mechanism glows faintly, unresponsive. Still sealed.\n\nThis is as far as you can go for now. Regroup at the inn or finish any remaining work.\n\nYou turn back, the warning etched into your memory.",
@@ -1569,8 +1630,7 @@
         "type": "enter_game_menu",
         "message": "Guardian chamber locked. Return when stronger."
       }
-    ],
-    "next": "floor1_ready_router"
+    ]
   },
   "floor1_ready_router": {
     "text": "",
@@ -1604,8 +1664,7 @@
         "type": "enter_game_menu",
         "message": "Floor One slice complete. Explore freely, or tackle the Rampager if you haven't yet."
       }
-    ],
-    "next": "ch00_complete_check"
+    ]
   },
   "floor1_ready_turn_in": {
     "text": "Floor One is open. The Rampager is down, but Cerel is still waiting at the inn.\n\nReturn to the Threshold Inn to report in and collect your reward.",
@@ -1615,8 +1674,7 @@
         "type": "enter_game_menu",
         "message": "Rampager defeated. Return to Cerel at the Threshold Inn."
       }
-    ],
-    "next": "threshold_inn_hub_router"
+    ]
   },
   "ch00_complete_check": {
     "text": "",
@@ -1631,7 +1689,13 @@
     ]
   },
   "ch00_incomplete": {
-    "text": "Floor One exploration continues. When you're ready, tackle the Goblin Rampager to conclude Chapter 00."
+    "text": "Floor One exploration continues. When you're ready, tackle the Goblin Rampager to conclude Chapter 00.",
+    "effects": [
+      {
+        "type": "enter_game_menu",
+        "message": "Chapter 00 is incomplete. Defeat the Rampager to proceed."
+      }
+    ]
   },
   "chapter_00_epilogue": {
     "text": "",
