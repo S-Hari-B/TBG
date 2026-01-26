@@ -274,44 +274,6 @@
     ],
     "next": "protoquest_offer_router"
   },
-  "beach_side_area_intro": {
-    "text": "",
-    "effects": [
-      {
-        "type": "branch_on_flag",
-        "flag_id": "flag_companion_none",
-        "expected": true,
-        "next_on_true": "beach_side_area_intro_solo",
-        "next_on_false": "beach_side_area_intro_party"
-      }
-    ]
-  },
-  "beach_side_area_intro_solo": {
-    "text": "Cerel glances toward the cliffs. \"Before we open the Floor One gate, there's something you should see. Or maybe you shouldn't.\"\n\nDana follows his gaze. \"There's an old tide cave up the coast. Used to be a smuggler's cache, back when this place had smugglers. Now it's just... hollow. Quiet. Too quiet.\"\n\nShe looks at you. \"A few scavengers went in yesterday. Didn't come back. Could be goblins. Could be something else. You're not required to check it out, but if you do, be ready.\"",
-    "choices": [
-      {
-        "label": "Investigate the tide cave",
-        "next": "tide_cave_router"
-      },
-      {
-        "label": "Skip it. What's next?",
-        "next": "skip_tide_cave"
-      }
-    ]
-  },
-  "beach_side_area_intro_party": {
-    "text": "Cerel glances toward the cliffs. \"Before we open the Floor One gate, there's something you should see. Or maybe you shouldn't.\"\n\nDana follows his gaze. \"There's an old tide cave up the coast. Used to be a smuggler's cache, back when this place had smugglers. Now it's just... hollow. Quiet. Too quiet.\"\n\nYour companion shifts. \"I've heard stories. A few scavengers went in yesterday. Didn't come back.\"\n\nDana looks at you. \"Could be goblins. Could be something else. You're not required to check it out, but if you do, be ready.\"",
-    "choices": [
-      {
-        "label": "Investigate the tide cave",
-        "next": "tide_cave_router"
-      },
-      {
-        "label": "Skip it. What's next?",
-        "next": "skip_tide_cave"
-      }
-    ]
-  },
   "tide_cave_router": {
     "text": "",
     "effects": [
@@ -419,10 +381,6 @@
       { "type": "quest", "action": "turn_in", "quest_id": "tide_cave_cache" }
     ],
     "next": "threshold_inn_hub_router"
-  },
-  "skip_tide_cave": {
-    "text": "\"I'll pass for now,\" you say.\n\nDana shrugs. \"Your call. Just know it's there.\"",
-    "next": "protoquest_offer_router"
   },
   "protoquest_offer_router": {
     "text": "",

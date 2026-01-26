@@ -29,6 +29,9 @@ class StoryNodeView:
     segments: List[Tuple[str, str]]
 
 
+START_NODE_ID = "arrival_beach_wake"
+
+
 @dataclass(slots=True)
 class StoryEvent:
     """Base class for story events."""
@@ -143,10 +146,10 @@ class StoryService:
             seed=seed,
             rng=rng,
             mode="story",
-            current_node_id="arrival_beach_wake",
+            current_node_id=START_NODE_ID,
         )
         state.player_name = player_name or self._default_player_name
-        self._enter_node(state, "arrival_beach_wake", [])
+        self._enter_node(state, START_NODE_ID, [])
         return state
 
     def get_current_node_view(self, state: GameState) -> StoryNodeView:
