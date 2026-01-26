@@ -17,6 +17,7 @@
   },
   "goblin_shaman": {
     "name": "Goblin Shaman",
+    "knowledge_key": "k_ch00_goblin_shaman",
     "hp": 40,
     "mp": 16,
     "attack": 8,
@@ -33,6 +34,7 @@
   },
   "goblin_rampager": {
     "name": "Goblin Rampager",
+    "knowledge_key": "k_ch00_goblin_rampager",
     "hp": 140,
     "mp": 20,
     "attack": 16,

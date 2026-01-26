@@ -11,6 +11,7 @@ from tbg.services.story_service import StoryService
 from tbg.services.errors import SaveLoadError
 from tbg.services.area_service_v2 import AreaServiceV2
 from tbg.services.errors import TravelBlockedError
+from tbg.services.knowledge_keys import resolve_enemy_knowledge_key
 from tbg.data.repositories import (
     ArmourRepository,
     ClassesRepository,
@@ -124,6 +125,7 @@ def test_save_round_trip_preserves_state() -> None:
     state.gold = 77
     state.exp = 42
     state.flags["tutorial_complete"] = True
+    state.knowledge_kill_counts = {"k_goblin": 2}
     state.pending_story_node_id = "trial_setup"
     state.pending_narration = [("arrival_beach_wake", "Intro text")]
     weapon_id = repos["weapons"].all()[0].id
@@ -198,8 +200,29 @@ def test_save_round_trip_preserves_state() -> None:
     assert restored.party_member_attributes == state.party_member_attributes
     assert restored.owned_summons == state.owned_summons
     assert restored.party_member_summon_loadouts == state.party_member_summon_loadouts
+    assert restored.knowledge_kill_counts == state.knowledge_kill_counts
     assert "cerel_kill_hunt" in restored.quests_active
     assert restored.quests_completed == state.quests_completed
+
+
+def test_save_round_trip_preserves_knowledge_kills_after_victory() -> None:
+    story_service, battle_service, _, save_service, area_service, _ = _build_test_services()
+    state = story_service.start_new_game(seed=123, player_name="Tester")
+    area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
+    story_service.choose(state, 0)  # select first class
+
+    battle_state, _ = battle_service.start_battle("goblin_grunt", state)
+    for enemy in battle_state.enemies:
+        enemy.stats.hp = 0
+    battle_service.apply_victory_rewards(battle_state, state)
+
+    payload = save_service.serialize(state)
+    restored = save_service.deserialize(payload)
+
+    key = resolve_enemy_knowledge_key(battle_service._enemies_repo.get("goblin_grunt"))
+    assert restored.knowledge_kill_counts.get(key, 0) == state.knowledge_kill_counts.get(key, 0)
+    assert restored.knowledge_kill_counts.get(key, 0) == 1
 
 
 def test_missing_equipped_summons_defaults_to_empty() -> None:
@@ -270,6 +293,49 @@ def test_missing_attribute_points_debug_bonus_defaults_to_zero() -> None:
     restored = save_service.deserialize(payload)
 
     assert restored.player_attribute_points_debug_bonus == 0
+
+
+def test_missing_knowledge_kill_counts_defaults_empty() -> None:
+    (
+        story_service,
+        _,
+        _,
+        save_service,
+        area_service,
+        _,
+    ) = _build_test_services()
+    state = story_service.start_new_game(seed=222, player_name="Hero")
+    area_service.initialize_state(state)
+    area_service.initialize_state(state)
+    _advance_to_class_select(story_service, state)
+    story_service.choose(state, 0)
+    state.knowledge_kill_counts = {"k_test": 5}
+
+    payload = save_service.serialize(state)
+    del payload["state"]["knowledge_kill_counts"]
+    restored = save_service.deserialize(payload)
+
+    assert restored.knowledge_kill_counts == {}
+
+
+def test_invalid_knowledge_kill_counts_rejected() -> None:
+    story_service, _, _, save_service, area_service, _ = _build_test_services()
+    state = story_service.start_new_game(seed=1001, player_name="Hero")
+    area_service.initialize_state(state)
+    area_service.initialize_state(state)
+    payload = save_service.serialize(state)
+
+    payload["state"]["knowledge_kill_counts"] = {"k_valid": "bad"}
+    with pytest.raises(SaveLoadError):
+        save_service.deserialize(payload)
+
+    payload["state"]["knowledge_kill_counts"] = {1: 2}
+    with pytest.raises(SaveLoadError):
+        save_service.deserialize(payload)
+
+    payload["state"]["knowledge_kill_counts"] = {"k_negative": -1}
+    with pytest.raises(SaveLoadError):
+        save_service.deserialize(payload)
 
 
 def test_missing_owned_summons_defaults_from_class() -> None:

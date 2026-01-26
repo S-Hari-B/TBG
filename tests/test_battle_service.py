@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
 
 from tbg.core.rng import RNG
+from tbg.data import paths
 from tbg.data.repositories import (
     ArmourRepository,
     ClassesRepository,
@@ -21,7 +23,7 @@ from tbg.data.repositories import (
     WeaponsRepository,
 )
 from tbg.domain.battle_models import BattleState, Combatant
-from tbg.domain.defs import ItemDef
+from tbg.domain.defs import ItemDef, KnowledgeEntry
 from tbg.domain.enemy_scaling import (
     ATTACK_PER_LEVEL,
     DEFENSE_PER_LEVEL,
@@ -47,6 +49,7 @@ from tbg.services.battle_service import (
 )
 from tbg.services.factories import create_player_from_class_id
 from tbg.services.inventory_service import InventoryService
+from tbg.services.knowledge_keys import resolve_enemy_knowledge_key
 
 
 FIXTURE_DEFINITIONS_DIR = Path(__file__).parent / "fixtures" / "data" / "definitions"
@@ -107,6 +110,142 @@ def _make_state(seed: int = 123, with_party: bool = True, class_id: str = "warri
         state.member_exp["emma"] = 0
         state.party_member_attributes["emma"] = member_def.starting_attributes
     return state
+
+
+def _make_live_battle_service() -> BattleService:
+    definitions_dir = paths.get_definitions_path()
+    floors_repo = FloorsRepository(base_path=definitions_dir)
+    locations_repo = LocationsRepository(
+        floors_repo=floors_repo, base_path=definitions_dir
+    )
+    return BattleService(
+        enemies_repo=EnemiesRepository(base_path=definitions_dir),
+        party_members_repo=PartyMembersRepository(base_path=definitions_dir),
+        knowledge_repo=KnowledgeRepository(base_path=definitions_dir),
+        weapons_repo=WeaponsRepository(base_path=definitions_dir),
+        armour_repo=ArmourRepository(base_path=definitions_dir),
+        skills_repo=SkillsRepository(base_path=definitions_dir),
+        items_repo=ItemsRepository(base_path=definitions_dir),
+        loot_tables_repo=LootTablesRepository(base_path=definitions_dir),
+        summons_repo=SummonsRepository(base_path=definitions_dir),
+        floors_repo=floors_repo,
+        locations_repo=locations_repo,
+    )
+
+
+def _make_live_state(seed: int = 123, with_party: bool = True, class_id: str = "warrior") -> GameState:
+    definitions_dir = paths.get_definitions_path()
+    rng = RNG(seed)
+    state = GameState(seed=seed, rng=rng, mode="game_menu", current_node_id="class_select")
+    weapons_repo = WeaponsRepository(base_path=definitions_dir)
+    armour_repo = ArmourRepository(base_path=definitions_dir)
+    classes_repo = ClassesRepository(
+        weapons_repo=weapons_repo, armour_repo=armour_repo, base_path=definitions_dir
+    )
+    party_repo = PartyMembersRepository(base_path=definitions_dir)
+    inventory_service = InventoryService(
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        party_members_repo=party_repo,
+    )
+    player = create_player_from_class_id(
+        class_id=class_id,
+        name="Tester",
+        classes_repo=classes_repo,
+        weapons_repo=weapons_repo,
+        armour_repo=armour_repo,
+        rng=rng,
+    )
+    state.player = player
+    class_def = classes_repo.get(class_id)
+    inventory_service.initialize_player_loadout(state, player.id, class_def)
+    state.member_levels[player.id] = classes_repo.get_starting_level(class_id)
+    state.member_exp[player.id] = 0
+    if with_party:
+        state.party_members = ["emma"]
+        member_def = party_repo.get("emma")
+        inventory_service.initialize_party_member_loadout(state, "emma", member_def)
+        state.member_levels["emma"] = member_def.starting_level
+        state.member_exp["emma"] = 0
+        state.party_member_attributes["emma"] = member_def.starting_attributes
+    return state
+
+
+def test_battle_view_hp_visibility_by_tier() -> None:
+    service = _make_battle_service()
+    knowledge_key = resolve_enemy_knowledge_key(service._enemies_repo.get("goblin_grunt"))
+
+    state_tier0 = _make_state(seed=10)
+    battle_state_tier0, _ = service.start_battle("goblin_grunt", state_tier0)
+    view_tier0 = service.get_battle_view(battle_state_tier0)
+    assert view_tier0.enemies[0].hp_display == "???"
+
+    state_tier1 = _make_state(seed=11)
+    state_tier1.knowledge_kill_counts[knowledge_key] = 25
+    battle_state_tier1, _ = service.start_battle("goblin_grunt", state_tier1)
+    view_tier1 = service.get_battle_view(battle_state_tier1)
+    expected_range = service._format_static_hp_range(battle_state_tier1.enemies[0].stats.max_hp)
+    assert view_tier1.enemies[0].hp_display == expected_range
+
+    state_tier2 = _make_state(seed=12)
+    state_tier2.knowledge_kill_counts[knowledge_key] = 75
+    battle_state_tier2, _ = service.start_battle("goblin_grunt", state_tier2)
+    view_tier2 = service.get_battle_view(battle_state_tier2)
+    assert view_tier2.enemies[0].hp_display == (
+        f"{battle_state_tier2.enemies[0].stats.hp}/{battle_state_tier2.enemies[0].stats.max_hp}"
+    )
+
+
+def test_tier1_hp_range_is_static() -> None:
+    service = _make_battle_service()
+    knowledge_key = resolve_enemy_knowledge_key(service._enemies_repo.get("goblin_grunt"))
+    state = _make_state(seed=13)
+    state.knowledge_kill_counts[knowledge_key] = 25
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    view_before = service.get_battle_view(battle_state)
+    battle_state.enemies[0].stats.hp = max(0, battle_state.enemies[0].stats.hp - 5)
+    view_after = service.get_battle_view(battle_state)
+    assert view_before.enemies[0].hp_display == view_after.enemies[0].hp_display
+
+
+def test_tier2_hp_display_updates_with_damage() -> None:
+    service = _make_battle_service()
+    knowledge_key = resolve_enemy_knowledge_key(service._enemies_repo.get("goblin_grunt"))
+    state = _make_state(seed=14)
+    state.knowledge_kill_counts[knowledge_key] = 75
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    view_before = service.get_battle_view(battle_state)
+    battle_state.enemies[0].stats.hp = max(0, battle_state.enemies[0].stats.hp - 5)
+    view_after = service.get_battle_view(battle_state)
+    assert view_before.enemies[0].hp_display != view_after.enemies[0].hp_display
+    assert view_after.enemies[0].hp_display.startswith(
+        f"{battle_state.enemies[0].stats.hp}/"
+    )
+
+
+def test_knowledge_snapshot_does_not_consume_rng() -> None:
+    service = _make_battle_service()
+    state = _make_state(seed=15)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    before = state.rng.export_state()
+    _ = service._build_knowledge_snapshot(state, battle_state)
+    after = state.rng.export_state()
+    assert before == after
+
+
+def test_refresh_knowledge_snapshot_updates_view() -> None:
+    service = _make_battle_service()
+    knowledge_key = resolve_enemy_knowledge_key(service._enemies_repo.get("goblin_grunt"))
+    state = _make_state(seed=16)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    view_before = service.get_battle_view(battle_state)
+    assert view_before.enemies[0].hp_display == "???"
+    state.knowledge_kill_counts[knowledge_key] = 75
+    service.refresh_knowledge_snapshot(battle_state, state)
+    view_after = service.get_battle_view(battle_state)
+    assert view_after.enemies[0].hp_display == (
+        f"{battle_state.enemies[0].stats.hp}/{battle_state.enemies[0].stats.max_hp}"
+    )
 
 
 def _make_threat_test_battle() -> tuple[BattleState, Combatant, Combatant, Combatant]:
@@ -360,37 +499,193 @@ def test_battle_turn_order_deterministic_for_seed() -> None:
     assert battle_state.turn_queue == expected_order
 
 
-def test_party_talk_returns_expected_knowledge_text_for_goblins() -> None:
+def test_party_talk_tier0_temp_reveal_updates_snapshot_and_text() -> None:
     service = _make_battle_service()
     state = _make_state()
-    battle_state, _ = service.start_battle("goblin_pack_3", state)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
     battle_state.current_actor_id = "party_emma"
 
-    events = service.party_talk(battle_state, "party_emma", RNG(7))
+    events = service.party_talk(battle_state, state, "party_emma")
 
-    talk_events = [evt for evt in events if isinstance(evt, PartyTalkEvent)]
-    assert talk_events
-    text = talk_events[0].text
-    assert "Emma:" in text
-    assert "Goblin" in text
-    assert "HP" in text
+    talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
+    expected_range = service._format_static_hp_range(battle_state.enemies[0].stats.max_hp)
+    view = service.get_battle_view(battle_state)
+    assert expected_range in talk_event.text
+    assert view.enemies[0].hp_display == expected_range
 
 
-def test_party_talk_hp_estimate_is_deterministic() -> None:
+def test_party_talk_temp_reveal_is_battle_only() -> None:
     service = _make_battle_service()
-    state_a = _make_state()
-    state_b = _make_state()
+    state = _make_state()
+
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    battle_state.current_actor_id = "party_emma"
+    service.party_talk(battle_state, state, "party_emma")
+    view_after = service.get_battle_view(battle_state)
+    assert view_after.enemies[0].hp_display != "???"
+
+    next_battle, _ = service.start_battle("goblin_grunt", state)
+    view_next = service.get_battle_view(next_battle)
+    assert view_next.enemies[0].hp_display == "???"
+
+
+def test_party_talk_output_deterministic_across_seeds() -> None:
+    service = _make_battle_service()
+    state_a = _make_state(seed=1)
+    state_b = _make_state(seed=999)
     battle_a, _ = service.start_battle("goblin_grunt", state_a)
     battle_b, _ = service.start_battle("goblin_grunt", state_b)
     battle_a.current_actor_id = "party_emma"
     battle_b.current_actor_id = "party_emma"
 
-    events_a = service.party_talk(battle_a, "party_emma", RNG(99))
-    events_b = service.party_talk(battle_b, "party_emma", RNG(99))
+    events_a = service.party_talk(battle_a, state_a, "party_emma")
+    events_b = service.party_talk(battle_b, state_b, "party_emma")
     talk_a = next(evt for evt in events_a if isinstance(evt, PartyTalkEvent)).text
     talk_b = next(evt for evt in events_b if isinstance(evt, PartyTalkEvent)).text
 
     assert talk_a == talk_b
+
+
+def test_party_talk_tier0_without_hp_knowledge_has_no_numbers() -> None:
+    service = _make_battle_service()
+    service._knowledge_repo._ensure_loaded()  # type: ignore[attr-defined]
+    service._knowledge_repo._definitions["emma"] = [
+        KnowledgeEntry(
+            knowledge_keys=(),
+            enemy_tags=("goblin",),
+            max_level=None,
+            hp_range=None,
+            speed_hint="Fast movers.",
+            behavior="They harass the back line.",
+        )
+    ]  # type: ignore[attr-defined]
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    battle_state.current_actor_id = "party_emma"
+
+    events = service.party_talk(battle_state, state, "party_emma")
+    talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
+
+    assert not re.search(r"\d", talk_event.text)
+
+
+def test_party_talk_tier1_mentions_static_range() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    knowledge_key = resolve_enemy_knowledge_key(service._enemies_repo.get("goblin_grunt"))
+    state.knowledge_kill_counts[knowledge_key] = 25
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    battle_state.current_actor_id = "party_emma"
+
+    events = service.party_talk(battle_state, state, "party_emma")
+    talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
+    expected_range = service._format_static_hp_range(battle_state.enemies[0].stats.max_hp)
+
+    assert expected_range in talk_event.text
+
+
+def test_party_talk_tier2_has_no_numeric_hp() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    knowledge_key = resolve_enemy_knowledge_key(service._enemies_repo.get("goblin_grunt"))
+    state.knowledge_kill_counts[knowledge_key] = 75
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    battle_state.current_actor_id = "party_emma"
+
+    events = service.party_talk(battle_state, state, "party_emma")
+    talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
+
+    assert not re.search(r"\d+/\d+|\d+-\d+", talk_event.text)
+
+
+def test_party_talk_matching_prefers_knowledge_keys() -> None:
+    service = _make_battle_service()
+    knowledge_key = resolve_enemy_knowledge_key(service._enemies_repo.get("goblin_grunt"))
+    service._knowledge_repo._ensure_loaded()  # type: ignore[attr-defined]
+    service._knowledge_repo._definitions["emma"] = [
+        KnowledgeEntry(
+            knowledge_keys=(knowledge_key,),
+            enemy_tags=("goblin",),
+            max_level=None,
+            hp_range=None,
+            speed_hint=None,
+            behavior="Key match behavior.",
+        ),
+        KnowledgeEntry(
+            knowledge_keys=(),
+            enemy_tags=("goblin",),
+            max_level=None,
+            hp_range=None,
+            speed_hint=None,
+            behavior="Tag match behavior.",
+        ),
+    ]  # type: ignore[attr-defined]
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    battle_state.current_actor_id = "party_emma"
+
+    events = service.party_talk(battle_state, state, "party_emma")
+    talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
+
+    assert "Key match behavior." in talk_event.text
+    assert "Tag match behavior." not in talk_event.text
+
+
+def test_party_talk_goblin_rampager_uses_knowledge_key() -> None:
+    service = _make_live_battle_service()
+    state = _make_live_state()
+    battle_state, _ = service.start_battle("goblin_rampager", state)
+    battle_state.current_actor_id = "party_emma"
+
+    events = service.party_talk(battle_state, state, "party_emma")
+    talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
+
+    assert "Goblin Rampager look to have around" in talk_event.text
+    assert "Often attack in groups" in talk_event.text
+
+
+def test_party_talk_tag_only_entries_still_work() -> None:
+    service = _make_battle_service()
+    service._knowledge_repo._ensure_loaded()  # type: ignore[attr-defined]
+    service._knowledge_repo._definitions["emma"] = [
+        KnowledgeEntry(
+            knowledge_keys=(),
+            enemy_tags=("goblin",),
+            max_level=None,
+            hp_range=None,
+            speed_hint=None,
+            behavior="Legacy tag behavior.",
+        )
+    ]  # type: ignore[attr-defined]
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    battle_state.current_actor_id = "party_emma"
+
+    events = service.party_talk(battle_state, state, "party_emma")
+    talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
+
+    assert "Legacy tag behavior." in talk_event.text
+
+
+def test_party_talk_preview_does_not_mutate_state() -> None:
+    service = _make_battle_service()
+    state = _make_state()
+    battle_state, _ = service.start_battle("goblin_pack_3", state)
+    battle_state.current_actor_id = "party_emma"
+
+    rng_before = state.rng.export_state()
+    snapshot_before = battle_state.knowledge_snapshot
+    temp_reveals_before = set(battle_state.temp_knowledge_reveals)
+    knowledge_before = dict(state.knowledge_kill_counts)
+    actor_before = battle_state.current_actor_id
+
+    service.party_talk_preview(battle_state, state, "party_emma")
+
+    assert battle_state.current_actor_id == actor_before
+    assert battle_state.temp_knowledge_reveals == temp_reveals_before
+    assert battle_state.knowledge_snapshot is snapshot_before
+    assert state.knowledge_kill_counts == knowledge_before
+    assert state.rng.export_state() == rng_before
 
 
 def test_party_talk_without_knowledge_defaults_to_uncertain() -> None:
@@ -401,7 +696,7 @@ def test_party_talk_without_knowledge_defaults_to_uncertain() -> None:
     battle_state, _ = service.start_battle("goblin_pack_3", state)
     battle_state.current_actor_id = "party_emma"
 
-    events = service.party_talk(battle_state, "party_emma", RNG(10))
+    events = service.party_talk(battle_state, state, "party_emma")
     talk_event = next(evt for evt in events if isinstance(evt, PartyTalkEvent))
 
     assert "I'm not sure" in talk_event.text
@@ -724,6 +1019,100 @@ def test_apply_victory_rewards_grants_gold_exp_and_loot() -> None:
     assert state.gold > gold_before
     assert state.member_exp[state.player.id] > exp_before or state.member_levels[state.player.id] > level_before
     assert any(isinstance(evt, LootAcquiredEvent) for evt in events)
+
+
+def test_apply_victory_rewards_idempotent() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    for enemy in battle_state.enemies:
+        enemy.stats.hp = 0
+
+    events_first = service.apply_victory_rewards(battle_state, state)
+
+    assert events_first
+    gold_after = state.gold
+    exp_after = dict(state.member_exp)
+    levels_after = dict(state.member_levels)
+    inventory_after = dict(state.inventory.items)
+    knowledge_after = dict(state.knowledge_kill_counts)
+
+    events_second = service.apply_victory_rewards(battle_state, state)
+
+    assert events_second == []
+    assert state.gold == gold_after
+    assert state.member_exp == exp_after
+    assert state.member_levels == levels_after
+    assert state.inventory.items == inventory_after
+    assert state.knowledge_kill_counts == knowledge_after
+
+
+def test_apply_victory_rewards_records_knowledge_kills() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_pack_3", state)
+    for enemy in battle_state.enemies:
+        enemy.stats.hp = 0
+    state.knowledge_kill_counts["goblin_grunt"] = 1
+
+    service.apply_victory_rewards(battle_state, state)
+
+    assert state.knowledge_kill_counts["goblin_grunt"] == 4
+
+
+def test_apply_victory_rewards_knowledge_key_resolution() -> None:
+    service = _make_battle_service()
+    state = _make_state(with_party=False)
+    shaman_key = resolve_enemy_knowledge_key(service._enemies_repo.get("goblin_shaman"))
+    battle_state, _ = service.start_battle("goblin_shaman", state)
+    for enemy in battle_state.enemies:
+        enemy.stats.hp = 0
+
+    service.apply_victory_rewards(battle_state, state)
+
+    assert state.knowledge_kill_counts[shaman_key] == 1
+    assert "goblin_shaman" not in state.knowledge_kill_counts
+
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    for enemy in battle_state.enemies:
+        enemy.stats.hp = 0
+
+    service.apply_victory_rewards(battle_state, state)
+
+    assert state.knowledge_kill_counts["goblin_grunt"] == 1
+
+
+def test_apply_victory_rewards_does_not_consume_rng_without_loot(tmp_path) -> None:
+    loot_dir = tmp_path / "loot_defs"
+    loot_dir.mkdir()
+    (loot_dir / "loot_tables.json").write_text("[]", encoding="utf-8")
+    floors_repo = FloorsRepository(base_path=FIXTURE_DEFINITIONS_DIR)
+    locations_repo = LocationsRepository(
+        floors_repo=floors_repo, base_path=FIXTURE_DEFINITIONS_DIR
+    )
+    service = BattleService(
+        enemies_repo=EnemiesRepository(base_path=FIXTURE_DEFINITIONS_DIR),
+        party_members_repo=PartyMembersRepository(base_path=FIXTURE_DEFINITIONS_DIR),
+        knowledge_repo=KnowledgeRepository(base_path=FIXTURE_DEFINITIONS_DIR),
+        weapons_repo=WeaponsRepository(base_path=FIXTURE_DEFINITIONS_DIR),
+        armour_repo=ArmourRepository(base_path=FIXTURE_DEFINITIONS_DIR),
+        skills_repo=SkillsRepository(base_path=FIXTURE_DEFINITIONS_DIR),
+        items_repo=ItemsRepository(base_path=FIXTURE_DEFINITIONS_DIR),
+        loot_tables_repo=LootTablesRepository(base_path=loot_dir),
+        summons_repo=SummonsRepository(base_path=FIXTURE_DEFINITIONS_DIR),
+        floors_repo=floors_repo,
+        locations_repo=locations_repo,
+    )
+    state = _make_state(with_party=False)
+    battle_state, _ = service.start_battle("goblin_grunt", state)
+    for enemy in battle_state.enemies:
+        enemy.stats.hp = 0
+
+    before = state.rng.export_state()
+    service.apply_victory_rewards(battle_state, state)
+    after = state.rng.export_state()
+
+    assert after == before
 
 
 def test_enemy_scaling_floor_zero_no_change() -> None:

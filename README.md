@@ -1,4 +1,4 @@
-# Echoes of the Cycle (v0.0.1)
+# Echoes of the Cycle (v0.0.2)
 
 Echoes of the Cycle is a demo / vertical slice of a deterministic, text-based RPG. Content is intentionally limited and reaching an ending is expected.
 

@@ -6,6 +6,7 @@ from typing import Dict, List, Literal, Tuple
 
 from tbg.domain.entities import Attributes, BaseStats, Stats
 from tbg.domain.debuffs import ActiveDebuff
+from tbg.domain.knowledge_models import EnemyHpVisibilityMode
 
 Side = Literal["allies", "enemies"]
 
@@ -48,6 +49,8 @@ class BattleState:
     battle_id: str
     allies: List[Combatant]
     enemies: List[Combatant]
+    rewards_applied: bool = False
+    knowledge_snapshot: "BattleKnowledgeSnapshot | None" = None
     enemy_aggro: Dict[str, Dict[str, int]] = field(default_factory=dict)
     party_threat: Dict[str, Dict[str, int]] = field(default_factory=dict)
     last_target: Dict[str, str | None] = field(default_factory=dict)
@@ -59,6 +62,18 @@ class BattleState:
     round_index: int = 1
     round_last_actor_id: str | None = None
     enemy_skill_uses: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    temp_knowledge_reveals: set[str] = field(default_factory=set)
+
+
+@dataclass(frozen=True, slots=True)
+class HpVisibilityEntry:
+    mode: EnemyHpVisibilityMode
+    static_range: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class BattleKnowledgeSnapshot:
+    entries: Dict[str, HpVisibilityEntry]
 
 
 @dataclass(slots=True)

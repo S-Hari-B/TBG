@@ -30,6 +30,7 @@ class GameState:
     gold: int = 0
     exp: int = 0
     flags: Dict[str, bool] = field(default_factory=dict)
+    knowledge_kill_counts: Dict[str, int] = field(default_factory=dict)
     pending_narration: List[Tuple[str, str]] = field(default_factory=list)
     pending_story_node_id: str | None = None
     inventory: PartyInventory = field(default_factory=PartyInventory)

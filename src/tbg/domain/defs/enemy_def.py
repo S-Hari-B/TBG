@@ -18,6 +18,7 @@ class EnemyDef:
     rewards_exp: int | None = None
     rewards_gold: int | None = None
     tags: tuple[str, ...] = ()
+    knowledge_key: str | None = None
     enemy_ids: tuple[str, ...] | None = None
     weapon_ids: tuple[str, ...] = ()
     armour_id: str | None = None

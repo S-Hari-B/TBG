@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Dict, Iterable, List, Sequence, Tuple
 
 from tbg.core.rng import RNG
@@ -11,6 +12,7 @@ from tbg.data.repositories import (
     FloorsRepository,
     ItemsRepository,
     KnowledgeRepository,
+    KnowledgeRulesRepository,
     LootTablesRepository,
     LocationsRepository,
     PartyMembersRepository,
@@ -18,7 +20,13 @@ from tbg.data.repositories import (
     SummonsRepository,
     WeaponsRepository,
 )
-from tbg.domain.battle_models import BattleCombatantView, BattleState, Combatant
+from tbg.domain.battle_models import (
+    BattleCombatantView,
+    BattleKnowledgeSnapshot,
+    BattleState,
+    Combatant,
+    HpVisibilityEntry,
+)
 from tbg.domain.defs import ItemDef, KnowledgeEntry, LootTableDef, SkillDef
 from tbg.domain.attribute_scaling import (
     PHYSICAL_SKILL_TAG,
@@ -38,18 +46,24 @@ from tbg.domain.debuffs import (
     compute_effective_attack,
     compute_effective_defense,
 )
+from tbg.domain.knowledge_models import EnemyHpVisibilityMode, KnowledgeTier
 from tbg.domain.item_effects import apply_item_effects
 from tbg.domain.entities import Attributes, BaseStats, Stats
 from tbg.domain.inventory import ARMOUR_SLOTS, MemberEquipment
 from tbg.domain.state import GameState
 from tbg.services.errors import FactoryError
 from tbg.services.factories import create_enemy_instance, create_summon_combatant, make_instance_id
+from tbg.services.knowledge_keys import resolve_enemy_knowledge_key
+from tbg.services.knowledge_service import KnowledgeService
 from tbg.services.quest_service import QuestService
 
 ANTI_REPEAT_MULTIPLIER = 0.8  # Reduce threat for repeat targets when eligible.
 ANTI_REPEAT_IGNORE_GAP = 10  # Ignore repeat penalty if top threat exceeds runner-up by this amount.
 AGGRO_BASE_DIVISOR = 5  # Smaller base seed so damage quickly dominates.
 AGGRO_HIT_BONUS = 2  # Flat bonus so low-damage hits still build aggro.
+PARTY_TALK_ATTACK_HINT_THRESHOLD = 14
+PARTY_TALK_DEFENSE_HINT_THRESHOLD = 4
+PARTY_TALK_SPEED_HINT_THRESHOLD = 9
 
 
 @dataclass(slots=True)
@@ -151,6 +165,19 @@ class PartyTalkEvent(BattleEvent):
     speaker_id: str
     speaker_name: str
     text: str
+
+
+@dataclass(slots=True)
+class PartyTalkPreviewGroup:
+    enemy_name: str
+    source_id: str | None
+    knowledge_key: str
+    tier: KnowledgeTier
+    temp_reveal: bool
+    effective_tier: KnowledgeTier
+    matched: str
+    reveal: str
+    preview_line: str | None
 
 
 @dataclass(slots=True)
@@ -263,6 +290,7 @@ class BattleService:
         floors_repo: FloorsRepository | None = None,
         locations_repo: LocationsRepository | None = None,
         quest_service: QuestService | None = None,
+        knowledge_rules_repo: KnowledgeRulesRepository | None = None,
     ) -> None:
         self._enemies_repo = enemies_repo
         self._party_members_repo = party_members_repo
@@ -277,6 +305,8 @@ class BattleService:
         self._floors_repo = floors_repo
         self._locations_repo = locations_repo
         self._quest_service = quest_service
+        self._knowledge_rules_repo = knowledge_rules_repo or KnowledgeRulesRepository()
+        self._knowledge_service = KnowledgeService(self._knowledge_rules_repo)
 
     # -----------------------
     # Battle Lifecycle
@@ -326,6 +356,7 @@ class BattleService:
         battle_id = make_instance_id("battle", state.rng)
         player_id = state.player.id if state.player else None
         battle_state = BattleState(battle_id=battle_id, allies=allies, enemies=enemies, player_id=player_id)
+        battle_state.knowledge_snapshot = self._build_knowledge_snapshot(state, battle_state)
 
         events = [
             BattleStartedEvent(
@@ -494,10 +525,14 @@ class BattleService:
 
     def get_battle_view(self, battle_state: BattleState) -> BattleView:
         """Return structured information for rendering."""
+        snapshot = battle_state.knowledge_snapshot
         return BattleView(
             battle_id=battle_state.battle_id,
-            allies=[self._to_view(ally, hide_hp=False) for ally in battle_state.allies],
-            enemies=[self._to_view(enemy, hide_hp=True) for enemy in battle_state.enemies],
+            allies=[self._to_view(ally, hp_display=f"{ally.stats.hp}/{ally.stats.max_hp}") for ally in battle_state.allies],
+            enemies=[
+                self._to_view(enemy, hp_display=self._resolve_enemy_hp_display(enemy, snapshot))
+                for enemy in battle_state.enemies
+            ],
             current_actor_id=battle_state.current_actor_id,
         )
 
@@ -522,6 +557,9 @@ class BattleService:
                 )
             )
         return entries
+
+    def refresh_knowledge_snapshot(self, battle_state: BattleState, state: GameState) -> None:
+        battle_state.knowledge_snapshot = self._build_knowledge_snapshot(state, battle_state)
 
     # -----------------------
     # Player Actions
@@ -643,13 +681,58 @@ class BattleService:
             events.extend(round_events)
         return events
 
-    def party_talk(self, battle_state: BattleState, speaker_id: str, rng: RNG) -> List[BattleEvent]:
+    def party_talk(self, battle_state: BattleState, state: GameState, speaker_id: str) -> List[BattleEvent]:
         speaker = self._get_combatant(battle_state, speaker_id)
         source_id = speaker.source_id or speaker.instance_id
-        text = self._build_party_talk_text(source_id, speaker.display_name, battle_state, rng)
-        events = [PartyTalkEvent(speaker_id=speaker.instance_id, speaker_name=speaker.display_name, text=text)]
-        events.extend(self._advance_turn(battle_state, speaker.instance_id))
-        return events
+        text, reveal_applied = self._build_party_talk_text(
+            source_id, speaker.display_name, battle_state, state
+        )
+        if reveal_applied:
+            self.refresh_knowledge_snapshot(battle_state, state)
+        return [PartyTalkEvent(speaker_id=speaker.instance_id, speaker_name=speaker.display_name, text=text)]
+
+    def party_talk_preview(
+        self, battle_state: BattleState, state: GameState, speaker_id: str
+    ) -> List[PartyTalkPreviewGroup]:
+        speaker = self._get_combatant(battle_state, speaker_id)
+        member_id = speaker.source_id or speaker.instance_id
+        entries = self._knowledge_repo.get_entries(member_id)
+        previews: List[PartyTalkPreviewGroup] = []
+        for group in self._group_alive_enemies(battle_state):
+            knowledge_key = group["knowledge_key"]
+            entry = self._match_knowledge_entry(entries, knowledge_key, group["tags"]) if entries else None
+            tier = self._knowledge_service.get_tier_for_key(state, knowledge_key)
+            effective_tier = tier
+            if entry and tier == KnowledgeTier.TIER_0 and entry.hp_range is not None:
+                effective_tier = KnowledgeTier.TIER_1
+            matched = "none"
+            if entry:
+                matched = "knowledge_keys" if entry.knowledge_keys else "tags"
+            reveal = "none"
+            if entry:
+                if effective_tier == KnowledgeTier.TIER_1:
+                    reveal = "hp_range_line"
+                elif effective_tier >= KnowledgeTier.TIER_2:
+                    reveal = "flavor_only"
+            preview_line = (
+                self._build_party_talk_group_preview_line(battle_state, group, entry, effective_tier)
+                if entry
+                else None
+            )
+            previews.append(
+                PartyTalkPreviewGroup(
+                    enemy_name=group["name"],
+                    source_id=group["source_id"],
+                    knowledge_key=knowledge_key,
+                    tier=tier,
+                    temp_reveal=knowledge_key in battle_state.temp_knowledge_reveals,
+                    effective_tier=effective_tier,
+                    matched=matched,
+                    reveal=reveal,
+                    preview_line=preview_line,
+                )
+            )
+        return previews
     def _apply_debuff_item(
         self,
         *,
@@ -1260,34 +1343,90 @@ class BattleService:
         member_id: str,
         member_name: str,
         battle_state: BattleState,
-        rng: RNG,
-    ) -> str:
+        state: GameState,
+    ) -> tuple[str, bool]:
         entries = self._knowledge_repo.get_entries(member_id)
         if not entries:
-            return f"{member_name}: I'm not sure about these foes."
+            return f"{member_name}: I'm not sure about these foes.", False
 
         info_lines: List[str] = []
+        reveal_applied = False
         for group in self._group_alive_enemies(battle_state):
-            entry = self._match_knowledge_entry(entries, group["tags"])
+            entry = self._match_knowledge_entry(entries, group["knowledge_key"], group["tags"])
             if not entry:
                 continue
-            low, high = self._estimate_hp_range(group["max_hp"], rng)
-            parts = [f"{group['name']} look to have around {low}-{high} HP."]
+            knowledge_key = group["knowledge_key"]
+            tier = self._knowledge_service.get_tier_for_key(state, knowledge_key)
+            effective_tier = tier
+            if tier == KnowledgeTier.TIER_0 and entry.hp_range is not None:
+                battle_state.temp_knowledge_reveals.add(knowledge_key)
+                effective_tier = KnowledgeTier.TIER_1
+                reveal_applied = True
+
+            parts = []
+            if effective_tier == KnowledgeTier.TIER_1:
+                snapshot = battle_state.knowledge_snapshot
+                entry_snapshot = snapshot.entries.get(group["instance_id"]) if snapshot else None
+                static_range = None
+                if entry_snapshot and entry_snapshot.mode == EnemyHpVisibilityMode.STATIC_RANGE:
+                    static_range = entry_snapshot.static_range
+                if not static_range:
+                    static_range = self._format_static_hp_range(group["max_hp"])
+                parts.append(f"{group['name']} look to have around {static_range} HP.")
+            elif effective_tier == KnowledgeTier.TIER_0:
+                parts.append(f"{group['name']}: I don't know how tough they are.")
+
+            if effective_tier >= KnowledgeTier.TIER_2:
+                parts.append(f"{group['name']}:")
+
             if entry.speed_hint:
                 parts.append(entry.speed_hint)
             if entry.behavior:
                 parts.append(entry.behavior)
+
+            if effective_tier >= KnowledgeTier.TIER_2:
+                parts.extend(self._build_stat_flavor(group["stats"]))
+
             info_lines.append(" ".join(parts))
 
         if not info_lines:
-            return f"{member_name}: I'm not sure about these foes."
-        return f"{member_name}: {' '.join(info_lines)}"
+            return f"{member_name}: I'm not sure about these foes.", reveal_applied
+        return f"{member_name}: {' '.join(info_lines)}", reveal_applied
 
-    def _to_view(self, combatant: Combatant, *, hide_hp: bool) -> BattleCombatantView:
-        if hide_hp:
-            hp_display = "???"
-        else:
-            hp_display = f"{combatant.stats.hp}/{combatant.stats.max_hp}"
+    def _build_party_talk_group_preview_line(
+        self,
+        battle_state: BattleState,
+        group: Dict[str, object],
+        entry: KnowledgeEntry,
+        effective_tier: KnowledgeTier,
+    ) -> str:
+        parts = []
+        if effective_tier == KnowledgeTier.TIER_1:
+            snapshot = battle_state.knowledge_snapshot
+            entry_snapshot = snapshot.entries.get(group["instance_id"]) if snapshot else None
+            static_range = None
+            if entry_snapshot and entry_snapshot.mode == EnemyHpVisibilityMode.STATIC_RANGE:
+                static_range = entry_snapshot.static_range
+            if not static_range:
+                static_range = self._format_static_hp_range(group["max_hp"])
+            parts.append(f"{group['name']} look to have around {static_range} HP.")
+        elif effective_tier == KnowledgeTier.TIER_0:
+            parts.append(f"{group['name']}: I don't know how tough they are.")
+
+        if effective_tier >= KnowledgeTier.TIER_2:
+            parts.append(f"{group['name']}:")
+
+        if entry.speed_hint:
+            parts.append(entry.speed_hint)
+        if entry.behavior:
+            parts.append(entry.behavior)
+
+        if effective_tier >= KnowledgeTier.TIER_2:
+            parts.extend(self._build_stat_flavor(group["stats"]))
+
+        return " ".join(parts)
+
+    def _to_view(self, combatant: Combatant, *, hp_display: str) -> BattleCombatantView:
         return BattleCombatantView(
             instance_id=combatant.instance_id,
             name=combatant.display_name,
@@ -1298,6 +1437,56 @@ class BattleService:
             max_hp=combatant.stats.max_hp,
             defense=combatant.stats.defense,
         )
+
+    def _resolve_enemy_hp_display(
+        self,
+        enemy: Combatant,
+        snapshot: BattleKnowledgeSnapshot | None,
+    ) -> str:
+        entry = snapshot.entries.get(enemy.instance_id) if snapshot else None
+        if entry is None:
+            return "???"
+        if entry.mode == EnemyHpVisibilityMode.HIDDEN:
+            return "???"
+        if entry.mode == EnemyHpVisibilityMode.STATIC_RANGE:
+            return entry.static_range or "???"
+        return f"{enemy.stats.hp}/{enemy.stats.max_hp}"
+
+    def _build_knowledge_snapshot(
+        self,
+        state: GameState,
+        battle_state: BattleState,
+    ) -> BattleKnowledgeSnapshot:
+        entries: Dict[str, HpVisibilityEntry] = {}
+        for enemy in battle_state.enemies:
+            enemy_def = None
+            if enemy.source_id:
+                try:
+                    enemy_def = self._enemies_repo.get(enemy.source_id)
+                except KeyError:
+                    enemy_def = None
+            if enemy_def is None:
+                key = enemy.source_id or enemy.instance_id
+            else:
+                key = resolve_enemy_knowledge_key(enemy_def)
+            tier = self._knowledge_service.get_tier_for_key(state, key)
+            if key in battle_state.temp_knowledge_reveals and tier == KnowledgeTier.TIER_0:
+                tier = KnowledgeTier.TIER_1
+            mode = self._knowledge_service.get_hp_visibility_mode_for_tier(tier)
+            static_range = None
+            if mode == EnemyHpVisibilityMode.STATIC_RANGE:
+                static_range = self._format_static_hp_range(enemy.stats.max_hp)
+            entries[enemy.instance_id] = HpVisibilityEntry(mode=mode, static_range=static_range)
+        return BattleKnowledgeSnapshot(entries=entries)
+
+    @staticmethod
+    def _format_static_hp_range(max_hp: int) -> str:
+        low = math.floor(max_hp * 0.8)
+        high = math.ceil(max_hp * 1.2)
+        low = max(1, low)
+        if high <= low:
+            high = low + 1
+        return f"{low}-{high}"
 
     def _weapon_tags_for_ids(self, weapon_ids: Sequence[str]) -> Tuple[str, ...]:
         tags: set[str] = set()
@@ -1532,48 +1721,93 @@ class BattleService:
         for enemy in battle_state.enemies:
             if not enemy.is_alive:
                 continue
-            key = enemy.source_id or enemy.instance_id
-            if key not in groups:
-                groups[key] = {
+            source_id = enemy.source_id or enemy.instance_id
+            if source_id not in groups:
+                knowledge_key = source_id
+                if enemy.source_id:
+                    try:
+                        enemy_def = self._enemies_repo.get(enemy.source_id)
+                        knowledge_key = resolve_enemy_knowledge_key(enemy_def)
+                    except KeyError:
+                        knowledge_key = source_id
+                groups[source_id] = {
                     "name": enemy.display_name,
                     "tags": tuple(enemy.tags),
                     "max_hp": enemy.stats.max_hp,
+                    "knowledge_key": knowledge_key,
+                    "instance_id": enemy.instance_id,
+                    "source_id": enemy.source_id,
+                    "stats": enemy.stats,
                 }
         return [groups[key] for key in sorted(groups.keys())]
 
     @staticmethod
-    def _match_knowledge_entry(entries: Sequence[KnowledgeEntry], tags: Tuple[str, ...]) -> KnowledgeEntry | None:
+    def _match_knowledge_entry(
+        entries: Sequence[KnowledgeEntry], knowledge_key: str, tags: Tuple[str, ...]
+    ) -> KnowledgeEntry | None:
         tag_set = set(tags)
         for entry in entries:
+            if entry.knowledge_keys:
+                if knowledge_key in entry.knowledge_keys:
+                    return entry
+                continue
             if set(entry.enemy_tags) & tag_set:
                 return entry
         return None
 
     @staticmethod
-    def _estimate_hp_range(actual_hp: int, rng: RNG) -> Tuple[int, int]:
-        low = max(1, actual_hp + rng.randint(-3, -1))
-        high = max(low, actual_hp + rng.randint(0, 3))
-        return low, high
+    def _build_stat_flavor(stats: Stats) -> List[str]:
+        hints: List[str] = []
+        if stats.attack >= PARTY_TALK_ATTACK_HINT_THRESHOLD:
+            hints.append("They hit harder than most.")
+        if stats.defense >= PARTY_TALK_DEFENSE_HINT_THRESHOLD:
+            hints.append("They're tougher than they look.")
+        if stats.speed >= PARTY_TALK_SPEED_HINT_THRESHOLD:
+            hints.append("They're quick to act.")
+        return hints
 
     # -----------------------
     # Rewards & Loot
     # -----------------------
     def apply_victory_rewards(self, battle_state: BattleState, state: GameState) -> List[BattleEvent]:
+        if battle_state.rewards_applied:
+            return []
         if not state.player:
             return []
+        if battle_state.is_over:
+            if battle_state.victor != "allies":
+                return []
+        else:
+            self._update_victory(battle_state)
+            if not battle_state.is_over or battle_state.victor != "allies":
+                return []
+        battle_state.rewards_applied = True
         defeated: List[tuple[Combatant, object]] = []
         total_gold = 0
         total_exp = 0
+        knowledge_kills: Dict[str, int] = {}
         for enemy in battle_state.enemies:
+            if enemy.is_alive:
+                continue
             if enemy.source_id is None:
                 continue
+            enemy_def = None
             try:
                 enemy_def = self._enemies_repo.get(enemy.source_id)
             except KeyError:
+                enemy_def = None
+            knowledge_key = (
+                resolve_enemy_knowledge_key(enemy_def) if enemy_def else enemy.source_id
+            )
+            knowledge_kills[knowledge_key] = knowledge_kills.get(knowledge_key, 0) + 1
+            if enemy_def is None:
                 continue
             total_gold += getattr(enemy_def, "rewards_gold", 0) or 0
             total_exp += getattr(enemy_def, "rewards_exp", 0) or 0
             defeated.append((enemy, enemy_def))
+
+        if knowledge_kills:
+            self._knowledge_service.record_kills(state, knowledge_kills)
 
         reward_events: List[BattleEvent] = []
         if total_gold <= 0 and total_exp <= 0 and not defeated:

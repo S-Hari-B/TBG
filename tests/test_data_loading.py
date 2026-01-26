@@ -124,6 +124,62 @@ def test_enemies_repo_loads_goblin_rampager() -> None:
     assert "rampager" in enemy.tags
 
 
+def test_enemies_repo_allows_optional_knowledge_key(tmp_path: Path) -> None:
+    definitions_dir = _make_definitions_dir(tmp_path)
+    _write_json(
+        definitions_dir / "enemies.json",
+        {
+            "goblin_grunt": {
+                "name": "Goblin Grunt",
+                "knowledge_key": "k_ch00_goblin_grunt",
+                "hp": 10,
+                "mp": 0,
+                "attack": 3,
+                "defense": 1,
+                "speed": 2,
+                "rewards_exp": 1,
+                "rewards_gold": 1,
+            },
+            "wolf": {
+                "name": "Forest Wolf",
+                "hp": 12,
+                "mp": 0,
+                "attack": 4,
+                "defense": 1,
+                "speed": 3,
+                "rewards_exp": 2,
+                "rewards_gold": 1,
+            },
+        },
+    )
+    repo = EnemiesRepository(base_path=definitions_dir)
+    assert repo.get("goblin_grunt").knowledge_key == "k_ch00_goblin_grunt"
+    assert repo.get("wolf").knowledge_key is None
+
+
+def test_enemies_repo_rejects_empty_knowledge_key(tmp_path: Path) -> None:
+    definitions_dir = _make_definitions_dir(tmp_path)
+    _write_json(
+        definitions_dir / "enemies.json",
+        {
+            "goblin_grunt": {
+                "name": "Goblin Grunt",
+                "knowledge_key": "  ",
+                "hp": 10,
+                "mp": 0,
+                "attack": 3,
+                "defense": 1,
+                "speed": 2,
+                "rewards_exp": 1,
+                "rewards_gold": 1,
+            }
+        },
+    )
+    repo = EnemiesRepository(base_path=definitions_dir)
+    with pytest.raises(DataValidationError):
+        repo.all()
+
+
 def test_classes_repo_reference_validation_fails_when_weapon_missing(tmp_path: Path) -> None:
     definitions_dir = tmp_path / "definitions"
     definitions_dir.mkdir()

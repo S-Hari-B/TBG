@@ -12,6 +12,7 @@ from tbg.data.repositories import (
     FloorsRepository,
     ItemsRepository,
     KnowledgeRepository,
+    KnowledgeRulesRepository,
     LocationsRepository,
     LootTablesRepository,
     PartyMembersRepository,
@@ -56,6 +57,8 @@ from tbg.services import (
     TravelBlockedError,
     TravelPerformedEvent,
 )
+from tbg.services.knowledge_keys import list_all_knowledge_keys
+from tbg.services.knowledge_service import KnowledgeService
 from tbg.services.quest_service import QuestJournalView, QuestTurnInView
 from tbg.services.area_service_v2 import TRAVEL_BLOCKED_MESSAGE
 from tbg.services.shop_service import (
@@ -131,7 +134,7 @@ InfoAction = Literal[
 ]
 
 GAME_NAME = "Echoes of the Cycle"
-GAME_VERSION = "v0.0.1"
+GAME_VERSION = "v0.0.2"
 DEMO_MESSAGE = "Demo build — content is limited; reaching an ending is expected."
 _MAX_RANDOM_SEED = 2**31 - 1
 _MENU_TALK_LINES = {
@@ -547,6 +550,7 @@ def _build_camp_menu_entries(
     ]
     if _debug_enabled():
         entries.append(("Location Debug (DEBUG)", "location_debug"))
+        entries.append(("Debug", "debug_tools"))
     entries.append(("Inventory / Equipment", "inventory"))
     entries.append(("Allocate Attributes", "allocate_attributes"))
     if state.party_members:
@@ -565,6 +569,7 @@ def _build_town_menu_entries(
     ]
     if _debug_enabled():
         entries.append(("Location Debug (DEBUG)", "location_debug"))
+        entries.append(("Debug", "debug_tools"))
     entries.append(("Converse", "converse"))
     entries.append(("Quests", "quests"))
     entries.append(("Shops", "shops"))
@@ -1246,6 +1251,9 @@ def _run_camp_menu(
         if action == "location_debug":
             _render_location_debug_snapshot(area_service, quest_service, story_service, state)
             continue
+        if action == "debug_tools":
+            _run_debug_tools_menu(state)
+            continue
         if action == "inventory":
             _run_inventory_flow(inventory_service, summon_loadout_service, state)
             continue
@@ -1354,6 +1362,9 @@ def _run_town_menu(
             return _MENU_RESELECT
         if action == "location_debug":
             _render_location_debug_snapshot(area_service, quest_service, story_service, state)
+            continue
+        if action == "debug_tools":
+            _run_debug_tools_menu(state)
             continue
         if action == "converse":
             follow_up = _handle_converse_menu(area_service, story_service, state)
@@ -1872,6 +1883,174 @@ def _render_location_debug_snapshot(
             _render_definition_integrity(area_service, quest_service, story_service, state)
         else:
             return
+
+
+def _run_debug_tools_menu(state: GameState) -> None:
+    if not _debug_enabled():
+        return
+    knowledge_service = KnowledgeService(KnowledgeRulesRepository())
+    enemies_repo = EnemiesRepository()
+    knowledge_repo = KnowledgeRepository()
+    while True:
+        options = [
+            "Inspect Party Member Knowledge - show entries for a member",
+            "Set Knowledge Kills (by key) - set absolute count in save",
+            "Add Knowledge Kills (by key) - add delta to current count",
+            "List Knowledge Keys - shows keys in save and all known defs",
+            "Back",
+        ]
+        render_menu("Debug Tools", options)
+        choice = _prompt_menu_index(len(options))
+        if choice == 0:
+            _debug_inspect_party_member_knowledge(state, knowledge_repo)
+            continue
+        if choice == 1:
+            _debug_set_knowledge_kills(state, knowledge_service, enemies_repo)
+            continue
+        if choice == 2:
+            _debug_add_knowledge_kills(state, knowledge_service, enemies_repo)
+            continue
+        if choice == 3:
+            _debug_list_knowledge_keys(state, enemies_repo)
+            continue
+        return
+
+
+def _debug_prompt_knowledge_key(enemies_repo: EnemiesRepository) -> str | None:
+    raw = input("Enter knowledge key (or blank to cancel): ").strip()
+    if not raw:
+        return None
+    known_keys = set(list_all_knowledge_keys(enemies_repo))
+    if raw not in known_keys:
+        print(f"DEBUG: '{raw}' not found in enemy definitions.")
+    return raw
+
+
+def _debug_set_knowledge_kills(
+    state: GameState, knowledge_service: KnowledgeService, enemies_repo: EnemiesRepository
+) -> None:
+    key = _debug_prompt_knowledge_key(enemies_repo)
+    if key is None:
+        return
+    value = _prompt_non_negative_int("Enter exact kill count (0+): ")
+    knowledge_service.set_kill_count(state, key, value)
+    print(f"DEBUG: Set kills for {key} to {value}.")
+
+
+def _debug_add_knowledge_kills(
+    state: GameState, knowledge_service: KnowledgeService, enemies_repo: EnemiesRepository
+) -> None:
+    key = _debug_prompt_knowledge_key(enemies_repo)
+    if key is None:
+        return
+    while True:
+        raw = input("Enter kill delta (positive int): ").strip()
+        try:
+            delta = int(raw)
+        except ValueError:
+            print("Please enter a valid integer.")
+            continue
+        if delta <= 0:
+            print("Please enter a positive number.")
+            continue
+        break
+    total = knowledge_service.add_kill_count(state, key, delta)
+    print(f"DEBUG: Added +{delta} kills to {key}. Total is now {total}.")
+
+
+def _debug_list_knowledge_keys(state: GameState, enemies_repo: EnemiesRepository) -> None:
+    known_keys = sorted(state.knowledge_kill_counts.keys())
+    if known_keys:
+        known_line = ", ".join(known_keys)
+    else:
+        known_line = "(none)"
+    all_keys = list_all_knowledge_keys(enemies_repo)
+    all_line = ", ".join(all_keys) if all_keys else "(none)"
+    _render_boxed_panel("Debug: Knowledge Keys", [f"Known in save: {known_line}", f"All in defs: {all_line}"])
+
+
+def _debug_inspect_party_member_knowledge(state: GameState, knowledge_repo: KnowledgeRepository) -> None:
+    if not state.party_members:
+        print("No party members available.")
+        return
+    member_id = _prompt_party_member_choice(
+        state, prompt_title="Inspect Knowledge", boxed=True
+    )
+    entries = knowledge_repo.get_entries(member_id)
+    lines = _build_knowledge_entry_debug_lines(entries)
+    _render_boxed_panel(f"Debug: {member_id.title()} Knowledge", lines)
+
+
+def _build_knowledge_entry_debug_lines(entries: Sequence[object]) -> List[str]:
+    if not entries:
+        return ["(no knowledge entries)"]
+    lines: List[str] = []
+    for idx, entry in enumerate(entries, start=1):
+        knowledge_keys = getattr(entry, "knowledge_keys", ())
+        tags = getattr(entry, "enemy_tags", ())
+        if knowledge_keys:
+            keys_display = ", ".join(knowledge_keys)
+            lines.append(f"{idx}) match=knowledge_keys keys=[{keys_display}]")
+        else:
+            tags_display = ", ".join(tags)
+            lines.append(f"{idx}) match=tags tags=[{tags_display}]")
+        max_level = getattr(entry, "max_level", None)
+        hp_known = "yes" if getattr(entry, "hp_range", None) is not None else "no"
+        speed_hint = "yes" if getattr(entry, "speed_hint", None) else "no"
+        behavior = "yes" if getattr(entry, "behavior", None) else "no"
+        lines.append(
+            f"  max_level={max_level} hp_knowledge={hp_known} speed_hint={speed_hint} "
+            f"behavior={behavior}"
+        )
+        speed_text = _preview_snippet(getattr(entry, "speed_hint", None))
+        if speed_text:
+            lines.append(f"  speed_hint: {speed_text}")
+        behavior_text = _preview_snippet(getattr(entry, "behavior", None))
+        if behavior_text:
+            lines.append(f"  behavior: {behavior_text}")
+    return lines
+
+
+def _preview_snippet(text: str | None, *, limit: int = 40) -> str | None:
+    if not text:
+        return None
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    if limit <= 3:
+        return compact[:limit]
+    return f"{compact[: limit - 3]}..."
+
+
+def _debug_party_talk_preview(
+    controller: BattleController, battle_state: BattleState, state: GameState
+) -> None:
+    if not state.party_members:
+        print("No party members available.")
+        return
+    member_id = _prompt_party_member_choice(
+        state, prompt_title="Party Talk Preview", boxed=True
+    )
+    speaker_id = f"party_{member_id}"
+    previews = controller.party_talk_preview(battle_state, state, speaker_id)
+    if not previews:
+        _render_boxed_panel("Debug: Party Talk Preview", ["(no living enemies)"])
+        return
+    lines: List[str] = []
+    for idx, preview in enumerate(previews, start=1):
+        lines.append(f"{idx}) {preview.enemy_name}")
+        lines.append(f"  source_id={preview.source_id or '(none)'}")
+        lines.append(f"  knowledge_key={preview.knowledge_key}")
+        lines.append(
+            "  "
+            f"tier={int(preview.tier)} temp_reveal={'yes' if preview.temp_reveal else 'no'} "
+            f"effective_tier={int(preview.effective_tier)}"
+        )
+        lines.append(f"  matched={preview.matched}")
+        lines.append(f"  reveal={preview.reveal}")
+        if preview.preview_line:
+            lines.append(f"  preview: {preview.preview_line}")
+    _render_boxed_panel("Debug: Party Talk Preview", lines)
 
 
 def _render_quest_debug(quest_service: QuestService, state: GameState) -> None:
@@ -2496,6 +2675,7 @@ def _run_player_turn(
             can_talk=actions["can_talk"],
             can_use_skill=actions["can_use_skill"],
             can_use_item=actions["can_use_item"],
+            can_debug=_debug_enabled(),
         )
 
         if action_type == "attack":
@@ -2548,12 +2728,17 @@ def _run_player_turn(
             turn_lines.extend(_format_battle_event_lines(events))
             return turn_lines
 
+        if action_type == "debug_tools":
+            _run_battle_debug_tools_menu(controller, battle_state, state)
+            continue
+
         # Talk action
         speaker_member_id = _prompt_party_member_choice(state, boxed=True)
         speaker_combatant_id = f"party_{speaker_member_id}"
         action = BattleAction(action_type="talk", speaker_id=speaker_combatant_id)
         events = controller.apply_player_action(battle_state, state, action)
         turn_lines.extend(_format_battle_event_lines(events))
+        _render_full_battle_screen(controller, battle_state, state)
         return turn_lines
 
 
@@ -2747,17 +2932,21 @@ def _format_battle_event_lines(events: List[BattleEvent]) -> List[str]:
     return lines
 
 
-def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool, can_use_item: bool) -> str:
-    options: List[tuple[str, str]] = [("attack", "Basic Attack")]
-    if can_use_skill:
-        options.append(("skill", "Use Skill"))
-    if can_use_item:
-        options.append(("item", "Use Item"))
-    if can_talk:
-        options.append(("talk", "Party Talk"))
+def _prompt_battle_action(
+    *,
+    can_talk: bool,
+    can_use_skill: bool,
+    can_use_item: bool,
+    can_debug: bool,
+) -> str:
+    options = _build_battle_action_options(
+        can_talk=can_talk,
+        can_use_skill=can_use_skill,
+        can_use_item=can_use_item,
+        can_debug=can_debug,
+    )
     while True:
-        lines = [f"{idx + 1:>2}) {label}" for idx, (_, label) in enumerate(options)]
-        _render_boxed_panel("Actions", lines)
+        _render_battle_actions_panel(options)
         choice = input("Choose action: ").strip()
         try:
             index = int(choice) - 1
@@ -2767,6 +2956,104 @@ def _prompt_battle_action(*, can_talk: bool, can_use_skill: bool, can_use_item: 
         if 0 <= index < len(options):
             return options[index][0]
         print("Invalid selection.")
+
+
+def _build_battle_action_options(
+    *,
+    can_talk: bool,
+    can_use_skill: bool,
+    can_use_item: bool,
+    can_debug: bool,
+) -> List[tuple[str, str]]:
+    options: List[tuple[str, str]] = [("attack", "Basic Attack")]
+    if can_use_skill:
+        options.append(("skill", "Use Skill"))
+    if can_use_item:
+        options.append(("item", "Use Item"))
+    if can_talk:
+        options.append(("talk", "Party Talk"))
+    if can_debug:
+        options.append(("debug_tools", "Debug Tools (DEBUG)"))
+    return options
+
+
+def _render_battle_actions_panel(options: List[tuple[str, str]]) -> None:
+    lines = [f"{idx + 1:>2}) {label}" for idx, (_, label) in enumerate(options)]
+    _render_boxed_panel("Actions", lines)
+
+
+def _render_full_battle_screen(
+    controller: BattleController,
+    battle_state: BattleState,
+    state: GameState,
+) -> None:
+    actor_id = battle_state.current_actor_id
+    if not actor_id:
+        return
+    view = controller.get_battle_view(battle_state)
+    _render_turn_separator()
+    actor = _find_combatant(battle_state, actor_id)
+    if actor is None:
+        return
+    _render_turn_header(actor.display_name)
+    _render_battle_state_panel(view, battle_state, active_id=actor_id)
+    actions = controller.get_available_actions(battle_state, state)
+    options = _build_battle_action_options(
+        can_talk=actions["can_talk"],
+        can_use_skill=actions["can_use_skill"],
+        can_use_item=actions["can_use_item"],
+        can_debug=_debug_enabled(),
+    )
+    _render_battle_actions_panel(options)
+
+
+def _run_battle_debug_tools_menu(
+    controller: BattleController, battle_state: BattleState, state: GameState
+) -> None:
+    if not _debug_enabled():
+        return
+    knowledge_service = KnowledgeService(KnowledgeRulesRepository())
+    enemies_repo = EnemiesRepository()
+    knowledge_repo = KnowledgeRepository()
+    while True:
+        options = [
+            "Inspect Party Member Knowledge - show entries for a member",
+            "Party Talk Preview (why / what will be said)",
+            "Set Knowledge Kills (by key) - set absolute count in save",
+            "Add Knowledge Kills (by key) - add delta to current count",
+            "List Knowledge Keys - shows keys in save and all known defs",
+            "Refresh Knowledge Snapshot (this battle) - rebuild HP display rules",
+            "Back",
+        ]
+        render_menu("Debug Tools", options)
+        choice = _prompt_menu_index(len(options))
+        if choice == 0:
+            _debug_inspect_party_member_knowledge(state, knowledge_repo)
+            continue
+        if choice == 1:
+            _debug_party_talk_preview(controller, battle_state, state)
+            continue
+        if choice == 2:
+            _debug_set_knowledge_kills(state, knowledge_service, enemies_repo)
+            controller.refresh_knowledge_snapshot(battle_state, state)
+            print("DEBUG: Knowledge snapshot refreshed.")
+            _render_full_battle_screen(controller, battle_state, state)
+            continue
+        if choice == 3:
+            _debug_add_knowledge_kills(state, knowledge_service, enemies_repo)
+            controller.refresh_knowledge_snapshot(battle_state, state)
+            print("DEBUG: Knowledge snapshot refreshed.")
+            _render_full_battle_screen(controller, battle_state, state)
+            continue
+        if choice == 4:
+            _debug_list_knowledge_keys(state, enemies_repo)
+            continue
+        if choice == 5:
+            controller.refresh_knowledge_snapshot(battle_state, state)
+            print("DEBUG: Knowledge snapshot refreshed.")
+            _render_full_battle_screen(controller, battle_state, state)
+            continue
+        return
 
 
 def _prompt_skill_choice(

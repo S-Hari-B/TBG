@@ -25,11 +25,15 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
             if "enemy_ids" in enemy_data:
                 group_ids = self._require_str_list(enemy_data["enemy_ids"], f"enemy '{raw_id}' enemy_ids")
                 tags = self._require_str_list(enemy_data.get("tags", []), f"enemy '{raw_id}' tags")
+                knowledge_key = self._require_optional_non_empty_str(
+                    enemy_data.get("knowledge_key"), f"enemy '{raw_id}' knowledge_key"
+                )
                 self._group_definitions[raw_id] = EnemyDef(
                     id=raw_id,
                     name=self._require_str(enemy_data.get("name"), f"enemy '{raw_id}' name"),
                     enemy_ids=tuple(group_ids),
                     tags=tuple(tags),
+                    knowledge_key=knowledge_key,
                 )
                 continue
 
@@ -46,6 +50,9 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
             enemy_skill_ids = tuple(
                 self._require_str_list(enemy_data.get("enemy_skill_ids", []), f"enemy '{raw_id}' enemy_skill_ids")
             )
+            knowledge_key = self._require_optional_non_empty_str(
+                enemy_data.get("knowledge_key"), f"enemy '{raw_id}' knowledge_key"
+            )
 
             enemies[raw_id] = EnemyDef(
                 id=raw_id,
@@ -58,6 +65,7 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
                 rewards_exp=self._require_int(enemy_data["rewards_exp"], f"enemy '{raw_id}' rewards_exp"),
                 rewards_gold=self._require_int(enemy_data["rewards_gold"], f"enemy '{raw_id}' rewards_gold"),
                 tags=tuple(tags),
+                knowledge_key=knowledge_key,
                 weapon_ids=weapon_ids,
                 armour_id=armour_id,
                 armour_slots=armour_slots,
@@ -96,6 +104,15 @@ class EnemiesRepository(RepositoryBase[EnemyDef]):
         if value is None:
             return None
         return EnemiesRepository._require_str(value, context)
+
+    @staticmethod
+    def _require_optional_non_empty_str(value: object, context: str) -> str | None:
+        if value is None:
+            return None
+        text = EnemiesRepository._require_str(value, context)
+        if not text.strip():
+            raise DataValidationError(f"{context} must be a non-empty string.")
+        return text
 
     @staticmethod
     def _require_str_list(value: object, context: str) -> List[str]:

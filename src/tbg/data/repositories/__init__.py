@@ -8,6 +8,7 @@ from .enemies_repo import EnemiesRepository
 from .classes_repo import ClassesRepository
 from .party_members_repo import PartyMembersRepository
 from .knowledge_repo import KnowledgeRepository
+from .knowledge_rules_repo import KnowledgeRulesRepository
 from .skills_repo import SkillsRepository
 from .loot_tables_repo import LootTablesRepository
 from .floors_repo import FloorsRepository
@@ -25,6 +26,7 @@ __all__ = [
     "StoryRepository",
     "PartyMembersRepository",
     "KnowledgeRepository",
+    "KnowledgeRulesRepository",
     "SkillsRepository",
     "LootTablesRepository",
     "FloorsRepository",

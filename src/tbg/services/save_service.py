@@ -111,6 +111,9 @@ class SaveService:
         state.gold = self._require_int(state_payload.get("gold"), "state.gold")
         state.exp = self._require_int(state_payload.get("exp"), "state.exp")
         state.flags = self._coerce_bool_dict(state_payload.get("flags"), "state.flags")
+        state.knowledge_kill_counts = self._coerce_non_negative_int_dict(
+            state_payload.get("knowledge_kill_counts"), "state.knowledge_kill_counts"
+        )
         state.party_members = self._coerce_party_members(state_payload.get("party_members"))
         player_attributes = self._coerce_optional_attributes(
             state_payload.get("player_attributes"), "state.player_attributes"
@@ -217,6 +220,7 @@ class SaveService:
             "gold": state.gold,
             "exp": state.exp,
             "flags": dict(state.flags),
+            "knowledge_kill_counts": dict(state.knowledge_kill_counts),
             "party_members": list(state.party_members),
             "player_attributes": self._serialize_attributes(state.player.attributes) if state.player else None,
             "party_member_attributes": {
@@ -411,6 +415,21 @@ class SaveService:
                 raise SaveLoadError(f"{context} keys must be strings.")
             if not isinstance(entry, int):
                 raise SaveLoadError(f"{context}.{key} must be an integer.")
+            result[key] = entry
+        return result
+
+    def _coerce_non_negative_int_dict(self, value: Any, context: str) -> Dict[str, int]:
+        if value is None:
+            return {}
+        mapping = self._require_dict(value, context)
+        result: Dict[str, int] = {}
+        for key, entry in mapping.items():
+            if not isinstance(key, str):
+                raise SaveLoadError(f"{context} keys must be strings.")
+            if not isinstance(entry, int):
+                raise SaveLoadError(f"{context}.{key} must be an integer.")
+            if entry < 0:
+                raise SaveLoadError(f"{context}.{key} must be non-negative.")
             result[key] = entry
         return result
 

@@ -1,0 +1,14 @@
+{
+  "thresholds": {
+    "tier1_kills": 25,
+    "tier2_kills": 75,
+    "tier3_kills": 150
+  },
+  "hp_visibility_by_tier": {
+    "0": "HIDDEN",
+    "1": "STATIC_RANGE",
+    "2": "REALTIME",
+    "3": "REALTIME"
+  },
+  "overrides": {}
+}

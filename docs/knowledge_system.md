@@ -106,3 +106,15 @@ The underlying facts are identical in both cases. (Ticket-005 keeps the LLM path
 * Partial stat reveals before full information
 * Enemy-specific tactics and warnings
 * World lore knowledge affecting story choices
+
+---
+
+## Knowledge Keys
+
+Enemy tags are taxonomy labels used for multiple systems (loot, quests, party knowledge). A separate
+`knowledge_key` on enemy definitions is the **stable progression identifier** for the knowledge system.
+
+Notes:
+
+* If `knowledge_key` is missing, the enemy `id` is used as the fallback key.
+* Multiple enemies can intentionally share a `knowledge_key` to pool progression.

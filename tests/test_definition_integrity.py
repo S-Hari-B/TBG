@@ -23,6 +23,7 @@ def definitions_dir() -> Path:
         "items.json",
         "classes.json",
         "enemies.json",
+        "knowledge_rules.json",
         "story.json",
         "abilities.json",
         "skills.json",
@@ -55,6 +56,7 @@ def test_definition_integrity_and_references(definitions_dir: Path) -> None:
     _validate_party_members(definitions_dir, weapons, armour)
     _validate_summons(definitions_dir)
     _validate_knowledge(definitions_dir)
+    _validate_knowledge_rules(definitions_dir)
     _validate_loot_tables(definitions_dir, items)
     story_node_ids = _validate_story(definitions_dir, classes, enemies)
     _validate_abilities(definitions_dir)
@@ -373,13 +375,16 @@ def _validate_enemies(
             _assert_allowed_fields(
                 mapping,
                 required={"name", "enemy_ids"},
-                optional={"tags"},
+                optional={"tags", "knowledge_key"},
                 context=f"enemy group '{enemy_id}'",
             )
             _require_str(mapping["name"], f"enemy group '{enemy_id}' name")
             member_ids = _require_str_list(mapping["enemy_ids"], f"enemy group '{enemy_id}' ids")
             if "tags" in mapping:
                 _require_str_list(mapping["tags"], f"enemy group '{enemy_id}' tags")
+            if "knowledge_key" in mapping:
+                key = _require_str(mapping["knowledge_key"], f"enemy group '{enemy_id}' knowledge_key")
+                assert key.strip(), f"enemy group '{enemy_id}' knowledge_key must be non-empty"
             group_members[enemy_id] = member_ids
         else:
             _assert_allowed_fields(
@@ -394,7 +399,7 @@ def _validate_enemies(
                     "rewards_exp",
                     "rewards_gold",
                 },
-                optional={"tags", "equipment", "enemy_skill_ids"},
+                optional={"tags", "equipment", "enemy_skill_ids", "knowledge_key"},
                 context=f"enemy '{enemy_id}'",
             )
             _require_str(mapping["name"], f"enemy '{enemy_id}' name")
@@ -405,6 +410,9 @@ def _validate_enemies(
             _require_int(mapping["speed"], f"enemy '{enemy_id}' speed")
             _require_int(mapping["rewards_exp"], f"enemy '{enemy_id}' rewards_exp")
             _require_int(mapping["rewards_gold"], f"enemy '{enemy_id}' rewards_gold")
+            if "knowledge_key" in mapping:
+                key = _require_str(mapping["knowledge_key"], f"enemy '{enemy_id}' knowledge_key")
+                assert key.strip(), f"enemy '{enemy_id}' knowledge_key must be non-empty"
             if "tags" in mapping:
                 _require_str_list(mapping["tags"], f"enemy '{enemy_id}' tags")
             if "equipment" in mapping:
@@ -888,6 +896,15 @@ def _validate_knowledge(definitions_dir: Path) -> None:
         for index, entry in enumerate(entries):
             entry_map = _require_mapping(entry, f"knowledge '{member_id}' entry[{index}]")
             _require_str_list(entry_map.get("enemy_tags", []), f"knowledge '{member_id}' entry[{index}].enemy_tags")
+            if "knowledge_keys" in entry_map:
+                keys = _require_str_list(
+                    entry_map.get("knowledge_keys", []),
+                    f"knowledge '{member_id}' entry[{index}].knowledge_keys",
+                )
+                for key in keys:
+                    assert key.strip(), (
+                        f"knowledge '{member_id}' entry[{index}].knowledge_keys entries must be non-empty"
+                    )
             revealed = _require_mapping(
                 entry_map.get("revealed_fields", {}), f"knowledge '{member_id}' entry[{index}].revealed_fields"
             )
@@ -896,5 +913,30 @@ def _validate_knowledge(definitions_dir: Path) -> None:
                 assert len(hp_range) == 2, f"knowledge '{member_id}' entry[{index}].hp_range must have 2 values"
                 _require_int(hp_range[0], f"knowledge '{member_id}' entry[{index}].hp_range[0]")
                 _require_int(hp_range[1], f"knowledge '{member_id}' entry[{index}].hp_range[1]")
+
+
+def _validate_knowledge_rules(definitions_dir: Path) -> None:
+    data = _load_required_dict(definitions_dir, "knowledge_rules.json")
+    thresholds = _require_mapping(data.get("thresholds"), "knowledge_rules.json.thresholds")
+    _require_int(thresholds.get("tier1_kills"), "knowledge_rules.json.thresholds.tier1_kills")
+    _require_int(thresholds.get("tier2_kills"), "knowledge_rules.json.thresholds.tier2_kills")
+    _require_int(thresholds.get("tier3_kills"), "knowledge_rules.json.thresholds.tier3_kills")
+
+    hp_visibility = _require_mapping(
+        data.get("hp_visibility_by_tier"), "knowledge_rules.json.hp_visibility_by_tier"
+    )
+    expected_tiers = {"0", "1", "2", "3"}
+    actual_tiers = set(hp_visibility.keys())
+    assert expected_tiers == actual_tiers, "knowledge_rules.json.hp_visibility_by_tier must define tiers 0-3"
+    for tier, mode in hp_visibility.items():
+        _require_str(tier, "knowledge_rules.json.hp_visibility_by_tier key")
+        mode_value = _require_str(mode, f"knowledge_rules.json.hp_visibility_by_tier[{tier}]")
+        assert mode_value in {"HIDDEN", "STATIC_RANGE", "REALTIME"}
+
+    overrides = data.get("overrides", {})
+    overrides_map = _require_mapping(overrides, "knowledge_rules.json.overrides")
+    for key, entry in overrides_map.items():
+        _require_str(key, "knowledge_rules.json.overrides key")
+        _require_mapping(entry, f"knowledge_rules.json.overrides[{key}]")
 
 

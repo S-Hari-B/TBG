@@ -84,6 +84,11 @@ def _make_state_with_player(story_service: StoryService):
     return state
 
 
+def _defeat_enemies(battle_state) -> None:
+    for enemy in battle_state.enemies:
+        enemy.stats.hp = 0
+
+
 def test_dana_side_quest_turn_in_flow() -> None:
     story_service, battle_service, quest_service = _build_services()
     state = _make_state_with_player(story_service)
@@ -138,11 +143,13 @@ def test_cerel_kill_quest_turn_in_flow() -> None:
     # 5 patrol battles = 10 goblin grunts
     for _ in range(5):
         battle_state, _ = battle_service.start_battle("goblin_camp_patrol", state)
+        _defeat_enemies(battle_state)
         battle_service.apply_victory_rewards(battle_state, state)
 
     # 3 enforcer battles = 6 half-orcs (completes requirement)
     for _ in range(3):
         battle_state, _ = battle_service.start_battle("half_orc_pair", state)
+        _defeat_enemies(battle_state)
         battle_service.apply_victory_rewards(battle_state, state)
 
     assert state.flags.get("flag_kill_goblin_grunt_10") is True
@@ -220,6 +227,7 @@ def test_protoquest_not_ready_from_tide_cave_but_ready_after_ruins() -> None:
 
     story_service.play_node(state, "tide_cave_router")
     battle_state, _ = battle_service.start_battle("cave_sentry_pair", state)
+    _defeat_enemies(battle_state)
     battle_service.apply_victory_rewards(battle_state, state)
 
     assert state.flags.get("flag_protoquest_ready") is not True
@@ -257,6 +265,7 @@ def test_tide_cave_reward_grants_debuff_items_once() -> None:
         if any(isinstance(evt, BattleRequestedEvent) for evt in events):
             break
     battle_state, _ = battle_service.start_battle("cave_sentry_pair", state)
+    _defeat_enemies(battle_state)
     battle_service.apply_victory_rewards(battle_state, state)
 
     vials_before_turn_in = state.inventory.items.get("weakening_vial", 0)
@@ -311,6 +320,7 @@ def test_rampager_quest_reward_grants_bundle_once() -> None:
     story_service.resume_pending_flow(state)
 
     battle_state, _ = battle_service.start_battle("goblin_rampager", state)
+    _defeat_enemies(battle_state)
     battle_service.apply_victory_rewards(battle_state, state)
 
     gold_before_turn_in = state.gold

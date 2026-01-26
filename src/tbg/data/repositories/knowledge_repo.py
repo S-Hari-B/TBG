@@ -29,6 +29,12 @@ class KnowledgeRepository(RepositoryBase[List[KnowledgeEntry]]):
                     hp_range = self._require_hp_range(revealed_fields["hp_range"], f"knowledge '{member_id}' hp_range")
                 entries.append(
                     KnowledgeEntry(
+                        knowledge_keys=tuple(
+                            self._require_non_empty_str_list(
+                                entry_map.get("knowledge_keys"),
+                                f"knowledge '{member_id}' knowledge_keys",
+                            )
+                        ),
                         enemy_tags=tuple(
                             self._require_str_list(entry_map.get("enemy_tags", []), f"knowledge '{member_id}' enemy_tags")
                         ),
@@ -65,6 +71,21 @@ class KnowledgeRepository(RepositoryBase[List[KnowledgeEntry]]):
         for entry in value:
             if not isinstance(entry, str):
                 raise DataValidationError(f"{context} entries must be strings.")
+            result.append(entry)
+        return result
+
+    @staticmethod
+    def _require_non_empty_str_list(value: object, context: str) -> List[str]:
+        if value is None:
+            return []
+        if not isinstance(value, list):
+            raise DataValidationError(f"{context} must be a list.")
+        result: List[str] = []
+        for entry in value:
+            if not isinstance(entry, str):
+                raise DataValidationError(f"{context} entries must be strings.")
+            if not entry.strip():
+                raise DataValidationError(f"{context} entries must be non-empty.")
             result.append(entry)
         return result
 

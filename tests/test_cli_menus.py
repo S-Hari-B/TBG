@@ -179,7 +179,7 @@ def test_startup_banner_includes_name_and_version(capsys) -> None:
     _print_startup_banner()
     output = capsys.readouterr().out
     assert "Echoes of the Cycle" in output
-    assert "v0.0.1" in output
+    assert "v0.0.2" in output
     assert "Demo" in output
 
 
@@ -187,7 +187,7 @@ def test_main_menu_header_includes_name_and_version(capsys) -> None:
     _print_main_menu_header()
     output = capsys.readouterr().out
     assert "Echoes of the Cycle" in output
-    assert "v0.0.1" in output
+    assert "v0.0.2" in output
 
 
 def test_placeholder_screens_return_safely(monkeypatch, capsys) -> None:

@@ -13,6 +13,7 @@ from tbg.services.battle_service import (
     BattleInventoryItem,
     BattleService,
     BattleView,
+    PartyTalkPreviewGroup,
 )
 
 
@@ -56,6 +57,9 @@ class BattleController:
     def get_battle_view(self, battle_state: BattleState) -> BattleView:
         """Return structured view of current battle state for rendering."""
         return self._service.get_battle_view(battle_state)
+
+    def refresh_knowledge_snapshot(self, battle_state: BattleState, state: GameState) -> None:
+        self._service.refresh_knowledge_snapshot(battle_state, state)
 
     def is_player_controlled_turn(self, battle_state: BattleState, state: GameState) -> bool:
         """Check if the current actor is the player-controlled character."""
@@ -147,7 +151,7 @@ class BattleController:
         if action.action_type == "talk":
             if not action.speaker_id:
                 raise ValueError("Talk action requires speaker_id.")
-            return self._service.party_talk(battle_state, action.speaker_id, state.rng)
+            return self._service.party_talk(battle_state, state, action.speaker_id)
 
         if action.action_type == "item":
             if not action.item_id or not action.target_id:
@@ -185,6 +189,12 @@ class BattleController:
     def apply_victory_rewards(self, battle_state: BattleState, state: GameState) -> List[BattleEvent]:
         """Apply victory rewards and return events."""
         return self._service.apply_victory_rewards(battle_state, state)
+
+    def party_talk_preview(
+        self, battle_state: BattleState, state: GameState, speaker_id: str
+    ) -> List[PartyTalkPreviewGroup]:
+        """Preview Party Talk output without mutating state."""
+        return self._service.party_talk_preview(battle_state, state, speaker_id)
 
     def has_knowledge_of_enemy(self, state: GameState, enemy_tags: Tuple[str, ...]) -> bool:
         """

@@ -9,6 +9,7 @@ from typing import Tuple
 class KnowledgeEntry:
     """Represents a block of knowledge a party member can share."""
 
+    knowledge_keys: Tuple[str, ...]
     enemy_tags: Tuple[str, ...]
     max_level: int | None
     hp_range: Tuple[int, int] | None

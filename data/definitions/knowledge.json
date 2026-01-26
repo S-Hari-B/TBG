@@ -2,6 +2,14 @@
   "emma": {
     "known_enemies": [
       {
+        "knowledge_keys": [
+          "k_ch00_goblin_grunt",
+          "k_ch00_goblin_archer",
+          "k_ch00_goblin_skirmisher",
+          "k_ch00_goblin_brute",
+          "k_ch00_goblin_shaman",
+          "k_ch00_goblin_rampager"
+        ],
         "enemy_tags": ["goblin"],
         "max_level": 3,
         "revealed_fields": {
@@ -11,6 +19,7 @@
         }
       },
       {
+        "knowledge_keys": ["k_ch00_forest_wolf"],
         "enemy_tags": ["wolf"],
         "max_level": 5,
         "revealed_fields": {
@@ -20,6 +29,7 @@
         }
       },
       {
+        "knowledge_keys": ["k_ch00_half_orc_raider"],
         "enemy_tags": ["orc"],
         "max_level": 5,
         "revealed_fields": {
@@ -33,6 +43,14 @@
   "niale": {
     "known_enemies": [
       {
+        "knowledge_keys": [
+          "k_ch00_goblin_grunt",
+          "k_ch00_goblin_archer",
+          "k_ch00_goblin_skirmisher",
+          "k_ch00_goblin_brute",
+          "k_ch00_goblin_shaman",
+          "k_ch00_goblin_rampager"
+        ],
         "enemy_tags": ["goblin"],
         "max_level": 3,
         "revealed_fields": {
@@ -42,6 +60,7 @@
         }
       },
       {
+        "knowledge_keys": ["k_ch00_forest_wolf"],
         "enemy_tags": ["wolf"],
         "max_level": 5,
         "revealed_fields": {
@@ -51,6 +70,7 @@
         }
       },
       {
+        "knowledge_keys": ["k_ch00_half_orc_raider"],
         "enemy_tags": ["orc"],
         "max_level": 5,
         "revealed_fields": {

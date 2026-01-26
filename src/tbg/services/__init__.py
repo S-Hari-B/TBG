@@ -34,6 +34,7 @@ from .attribute_allocation_service import (
 from .quest_service import QuestService
 from .shop_service import ShopService
 from .save_service import SaveService
+from .knowledge_service import KnowledgeService
 from .summon_loadout_service import SummonLoadoutService
 from .controllers import BattleController, BattleAction, BattleActionType
 
@@ -68,6 +69,7 @@ __all__ = [
     "QuestService",
     "ShopService",
     "SaveService",
+    "KnowledgeService",
     "SummonLoadoutService",
     "BattleController",
     "BattleAction",

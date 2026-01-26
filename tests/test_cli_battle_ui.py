@@ -159,8 +159,8 @@ class _FakeBattleService:
         del battle_state, actor_id, rng
         return []
 
-    def party_talk(self, battle_state: BattleState, speaker_id: str, rng):
-        del battle_state, speaker_id, rng
+    def party_talk(self, battle_state: BattleState, state: GameState, speaker_id: str):
+        del battle_state, state, speaker_id
         return []
 
     def apply_victory_rewards(self, battle_state: BattleState, state: GameState):
